@@ -8,6 +8,9 @@
     <meta name="description"
         content="Sistema embebido IoT para mantenimiento predictivo y monitoreo térmico en salas eléctricas de misión crítica.">
 
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <link rel="apple-touch-icon" href="assets/favicon.png">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
@@ -175,11 +178,9 @@
     <nav class="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
-                <div id="logo-btn" class="flex-shrink-0 flex items-center gap-2 cursor-pointer">
-                    <img src="https://drive.google.com/thumbnail?id=12EIjaEF9z4aY8cNEIIL99LXdYUX4Eg7O&sz=w1000"
-                        alt="Logo Ecomonitor" class="h-10 w-auto object-contain">
-                    <span class="font-bold text-2xl tracking-tight text-eco-dark">ecomonitor<span
-                            class="text-eco-green">.ar</span></span>
+                <div id="logo-btn" class="flex-shrink-0 flex items-center cursor-pointer">
+                    <img src="assets/logos/ecomonitor-color.png"
+                        alt="Ecomonitor" class="h-9 md:h-11 w-auto object-contain">
                 </div>
 
                 <div class="hidden md:flex space-x-8 items-center">
@@ -190,6 +191,8 @@
                         class="text-sm font-medium text-gray-600 hover:text-eco-blue transition-colors">La Solución</a>
                     <a href="#arquitectura"
                         class="text-sm font-medium text-gray-600 hover:text-eco-blue transition-colors">Arquitectura</a>
+                    <a href="#instalacion"
+                        class="text-sm font-medium text-gray-600 hover:text-eco-blue transition-colors">Instalación</a>
                     <a href="#precios"
                         class="text-sm font-medium text-gray-600 hover:text-eco-blue transition-colors">Planes</a>
                     <button
@@ -209,6 +212,7 @@
             <a href="#problematica" class="block text-base font-medium text-gray-600">La Problemática</a>
             <a href="#solucion" class="block text-base font-medium text-gray-600">La Solución</a>
             <a href="#arquitectura" class="block text-base font-medium text-gray-600">Arquitectura</a>
+            <a href="#instalacion" class="block text-base font-medium text-gray-600">Instalación</a>
             <a href="#precios" class="block text-base font-medium text-gray-600">Planes</a>
             <button class="open-login-btn block text-base font-medium text-eco-blue w-full text-left">Acceso a
                 Portal</button>
@@ -232,6 +236,9 @@
             <div
                 class="absolute left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-30 animate-scan shadow-[0_0_15px_rgba(6,182,212,0.8)]">
             </div>
+
+            <img src="assets/logos/isologo-color.png" alt=""
+                class="hidden lg:block absolute -right-32 -bottom-32 w-[640px] opacity-[0.06] select-none pointer-events-none mix-blend-screen">
         </div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -1185,6 +1192,70 @@
         </div>
     </section>
 
+    <section id="instalacion" class="py-24 lg:py-32 bg-white relative overflow-hidden">
+        <div class="absolute inset-0 opacity-[0.04] pointer-events-none"
+            style="background-image: radial-gradient(#00478F 1px, transparent 1px); background-size: 30px 30px;">
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-16">
+                <h2 class="text-sm font-bold text-eco-blue uppercase tracking-wider mb-2">Instalación de Campo</h2>
+                <h3 class="text-3xl md:text-4xl font-bold text-eco-dark mb-4">Pensada para que el instalador no se
+                    complique</h3>
+                <p class="text-gray-600 max-w-2xl mx-auto">Hardware estándar, conexionado claro y puesta en marcha
+                    asistida desde la HMI. Sin sorpresas en obra, sin obra civil.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-6 lg:gap-8 mb-14">
+
+                <div
+                    class="group relative bg-white p-8 rounded-2xl border border-gray-200 hover:border-eco-blue/40 hover:shadow-xl hover:shadow-eco-blue/10 hover:-translate-y-1 transition-all duration-300">
+                    <div
+                        class="w-14 h-14 rounded-xl bg-eco-blue/10 text-eco-blue flex items-center justify-center mb-6 group-hover:bg-eco-blue group-hover:text-white transition-colors duration-300">
+                        <i data-lucide="git-branch" class="w-7 h-7"></i>
+                    </div>
+                    <h4 class="text-xl font-bold text-eco-dark mb-3">Cadena Modbus RS-485</h4>
+                    <p class="text-gray-600 leading-relaxed">Un solo cable de 3 hilos une todos los tableros en cadena
+                        (guirnalda). Sin estrella, sin centralita, sin tirados redundantes.</p>
+                </div>
+
+                <div
+                    class="group relative bg-white p-8 rounded-2xl border border-gray-200 hover:border-eco-green/40 hover:shadow-xl hover:shadow-eco-green/10 hover:-translate-y-1 transition-all duration-300">
+                    <div
+                        class="w-14 h-14 rounded-xl bg-eco-green/10 text-eco-green flex items-center justify-center mb-6 group-hover:bg-eco-green group-hover:text-white transition-colors duration-300">
+                        <i data-lucide="shield-check" class="w-7 h-7"></i>
+                    </div>
+                    <h4 class="text-xl font-bold text-eco-dark mb-3">Esclavos autónomos</h4>
+                    <p class="text-gray-600 leading-relaxed">Cada equipo opera independiente con redundancia N-X y
+                        seguridad enclavada. Si cae la red, el esclavo sigue protegiendo la sala.</p>
+                </div>
+
+                <div
+                    class="group relative bg-white p-8 rounded-2xl border border-gray-200 hover:border-eco-lightblue/40 hover:shadow-xl hover:shadow-eco-lightblue/10 hover:-translate-y-1 transition-all duration-300">
+                    <div
+                        class="w-14 h-14 rounded-xl bg-eco-lightblue/10 text-eco-lightblue flex items-center justify-center mb-6 group-hover:bg-eco-lightblue group-hover:text-white transition-colors duration-300">
+                        <i data-lucide="zap" class="w-7 h-7"></i>
+                    </div>
+                    <h4 class="text-xl font-bold text-eco-dark mb-3">HMI plug &amp; play</h4>
+                    <p class="text-gray-600 leading-relaxed">El Maestro descubre los Esclavos al energizar el sistema.
+                        Configuración asistida desde pantalla, sin escribir una línea de código.</p>
+                </div>
+
+            </div>
+
+            <div class="text-center">
+                <a href="docs/guia-instalacion.pdf" target="_blank" rel="noopener"
+                    class="inline-flex items-center gap-3 bg-eco-blue text-white px-7 py-4 rounded-full font-semibold hover:bg-eco-darkblue transition-all shadow-lg shadow-eco-blue/30 hover:shadow-xl hover:shadow-eco-blue/40 hover:scale-[1.02]">
+                    <i data-lucide="file-down" class="w-5 h-5"></i>
+                    <span>Descargar guía técnica de instalación</span>
+                    <span class="text-xs font-normal opacity-70 border-l border-white/30 pl-3">PDF · 10 págs</span>
+                </a>
+                <p class="text-xs text-gray-500 mt-4 max-w-md mx-auto">Manual completo para instalador eléctrico:
+                    borneras, canalizaciones, guirnalda, puesta en marcha y checklist de verificación.</p>
+            </div>
+        </div>
+    </section>
+
     <section id="hil-teaser" class="py-12 bg-gray-50 relative overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div
@@ -1357,11 +1428,9 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
                 <div class="md:col-span-1">
-                    <div class="flex items-center gap-2 mb-4">
-                        <img src="https://drive.google.com/thumbnail?id=12EIjaEF9z4aY8cNEIIL99LXdYUX4Eg7O&sz=w1000"
-                            alt="Logo Ecomonitor" class="h-8 w-auto object-contain">
-                        <span class="font-bold text-xl text-white">ecomonitor<span
-                                class="text-eco-green">.ar</span></span>
+                    <div class="mb-5">
+                        <img src="assets/logos/ecomonitor-blanco.png"
+                            alt="Ecomonitor" class="h-10 w-auto object-contain">
                     </div>
                     <p class="text-gray-400 text-sm mb-6"><a href="https://www.ecocontrol.com.ar" target="_blank"
                             class="text-white hover:text-eco-lightgreen transition-colors font-medium">Ecocontrol</a>.
