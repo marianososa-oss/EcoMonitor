@@ -170,13 +170,66 @@
         .animate-data-flow-vertical {
             animation: dataFlowVertical 2.5s linear infinite;
         }
+
+        /* Scroll Reveal */
+        .reveal {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity, transform;
+        }
+
+        .reveal.in {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reveal-stagger > * {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal-stagger.in > *:nth-child(1) { opacity: 1; transform: translateY(0); transition-delay: 0ms; }
+        .reveal-stagger.in > *:nth-child(2) { opacity: 1; transform: translateY(0); transition-delay: 120ms; }
+        .reveal-stagger.in > *:nth-child(3) { opacity: 1; transform: translateY(0); transition-delay: 240ms; }
+        .reveal-stagger.in > *:nth-child(4) { opacity: 1; transform: translateY(0); transition-delay: 360ms; }
+
+        /* Subtle floating animation for ambient elements */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-12px); }
+        }
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* Gradient text shimmer */
+        @keyframes shimmer {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+        .animate-shimmer {
+            background: linear-gradient(90deg, #4f7725 0%, #9ab63b 25%, #0098c6 50%, #00478F 75%, #4f7725 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 8s linear infinite;
+        }
+
+        /* Disable animations for reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            .reveal, .reveal-stagger > * { opacity: 1; transform: none; transition: none; }
+            .animate-float, .animate-shimmer { animation: none; }
+        }
     </style>
 </head>
 
 <body class="font-sans text-gray-800 antialiased selection:bg-eco-green selection:text-white overflow-x-hidden">
 
     <nav class="fixed w-full z-50 backdrop-blur-md border-b border-eco-blue/30 transition-all duration-300"
-        style="background: linear-gradient(to right, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.96) 28%, rgba(0,71,143,0.96) 78%, rgba(0,71,143,0.96) 100%);">
+        style="background: linear-gradient(to right, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.97) 20%, rgba(0,71,143,0.97) 48%, rgba(0,71,143,0.97) 100%);">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <div id="logo-btn" class="flex-shrink-0 flex items-center cursor-pointer">
@@ -186,16 +239,16 @@
 
                 <div class="hidden md:flex space-x-8 items-center">
                     <a href="#problematica"
-                        class="text-sm font-medium text-white/85 hover:text-white transition-colors">La
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm">La
                         Problemática</a>
                     <a href="#solucion"
-                        class="text-sm font-medium text-white/85 hover:text-white transition-colors">La Solución</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm">La Solución</a>
                     <a href="#arquitectura"
-                        class="text-sm font-medium text-white/85 hover:text-white transition-colors">Arquitectura</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm">Arquitectura</a>
                     <a href="#instalacion"
-                        class="text-sm font-medium text-white/85 hover:text-white transition-colors">Instalación</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm">Instalación</a>
                     <a href="#precios"
-                        class="text-sm font-medium text-white/85 hover:text-white transition-colors">Planes</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm">Planes</a>
                     <button
                         class="open-login-btn bg-white text-eco-blue px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-gray-100 transition-all shadow-md shadow-black/20">Acceso
                         a Portal</button>
@@ -505,25 +558,31 @@
         </div>
     </section>
 
-    <section id="problematica" class="py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <h2 class="text-sm font-bold text-eco-blue uppercase tracking-wider mb-2">El Desafío Industrial</h2>
-                <h3 class="text-3xl md:text-4xl font-bold text-eco-dark mb-4">Los Enemigos Silenciosos de la Sala
+    <section id="problematica" class="py-24 lg:py-32 bg-eco-dark relative overflow-hidden">
+        <div class="absolute inset-0 opacity-[0.06] pointer-events-none"
+            style="background-image: radial-gradient(#60a5fa 1px, transparent 1px); background-size: 30px 30px;">
+        </div>
+        <div class="absolute top-0 left-1/4 w-[600px] h-[600px] bg-eco-blue/10 rounded-full filter blur-[120px] pointer-events-none"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-16 reveal">
+                <h2 class="text-sm font-bold text-eco-lightgreen uppercase tracking-wider mb-2">El Desafío Industrial
+                </h2>
+                <h3 class="text-3xl md:text-4xl font-bold text-white mb-4">Los Enemigos Silenciosos de la Sala
                     Eléctrica</h3>
-                <p class="text-gray-600 max-w-2xl mx-auto">Las salas eléctricas son el centro neurálgico en Minería y
+                <p class="text-gray-300 max-w-2xl mx-auto">Las salas eléctricas son el centro neurálgico en Minería y
                     Oil & Gas. Una falla aquí implica la detención total de la producción y un altísimo lucro cesante.
                 </p>
             </div>
 
             <div class="grid md:grid-cols-3 gap-8">
                 <div
-                    class="relative p-8 rounded-2xl bg-slate-900 border border-slate-800 hover:shadow-xl hover:shadow-red-500/20 transition-all duration-300 overflow-hidden group">
+                    class="relative p-8 rounded-2xl bg-slate-800/80 border border-slate-700 backdrop-blur-sm reveal hover:shadow-xl hover:-translate-y-1 hover:shadow-red-500/20 transition-all duration-300 overflow-hidden group">
                     <div class="absolute inset-0 bg-red-600 opacity-10"></div>
                     <div class="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-30 group-hover:opacity-50 transition-all duration-700 group-hover:scale-105"
                         style="background-image: url('https://images.unsplash.com/photo-1581092335397-9583eb92d232?q=80&w=800&auto=format&fit=crop');">
                     </div>
-                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent"></div>
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-800 via-slate-800/90 to-transparent"></div>
                     <div class="relative z-10">
                         <div
                             class="w-14 h-14 rounded-xl bg-red-500/20 backdrop-blur-sm text-red-400 flex items-center justify-center mb-6 shadow-sm border border-red-500/30">
@@ -537,7 +596,7 @@
                 </div>
 
                 <div
-                    class="relative p-8 rounded-2xl bg-slate-900 border border-slate-800 hover:shadow-xl hover:shadow-amber-500/20 transition-all duration-300 overflow-hidden group">
+                    class="relative p-8 rounded-2xl bg-slate-800/80 border border-slate-700 backdrop-blur-sm reveal hover:shadow-xl hover:-translate-y-1 hover:shadow-amber-500/20 transition-all duration-300 overflow-hidden group">
                     <div class="absolute inset-0 bg-amber-500 opacity-10"></div>
                     <div class="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-20 group-hover:opacity-40 transition-all duration-700 group-hover:scale-105"
                         style="background-image: url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=800&auto=format&fit=crop');">
@@ -545,7 +604,7 @@
                     <div class="absolute inset-0 opacity-[0.05]"
                         style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E');">
                     </div>
-                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent"></div>
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-800 via-slate-800/90 to-transparent"></div>
                     <div class="relative z-10">
                         <div
                             class="w-14 h-14 rounded-xl bg-amber-500/20 backdrop-blur-sm text-amber-400 flex items-center justify-center mb-6 shadow-sm border border-amber-500/30">
@@ -559,7 +618,7 @@
                 </div>
 
                 <div
-                    class="relative p-8 rounded-2xl bg-slate-900 border border-slate-800 hover:shadow-xl hover:shadow-blue-500/20 transition-all duration-300 overflow-hidden group">
+                    class="relative p-8 rounded-2xl bg-slate-800/80 border border-slate-700 backdrop-blur-sm reveal hover:shadow-xl hover:-translate-y-1 hover:shadow-blue-500/20 transition-all duration-300 overflow-hidden group">
                     <div class="absolute inset-0 bg-blue-600 opacity-20"></div>
                     <div class="absolute inset-0 bg-cover bg-center grayscale invert mix-blend-screen opacity-30 group-hover:opacity-70 transition-all duration-700 group-hover:scale-105"
                         style="background-image: url('https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=800&auto=format&fit=crop');">
@@ -567,7 +626,7 @@
                     <div class="absolute inset-0 opacity-20"
                         style="background-image: radial-gradient(#60a5fa 1px, transparent 1px); background-size: 20px 20px;">
                     </div>
-                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent"></div>
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-800 via-slate-800/90 to-transparent"></div>
                     <div class="relative z-10">
                         <div
                             class="w-14 h-14 rounded-xl bg-blue-500/20 backdrop-blur-sm text-blue-400 flex items-center justify-center mb-6 shadow-sm border border-blue-500/30">
@@ -976,7 +1035,7 @@
             style="background-image: radial-gradient(#ffffff 1px, transparent 1px); background-size: 30px 30px;"></div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div class="text-center mb-16">
+            <div class="text-center mb-16 reveal">
                 <h2 class="text-sm font-bold text-eco-lightgreen uppercase tracking-wider mb-2">Conectividad y Control
                 </h2>
                 <h3 class="text-3xl md:text-4xl font-bold text-white mb-4">El Camino de la Alerta Predictiva</h3>
@@ -1092,7 +1151,7 @@
 
     <section id="arquitectura" class="py-20 bg-gray-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
+            <div class="text-center mb-16 reveal">
                 <h2 class="text-sm font-bold text-eco-blue uppercase tracking-wider mb-2">Tecnología de Borde</h2>
                 <h3 class="text-3xl md:text-4xl font-bold text-eco-dark mb-4">Arquitectura Maestro-Esclavo vía Modbus
                 </h3>
@@ -1190,65 +1249,68 @@
         </div>
     </section>
 
-    <section id="instalacion" class="py-24 lg:py-32 bg-white relative overflow-hidden">
-        <div class="absolute inset-0 opacity-[0.04] pointer-events-none"
-            style="background-image: radial-gradient(#00478F 1px, transparent 1px); background-size: 30px 30px;">
+    <section id="instalacion" class="py-24 lg:py-32 bg-eco-dark relative overflow-hidden">
+        <div class="absolute inset-0 opacity-[0.05] pointer-events-none"
+            style="background-image: radial-gradient(#9ab63b 1px, transparent 1px); background-size: 30px 30px;">
         </div>
+        <div class="absolute bottom-0 right-0 w-[600px] h-[600px] bg-eco-green/10 rounded-full filter blur-[120px] pointer-events-none"></div>
+        <div class="absolute top-0 left-0 w-[400px] h-[400px] bg-eco-blue/15 rounded-full filter blur-[100px] pointer-events-none"></div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div class="text-center mb-16">
-                <h2 class="text-sm font-bold text-eco-blue uppercase tracking-wider mb-2">Instalación de Campo</h2>
-                <h3 class="text-3xl md:text-4xl font-bold text-eco-dark mb-4">Pensada para que el instalador no se
+            <div class="text-center mb-16 reveal">
+                <h2 class="text-sm font-bold text-eco-lightgreen uppercase tracking-wider mb-2">Instalación de Campo
+                </h2>
+                <h3 class="text-3xl md:text-4xl font-bold text-white mb-4">Pensada para que el instalador no se
                     complique</h3>
-                <p class="text-gray-600 max-w-2xl mx-auto">Hardware estándar, conexionado claro y puesta en marcha
+                <p class="text-gray-300 max-w-2xl mx-auto">Hardware estándar, conexionado claro y puesta en marcha
                     asistida desde la HMI. Sin sorpresas en obra, sin obra civil.</p>
             </div>
 
             <div class="grid md:grid-cols-3 gap-6 lg:gap-8 mb-14">
 
                 <div
-                    class="group relative bg-white p-8 rounded-2xl border border-gray-200 hover:border-eco-blue/40 hover:shadow-xl hover:shadow-eco-blue/10 hover:-translate-y-1 transition-all duration-300">
+                    class="group relative bg-slate-800/60 backdrop-blur-sm p-8 rounded-2xl border border-slate-700 hover:border-eco-lightblue/60 hover:shadow-xl hover:shadow-eco-lightblue/20 hover:-translate-y-1 transition-all duration-300 reveal">
                     <div
-                        class="w-14 h-14 rounded-xl bg-eco-blue/10 text-eco-blue flex items-center justify-center mb-6 group-hover:bg-eco-blue group-hover:text-white transition-colors duration-300">
+                        class="w-14 h-14 rounded-xl bg-eco-lightblue/15 text-eco-lightblue flex items-center justify-center mb-6 group-hover:bg-eco-lightblue group-hover:text-white transition-colors duration-300 border border-eco-lightblue/30">
                         <i data-lucide="git-branch" class="w-7 h-7"></i>
                     </div>
-                    <h4 class="text-xl font-bold text-eco-dark mb-3">Cadena Modbus RS-485</h4>
-                    <p class="text-gray-600 leading-relaxed">Un solo cable de 3 hilos une todos los tableros en cadena
+                    <h4 class="text-xl font-bold text-white mb-3">Cadena Modbus RS-485</h4>
+                    <p class="text-gray-400 leading-relaxed">Un solo cable de 3 hilos une todos los tableros en cadena
                         (guirnalda). Sin estrella, sin centralita, sin tirados redundantes.</p>
                 </div>
 
                 <div
-                    class="group relative bg-white p-8 rounded-2xl border border-gray-200 hover:border-eco-green/40 hover:shadow-xl hover:shadow-eco-green/10 hover:-translate-y-1 transition-all duration-300">
+                    class="group relative bg-slate-800/60 backdrop-blur-sm p-8 rounded-2xl border border-slate-700 hover:border-eco-lightgreen/60 hover:shadow-xl hover:shadow-eco-green/20 hover:-translate-y-1 transition-all duration-300 reveal">
                     <div
-                        class="w-14 h-14 rounded-xl bg-eco-green/10 text-eco-green flex items-center justify-center mb-6 group-hover:bg-eco-green group-hover:text-white transition-colors duration-300">
+                        class="w-14 h-14 rounded-xl bg-eco-green/20 text-eco-lightgreen flex items-center justify-center mb-6 group-hover:bg-eco-green group-hover:text-white transition-colors duration-300 border border-eco-lightgreen/30">
                         <i data-lucide="shield-check" class="w-7 h-7"></i>
                     </div>
-                    <h4 class="text-xl font-bold text-eco-dark mb-3">Esclavos autónomos</h4>
-                    <p class="text-gray-600 leading-relaxed">Cada equipo opera independiente con redundancia N-X y
+                    <h4 class="text-xl font-bold text-white mb-3">Esclavos autónomos</h4>
+                    <p class="text-gray-400 leading-relaxed">Cada equipo opera independiente con redundancia N-X y
                         seguridad enclavada. Si cae la red, el esclavo sigue protegiendo la sala.</p>
                 </div>
 
                 <div
-                    class="group relative bg-white p-8 rounded-2xl border border-gray-200 hover:border-eco-lightblue/40 hover:shadow-xl hover:shadow-eco-lightblue/10 hover:-translate-y-1 transition-all duration-300">
+                    class="group relative bg-slate-800/60 backdrop-blur-sm p-8 rounded-2xl border border-slate-700 hover:border-amber-400/60 hover:shadow-xl hover:shadow-amber-500/20 hover:-translate-y-1 transition-all duration-300 reveal">
                     <div
-                        class="w-14 h-14 rounded-xl bg-eco-lightblue/10 text-eco-lightblue flex items-center justify-center mb-6 group-hover:bg-eco-lightblue group-hover:text-white transition-colors duration-300">
+                        class="w-14 h-14 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center mb-6 group-hover:bg-amber-500 group-hover:text-white transition-colors duration-300 border border-amber-400/30">
                         <i data-lucide="zap" class="w-7 h-7"></i>
                     </div>
-                    <h4 class="text-xl font-bold text-eco-dark mb-3">HMI plug &amp; play</h4>
-                    <p class="text-gray-600 leading-relaxed">El Maestro descubre los Esclavos al energizar el sistema.
+                    <h4 class="text-xl font-bold text-white mb-3">HMI plug &amp; play</h4>
+                    <p class="text-gray-400 leading-relaxed">El Maestro descubre los Esclavos al energizar el sistema.
                         Configuración asistida desde pantalla, sin escribir una línea de código.</p>
                 </div>
 
             </div>
 
-            <div class="text-center">
+            <div class="text-center reveal">
                 <a href="guia-instalacion.pdf" target="_blank" rel="noopener"
-                    class="inline-flex items-center gap-3 bg-eco-blue text-white px-7 py-4 rounded-full font-semibold hover:bg-eco-darkblue transition-all shadow-lg shadow-eco-blue/30 hover:shadow-xl hover:shadow-eco-blue/40 hover:scale-[1.02]">
+                    class="inline-flex items-center gap-3 bg-eco-lightgreen text-eco-dark px-7 py-4 rounded-full font-bold hover:bg-white transition-all shadow-lg shadow-eco-green/40 hover:shadow-xl hover:shadow-eco-lightgreen/50 hover:scale-[1.02]">
                     <i data-lucide="file-down" class="w-5 h-5"></i>
                     <span>Descargar guía técnica de instalación</span>
-                    <span class="text-xs font-normal opacity-70 border-l border-white/30 pl-3">PDF · 10 págs</span>
+                    <span class="text-xs font-normal opacity-70 border-l border-eco-dark/30 pl-3">PDF · 10 págs</span>
                 </a>
-                <p class="text-xs text-gray-500 mt-4 max-w-md mx-auto">Manual completo para instalador eléctrico:
+                <p class="text-xs text-gray-400 mt-4 max-w-md mx-auto">Manual completo para instalador eléctrico:
                     borneras, canalizaciones, guirnalda, puesta en marcha y checklist de verificación.</p>
             </div>
         </div>
@@ -1342,7 +1404,7 @@
         </div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div class="text-center mb-16">
+            <div class="text-center mb-16 reveal">
                 <h2 class="text-sm font-bold text-eco-blue uppercase tracking-wider mb-2">Modelos de Implementación</h2>
                 <h3 class="text-3xl md:text-4xl font-bold text-eco-dark mb-4">Elige el Nivel de Inteligencia de tu
                     Planta</h3>
@@ -1684,6 +1746,17 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             lucide.createIcons();
+
+            // Scroll-reveal: fade-in-up cuando entran en viewport
+            const revealObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('in');
+                        revealObserver.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+            document.querySelectorAll('.reveal, .reveal-stagger').forEach(el => revealObserver.observe(el));
 
             // 1. Interceptar enlaces internos para evitar que Google Sites recargue la página
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
