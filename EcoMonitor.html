@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ecomonitor - Control Térmico Predictivo 4.0</title>
     <meta name="description"
-        content="Sistema embebido IoT para mantenimiento predictivo y monitoreo térmico en salas eléctricas de misión crítica.">
+        content="Sistema embebido IoT para mantenimiento predictivo y monitoreo térmico en salas críticas de misión crítica.">
 
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="favicon.png">
@@ -57,6 +57,7 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
 
     <style>
         html {
@@ -294,14 +295,14 @@
         }
 
         .sim-iso-tilt {
-            transform: perspective(1600px) rotateX(22deg) rotateZ(-2deg);
-            transform-origin: center center;
-            transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: perspective(900px) rotateX(32deg);
+            transform-origin: center 65%;
+            transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .sim-top-flat {
-            transform: perspective(1600px) rotateX(0deg) rotateZ(0deg);
-            transform-origin: center center;
-            transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: perspective(900px) rotateX(0deg);
+            transform-origin: center 65%;
+            transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         @keyframes wifiPulse {
@@ -418,14 +419,14 @@
                     </div>
                     <h1
                         class="font-extrabold text-white mb-8 drop-shadow-md"
-                        style="font-size: clamp(2.5rem, 4.5vw + 1rem, 5rem); line-height: 1.05; letter-spacing: -0.035em; text-wrap: balance;">
-                        Del mantenimiento reactivo al
-                        <span class="text-eco-lightgreen">diagnóstico clínico continuo</span>.
+                        style="font-size: clamp(1.875rem, 3vw + 0.75rem, 3.25rem); line-height: 1.1; letter-spacing: -0.025em; text-wrap: balance;">
+                        Del mantenimiento correctivo al
+                        <span class="text-eco-lightgreen">predictivo</span> · monitoreo
+                        <span class="text-eco-lightblue">24/7</span>
                     </h1>
                     <p
                         class="text-lg text-gray-300 font-medium mb-10 leading-relaxed bg-white/5 backdrop-blur-sm p-5 rounded-2xl border border-white/10 shadow-lg">
-                        Ecomonitor es el sistema embebido industrial IoT para proteger el 'corazón' de tu operación.
-                        Evitamos paradas de planta monitoreando el rendimiento térmico de tus salas eléctricas 24/7.
+                        Monitoreando el estado de tus salas críticas y de tus equipos HVAC 24/7.
                     </p>
                     <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                         <a href="#solucion"
@@ -440,230 +441,33 @@
                 </div>
 
                 <div
-                    class="relative w-full aspect-square md:aspect-[4/3] flex items-center justify-center mt-10 lg:mt-0">
+                    class="relative w-full aspect-[16/9] flex items-center justify-center mt-10 lg:mt-0">
 
-                    <div
-                        class="absolute top-[5%] left-[35%] w-3 h-[20%] bg-gradient-to-b from-gray-900 to-gray-500 border-x border-gray-700 shadow-xl">
-                    </div>
-                    <div
-                        class="absolute top-[2%] right-[30%] w-4 h-[23%] bg-gradient-to-b from-gray-900 to-gray-500 border-x border-gray-700 shadow-xl">
-                    </div>
-                    <div
-                        class="absolute bottom-[5%] left-[25%] w-3 h-[20%] bg-gradient-to-t from-gray-900 to-gray-500 border-x border-gray-700 shadow-xl">
-                    </div>
-                    <div
-                        class="absolute bottom-[2%] right-[35%] w-5 h-[23%] bg-gradient-to-t from-gray-900 to-gray-500 border-x border-gray-700 shadow-xl">
-                    </div>
-                    <div
-                        class="absolute left-[5%] top-[40%] h-3 w-[20%] bg-gradient-to-r from-gray-900 to-gray-500 border-y border-gray-700 shadow-xl">
-                    </div>
-                    <div
-                        class="absolute left-[2%] bottom-[30%] h-4 w-[23%] bg-gradient-to-r from-gray-900 to-gray-500 border-y border-gray-700 shadow-xl">
-                    </div>
-                    <div
-                        class="absolute right-[5%] top-[30%] h-4 w-[20%] bg-gradient-to-l from-gray-900 to-gray-500 border-y border-gray-700 shadow-xl">
-                    </div>
-                    <div
-                        class="absolute right-[2%] bottom-[40%] h-3 w-[23%] bg-gradient-to-l from-gray-900 to-gray-500 border-y border-gray-700 shadow-xl">
+                    <div class="absolute inset-0 z-0">
+                        <div class="absolute top-1/4 left-1/4 w-48 h-48 bg-eco-blue/30 rounded-full filter blur-[80px]"></div>
+                        <div class="absolute bottom-1/4 right-1/4 w-48 h-48 bg-eco-green/20 rounded-full filter blur-[80px]"></div>
                     </div>
 
-                    <div
-                        class="relative w-[95%] h-[80%] bg-gray-800 rounded-xl border-[6px] border-gray-600 shadow-[0_0_50px_rgba(0,0,0,0.8)] p-2 z-10 flex flex-col items-center justify-center ring-1 ring-black">
-                        <div class="absolute top-2 left-2 w-2 h-2 rounded-full bg-gray-950 shadow-inner"></div>
-                        <div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-gray-950 shadow-inner"></div>
-                        <div class="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-gray-950 shadow-inner"></div>
-                        <div class="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-gray-950 shadow-inner"></div>
+                    <div class="relative w-full max-w-[680px] mx-auto rounded-xl bg-gray-900 border-[6px] border-gray-700 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden ring-1 ring-black/40">
+                        <div class="absolute top-2 left-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
+                        <div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
+                        <div class="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
+                        <div class="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
 
-                        <div
-                            class="w-full h-full bg-[#0a0f1c] rounded border border-gray-900 shadow-inner overflow-hidden flex flex-col p-2 lg:p-3 font-sans select-none relative">
+                        <div class="relative bg-[#0a0f1c]">
+                            <img src="hmi-principal.jpg" alt="Pantalla HMI EcoMonitor — Sala Principal"
+                                class="block w-full h-auto select-none" draggable="false">
 
-                            <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-2">
-                                <div class="flex items-center gap-2">
-                                    <div
-                                        class="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]">
-                                    </div>
-                                    <div
-                                        class="text-[#4f7725] font-bold text-xs lg:text-sm tracking-wide flex items-center gap-1">
-                                        <i data-lucide="monitor" class="w-3 h-3"></i> EcoMonitor
-                                    </div>
-                                </div>
-                                <div class="text-center">
-                                    <h2 class="text-white font-bold text-[10px] lg:text-xs tracking-wider">SALA DE
-                                        VARIADORES MT - VDF 01</h2>
-                                    <p class="text-gray-500 text-[8px] lg:text-[10px] uppercase">YPF S.A. - COMPLEJO
-                                        LUJÁN DE CUYO</p>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-cyan-400 font-mono font-bold text-xs lg:text-sm">12:58:05</div>
-                                    <div class="text-gray-500 text-[8px] font-mono">08 DE ABR DE 2026</div>
-                                </div>
+                            <div class="pointer-events-none absolute inset-0 z-10"
+                                style="background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 49.5%, rgba(0,180,255,0.10) 50%, rgba(255,255,255,0) 50.5%, rgba(255,255,255,0) 100%); background-size: 100% 4px;"></div>
+
+                            <div class="pointer-events-none absolute left-0 right-0 h-[2px] z-10 animate-scan"
+                                style="background: linear-gradient(to right, transparent, rgba(34,211,238,0.7), transparent); box-shadow: 0 0 14px rgba(34,211,238,0.7);"></div>
+
+                            <div class="pointer-events-none absolute top-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded text-[9px] font-mono text-eco-lightgreen bg-black/40 backdrop-blur-sm border border-eco-lightgreen/30 z-20 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-eco-lightgreen animate-pulse" style="box-shadow: 0 0 6px #9ab63b"></span>
+                                LIVE · HMI EcoMonitor
                             </div>
-
-                            <div
-                                class="flex justify-center gap-4 text-[8px] lg:text-[10px] font-bold text-gray-400 mb-2">
-                                <span class="flex items-center gap-1 text-emerald-400"><i data-lucide="flame"
-                                        class="w-3 h-3"></i> F&G OK</span>
-                                <span class="flex items-center gap-1 text-emerald-400"><i data-lucide="door-closed"
-                                        class="w-3 h-3"></i> PUERTA</span>
-                                <span class="flex items-center gap-1 text-emerald-400"><i data-lucide="server"
-                                        class="w-3 h-3"></i> MODBUS</span>
-                                <span class="flex items-center gap-1 text-cyan-400"><i data-lucide="wifi"
-                                        class="w-3 h-3"></i> WEB SYNC</span>
-                            </div>
-
-                            <div class="grid grid-cols-4 gap-2 mb-2 flex-1">
-                                <div
-                                    class="bg-[#161f33] rounded border border-blue-500/30 flex flex-col items-center justify-center p-2 relative overflow-hidden">
-                                    <div class="absolute top-0 left-0 w-full h-1 bg-blue-500/50"></div>
-                                    <span
-                                        class="text-gray-400 text-[8px] lg:text-[9px] font-bold tracking-wider mb-1">TEMPERATURA
-                                        SALA</span>
-                                    <div class="text-white text-xl lg:text-3xl font-bold font-mono">23.5<span
-                                            class="text-xs text-gray-500">°C</span></div>
-                                    <div
-                                        class="mt-1 bg-gray-900/80 rounded-full px-2 py-0.5 text-[8px] text-blue-400 border border-blue-900">
-                                        SP: 24.0°C</div>
-                                </div>
-                                <div
-                                    class="bg-[#161f33] rounded border border-cyan-500/30 flex flex-col items-center justify-center p-2 relative overflow-hidden">
-                                    <div class="absolute top-0 left-0 w-full h-1 bg-cyan-500/50"></div>
-                                    <span
-                                        class="text-gray-400 text-[8px] lg:text-[9px] font-bold tracking-wider mb-1">HUMEDAD
-                                        SALA</span>
-                                    <div class="text-white text-xl lg:text-3xl font-bold font-mono">42.1<span
-                                            class="text-xs text-gray-500">%</span></div>
-                                    <div
-                                        class="mt-1 bg-gray-900/80 rounded-full px-2 py-0.5 text-[8px] text-cyan-400 border border-cyan-900">
-                                        SP: 50.0%</div>
-                                </div>
-                                <div
-                                    class="bg-[#161f33] rounded border border-emerald-500/30 flex flex-col items-center justify-center p-2 relative overflow-hidden">
-                                    <div class="absolute top-0 left-0 w-full h-1 bg-emerald-500/50"></div>
-                                    <span
-                                        class="text-gray-400 text-[8px] lg:text-[9px] font-bold tracking-wider mb-1">PRESIÓN
-                                        DIFERENCIAL</span>
-                                    <div class="text-white text-xl lg:text-3xl font-bold font-mono">+25<span
-                                            class="text-xs text-gray-500">Pa</span></div>
-                                    <div
-                                        class="mt-1 bg-gray-900/80 rounded-full px-2 py-0.5 text-[8px] text-emerald-400 border border-emerald-900">
-                                        SP: 20.0PA</div>
-                                </div>
-                                <div
-                                    class="bg-[#161f33] rounded border border-orange-500/30 flex flex-col items-center justify-center p-2 relative overflow-hidden">
-                                    <div class="absolute top-0 left-0 w-full h-1 bg-orange-500/50"></div>
-                                    <span
-                                        class="text-gray-400 text-[8px] lg:text-[9px] font-bold tracking-wider mb-1 flex items-center gap-1"><i
-                                            data-lucide="thermometer-sun" class="w-3 h-3"></i> COND. EXTERIOR</span>
-                                    <div class="text-orange-400 text-xl lg:text-3xl font-bold font-mono mt-1">38.2<span
-                                            class="text-xs text-gray-500">°C</span></div>
-                                    <div class="text-cyan-400 text-sm lg:text-base font-bold font-mono mt-0.5">18.0<span
-                                            class="text-[8px] text-gray-500">%HR</span></div>
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-4 gap-2 flex-1">
-                                <div
-                                    class="bg-[#161f33] rounded border border-gray-800 flex flex-col items-center justify-center p-2 col-span-1">
-                                    <div
-                                        class="relative w-12 h-12 lg:w-16 lg:h-16 flex items-center justify-center rounded-full border-4 border-emerald-500 mb-2 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
-                                        <span class="text-white font-bold text-sm lg:text-lg font-mono">99%</span>
-                                    </div>
-                                    <span
-                                        class="text-white text-[8px] font-bold tracking-widest text-center">DISPONIBILIDAD</span>
-                                    <span class="text-gray-500 text-[7px] tracking-wider">UPTIME 24H</span>
-                                </div>
-
-                                <div
-                                    class="bg-[#161f33] rounded border border-gray-800 p-2 col-span-2 flex flex-col relative">
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span
-                                            class="text-gray-400 text-[8px] font-bold tracking-wider flex items-center gap-1"><i
-                                                data-lucide="activity" class="w-3 h-3 text-blue-500"></i> TENDENCIA
-                                            TÉRMICA 24H</span>
-                                        <div class="flex gap-2 text-[7px] font-bold">
-                                            <span class="text-emerald-400">— SALA</span>
-                                            <span class="text-orange-400">— EXTERIOR</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex-1 border-l border-b border-gray-700 relative mt-1">
-                                        <svg class="absolute inset-0 w-full h-full" preserveAspectRatio="none"
-                                            viewBox="0 0 100 100">
-                                            <line x1="0" y1="25" x2="100" y2="25" stroke="#374151" stroke-width="0.5"
-                                                stroke-dasharray="2" />
-                                            <line x1="0" y1="50" x2="100" y2="50" stroke="#374151" stroke-width="0.5"
-                                                stroke-dasharray="2" />
-                                            <line x1="0" y1="75" x2="100" y2="75" stroke="#374151" stroke-width="0.5"
-                                                stroke-dasharray="2" />
-                                            <path d="M0,70 L20,80 L40,60 L60,30 L80,50 L100,80" fill="none"
-                                                stroke="#f6ad55" stroke-width="1.5" />
-                                            <path d="M0,50 L20,50 L40,50 L60,48 L80,48 L100,50" fill="none"
-                                                stroke="#34d399" stroke-width="1.5" />
-                                        </svg>
-                                    </div>
-                                </div>
-
-                                <div
-                                    class="bg-red-950/30 rounded border border-red-900 flex flex-col items-center justify-center p-2 col-span-1 text-center relative overflow-hidden">
-                                    <div class="absolute inset-0 bg-red-600 opacity-5 animate-pulse"></div>
-                                    <div
-                                        class="w-6 h-6 lg:w-8 lg:h-8 rounded-full border border-red-500/50 flex items-center justify-center mb-1 text-red-500">
-                                        <i data-lucide="triangle-alert" class="w-3 h-3 lg:w-4 lg:h-4"></i>
-                                    </div>
-                                    <span class="text-red-500 text-[8px] font-bold tracking-widest mt-1">ESTADO
-                                        ALARMA</span>
-                                    <span
-                                        class="text-white text-xs lg:text-base font-bold tracking-widest my-0.5 animate-pulse">ACTIVA</span>
-                                    <span
-                                        class="text-gray-400 text-[7px] border-b border-red-500/50 pb-0.5 uppercase">FALLA
-                                        HVAC 4</span>
-                                </div>
-                            </div>
-
-                            <div class="flex gap-2 mt-2">
-                                <div
-                                    class="bg-[#161f33] rounded border border-gray-800 p-1.5 flex items-center justify-center text-gray-400 text-[8px] font-bold w-16 gap-1 hover:bg-gray-800 cursor-pointer">
-                                    <i data-lucide="settings" class="w-3 h-3"></i> AJUSTES
-                                </div>
-                                <div
-                                    class="flex-1 border border-gray-800 rounded bg-[#0a0f1c] flex items-center justify-between px-3">
-                                    <span class="text-gray-500 text-[7px] font-bold">EQUIPOS EN RED</span>
-                                    <div class="flex gap-2 lg:gap-4">
-                                        <div class="flex flex-col items-center"><span
-                                                class="text-[7px] text-gray-400">H1</span>
-                                            <div
-                                                class="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_5px_#10b981]">
-                                            </div>
-                                        </div>
-                                        <div class="flex flex-col items-center"><span
-                                                class="text-[7px] text-gray-400">H2</span>
-                                            <div
-                                                class="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_5px_#10b981]">
-                                            </div>
-                                        </div>
-                                        <div class="flex flex-col items-center"><span
-                                                class="text-[7px] text-gray-400">H3</span>
-                                            <div class="w-1.5 h-1.5 bg-gray-600 rounded-full"></div>
-                                        </div>
-                                        <div class="flex flex-col items-center"><span
-                                                class="text-[7px] text-gray-400">H4</span>
-                                            <div
-                                                class="w-1.5 h-1.5 bg-red-500 rounded-full shadow-[0_0_5px_#ef4444] animate-pulse">
-                                            </div>
-                                        </div>
-                                        <div class="flex flex-col items-center ml-2"><span
-                                                class="text-[7px] text-gray-400">P1</span>
-                                            <div
-                                                class="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_5px_#10b981]">
-                                            </div>
-                                        </div>
-                                        <div class="flex flex-col items-center"><span
-                                                class="text-[7px] text-gray-400">P2</span>
-                                            <div class="w-1.5 h-1.5 bg-gray-600 rounded-full"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
                         </div>
                     </div>
                 </div>
@@ -680,8 +484,8 @@
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center mb-16 reveal">
-                <h3 class="text-3xl md:text-5xl font-bold text-white mb-4" style="letter-spacing: -0.03em; text-wrap: balance;">Los enemigos silenciosos de la sala eléctrica</h3>
-                <p class="text-gray-300 max-w-2xl mx-auto">Las salas eléctricas son el centro neurálgico en Minería y
+                <h3 class="text-3xl md:text-5xl font-bold text-white mb-4" style="letter-spacing: -0.03em; text-wrap: balance;">Los enemigos silenciosos de la sala crítica</h3>
+                <p class="text-gray-300 max-w-2xl mx-auto">Las salas críticas son el centro neurálgico en Minería y
                     Oil & Gas. Una falla aquí implica la detención total de la producción y un altísimo lucro cesante.
                 </p>
             </div>
@@ -919,7 +723,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center mb-12 reveal">
                 <h3 class="text-3xl md:text-5xl font-bold text-white mb-4" style="letter-spacing: -0.03em; text-wrap: balance;">El antes y el después en tu operación</h3>
-                <p class="text-gray-300 max-w-2xl mx-auto">Tres condiciones hostiles que la sala eléctrica recibe a diario.
+                <p class="text-gray-300 max-w-2xl mx-auto">Tres condiciones hostiles que la sala crítica recibe a diario.
                     A la izquierda lo que pasa con mantenimiento tradicional. A la derecha lo que pasa con Ecomonitor.</p>
             </div>
 
@@ -957,14 +761,13 @@
                                 <li class="flex items-start gap-3">
                                     <i data-lucide="x-circle" class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0"></i>
                                     <p class="text-sm text-gray-300"><strong>Termostato ciego:</strong> Solo mide la
-                                        temperatura de retorno, ignorando el estrés real (ej. radiación y disipación de
-                                        +100kW de los VDF).</p>
+                                        temperatura de retorno, ignorando el estrés real.</p>
                                 </li>
                                 <li class="flex items-start gap-3">
                                     <i data-lucide="x-circle" class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0"></i>
                                     <p class="text-sm text-gray-300"><strong>Falla en cascada:</strong> En picos de
                                         calor extremo, un equipo A/A estándar sale de servicio por exceso de presión del
-                                        gas refrigerante, provocando el apagado de emergencia de la sala eléctrica.</p>
+                                        gas refrigerante, provocando el apagado de emergencia de la sala crítica.</p>
                                 </li>
                             </ul>
                         </div>
@@ -981,7 +784,7 @@
                             class="flex-1 bg-eco-dark border-2 border-eco-green rounded-2xl p-8 shadow-xl relative overflow-hidden">
                             <div
                                 class="absolute top-0 right-0 bg-eco-green text-white px-4 py-1.5 rounded-bl-xl text-xs font-bold uppercase tracking-wider">
-                                Con Ecomonitor 4.0</div>
+                                Con Ecomonitor</div>
                             <div
                                 class="w-12 h-12 bg-eco-green/20 rounded-full flex items-center justify-center text-eco-lightgreen mb-6">
                                 <i data-lucide="shield-check" class="w-6 h-6"></i>
@@ -1000,7 +803,7 @@
                                         class="w-5 h-5 text-eco-lightgreen mt-0.5 flex-shrink-0"></i>
                                     <p class="text-sm text-gray-300"><strong>Prevención total:</strong> Protege la
                                         inversión al mantener los VDF dentro de su curva térmica ideal, evitando cortes
-                                        de producción (cero lucro cesante).</p>
+                                        de producción.</p>
                                 </li>
                             </ul>
                         </div>
@@ -1047,7 +850,7 @@
                             class="flex-1 bg-eco-dark border-2 border-eco-green rounded-2xl p-8 shadow-xl relative overflow-hidden">
                             <div
                                 class="absolute top-0 right-0 bg-eco-green text-white px-4 py-1.5 rounded-bl-xl text-xs font-bold uppercase tracking-wider">
-                                Con Ecomonitor 4.0</div>
+                                Con Ecomonitor</div>
                             <div
                                 class="w-12 h-12 bg-eco-green/20 rounded-full flex items-center justify-center text-eco-lightgreen mb-6">
                                 <i data-lucide="gauge" class="w-6 h-6"></i>
@@ -1113,7 +916,7 @@
                             class="flex-1 bg-eco-dark border-2 border-eco-green rounded-2xl p-8 shadow-xl relative overflow-hidden">
                             <div
                                 class="absolute top-0 right-0 bg-eco-green text-white px-4 py-1.5 rounded-bl-xl text-xs font-bold uppercase tracking-wider">
-                                Con Ecomonitor 4.0</div>
+                                Con Ecomonitor</div>
                             <div
                                 class="w-12 h-12 bg-eco-green/20 rounded-full flex items-center justify-center text-eco-lightgreen mb-6">
                                 <i data-lucide="workflow" class="w-6 h-6"></i>
@@ -1463,9 +1266,6 @@
                     <i data-lucide="message-square" class="w-5 h-5"></i>
                     <span>Hablar con un especialista técnico</span>
                 </a>
-                <p class="text-xs text-gray-400 mt-4 max-w-md mx-auto">La documentación técnica completa
-                    (borneras, canalizaciones, puesta en marcha, checklist) se entrega al instalador eléctrico
-                    durante la implementación del proyecto.</p>
             </div>
         </div>
     </section>
@@ -1586,7 +1386,7 @@
                     <div
                         class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-eco-green text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
                         Recomendado</div>
-                    <h4 class="text-xl font-bold text-white mb-2">Ecomonitor 4.0</h4>
+                    <h4 class="text-xl font-bold text-white mb-2">Ecomonitor</h4>
                     <p class="text-sm text-gray-400 mb-6">Mantenimiento predictivo total y validación térmica para
                         plantas de misión crítica.</p>
                     <div class="text-4xl font-extrabold text-white mb-6">Partner</div>
@@ -1615,7 +1415,7 @@
                     <div class="text-4xl font-extrabold text-white mb-6">A medida</div>
                     <ul class="space-y-4 mb-8 flex-grow">
                         <li class="flex items-center gap-3 text-sm text-gray-300"><i data-lucide="check"
-                                class="w-5 h-5 text-eco-blue"></i> Todo lo incluido en Ecomonitor 4.0</li>
+                                class="w-5 h-5 text-eco-blue"></i> Todo lo incluido en Ecomonitor</li>
                         <li class="flex items-center gap-3 text-sm text-gray-300"><i data-lucide="check"
                                 class="w-5 h-5 text-eco-blue"></i> Integración SCADA / Modbus TCP</li>
                         <li class="flex items-center gap-3 text-sm text-gray-300"><i data-lucide="check"
@@ -1640,8 +1440,7 @@
                             alt="Ecomonitor" class="h-10 w-auto object-contain">
                     </div>
                     <p class="text-gray-400 text-sm mb-6"><a href="https://www.ecocontrol.com.ar" target="_blank"
-                            class="text-white hover:text-eco-lightgreen transition-colors font-medium">Ecocontrol</a>.
-                        Innovación en soluciones termomecánicas para ambientes críticos industriales.</p>
+                            class="text-white hover:text-eco-lightgreen transition-colors font-medium">Ecocontrol</a></p>
                 </div>
 
                 <div>
@@ -1731,7 +1530,7 @@
                         <div>
                             <h3 class="text-2xl font-bold text-gray-900 leading-tight">Solicitud de Ingeniería</h3>
                             <p class="text-sm text-gray-500 mt-1">Plan seleccionado: <span id="modal-plan-name"
-                                    class="font-semibold text-eco-green">Ecomonitor 4.0</span></p>
+                                    class="font-semibold text-eco-green">Ecomonitor</span></p>
                         </div>
                     </div>
 
@@ -2113,15 +1912,1677 @@
         });
     </script>
 
-    <script type="text/babel" data-presets="env,react">
+    <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
         const PERIOD_HOURS  = { day: 24,  week: 168, month: 720 };
         const PERIOD_LABELS = { day: '24 hs', week: '1 semana', month: '1 mes' };
 
+        // Brand palette for Three.js scene
+        const TH_COLOR = {
+            room: '#ffffff',
+            roomTint: '#f8fafc',
+            line: '#0f172a',
+            lineSoft: '#cbd5e1',
+            grid: '#e2e8f0',
+            equipBody: '#fafafa',
+            heat: '#fb923c',
+            heatBright: '#f97316',
+            titular: '#9ab63b',
+            suplente: '#94a3b8',
+            apoyo: '#f59e0b',
+            master: '#00478F',
+            masterAccent: '#0098c6',
+            cable: '#0098c6',
+            cloudGreen: '#9ab63b'
+        };
+
         const Icon = ({ name, className, size = 16, style }) => {
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ ...style, width: size, height: size }}></i>;
+        };
+
+        // Inline state colors — bypass any Tailwind JIT issue
+        const STATE_STYLE = {
+            TITULAR:  { border: '1.5px solid rgba(154,182,59,0.7)',  background: 'rgba(79,119,37,0.18)',   color: '#9ab63b', boxShadow: '0 0 20px rgba(154,182,59,0.40)' },
+            SUPLENTE: { border: '1px solid #334155',                 background: 'rgba(15,23,42,0.65)',    color: '#94a3b8', boxShadow: 'none' },
+            APOYO:    { border: '1.5px solid rgba(251,191,36,0.7)',  background: 'rgba(245,158,11,0.18)',  color: '#fcd34d', boxShadow: '0 0 24px rgba(251,191,36,0.55)' }
+        };
+        const STATE_BADGE = {
+            TITULAR:  { background: 'rgba(154,182,59,0.18)', color: '#9ab63b', border: '1px solid rgba(154,182,59,0.55)' },
+            SUPLENTE: { background: 'rgba(51,65,85,0.55)',   color: '#94a3b8', border: '1px solid #475569' },
+            APOYO:    { background: 'rgba(251,191,36,0.18)', color: '#fcd34d', border: '1px solid rgba(251,191,36,0.55)' }
+        };
+
+        const UnitCard = ({ unit, icon, style }) => {
+            const s = STATE_STYLE[unit.state] || STATE_STYLE.SUPLENTE;
+            const b = STATE_BADGE[unit.state] || STATE_BADGE.SUPLENTE;
+            const spinning = unit.state === 'TITULAR' ? 'sim-fan-spin' :
+                              unit.state === 'APOYO' ? 'sim-fan-spin-fast' : '';
+            return (
+                <div className="absolute z-10 rounded-lg backdrop-blur-sm transition-all duration-500 flex flex-col items-center"
+                    style={{ ...style, ...s, padding: '8px', width: '88px' }}>
+                    <Icon name={icon} size={20} className={`${spinning}`} style={{ color: s.color, opacity: unit.state === 'SUPLENTE' ? 0.45 : 0.95, marginBottom: '4px' }}/>
+                    <span className="text-[10px] font-mono font-bold" style={{ color: s.color, marginBottom: '3px' }}>{unit.id}</span>
+                    <span className="text-[8px] font-bold uppercase tracking-wider rounded-sm"
+                        style={{ ...b, padding: '1.5px 6px' }}>{unit.state}</span>
+                    <span className="text-[9px] font-mono mt-1" style={{ color: '#cbd5e1' }}>{String(unit.hours).padStart(4,'0')}h</span>
+                </div>
+            );
+        };
+
+        // ===== Sala3D : Three.js shelter Neuquén con tableros Maestro+Esclavos =====
+        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible }) => {
+            const containerRef = useRef(null);
+            const canvasRef    = useRef(null);
+            const sceneObj     = useRef(null);
+            const animRef      = useRef(null);
+
+            // Init scene once
+            useEffect(() => {
+                const THREE = window.THREE;
+                if (!THREE) { console.error('THREE not loaded'); return; }
+                const canvas    = canvasRef.current;
+                const container = containerRef.current;
+                if (!canvas || !container) return;
+
+                let W = container.clientWidth || 800;
+                const H = 560;
+
+                const scene = new THREE.Scene();
+                // Sky gradient como background — generado en canvas
+                const skyCanvas = document.createElement('canvas');
+                skyCanvas.width = 4; skyCanvas.height = 512;
+                const skyCtx = skyCanvas.getContext('2d');
+                const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 512);
+                skyGrad.addColorStop(0,    '#9bb4c8');  // cielo arriba (celeste suave)
+                skyGrad.addColorStop(0.45, '#c4c2b0');  // bruma a media altura
+                skyGrad.addColorStop(0.78, '#d8c5a0');  // horizonte arenoso
+                skyGrad.addColorStop(1,    '#b8a280');  // tierra cercana
+                skyCtx.fillStyle = skyGrad;
+                skyCtx.fillRect(0, 0, 4, 512);
+                const skyTex = new THREE.CanvasTexture(skyCanvas);
+                skyTex.colorSpace = THREE.SRGBColorSpace || undefined;
+                scene.background = skyTex;
+                // Niebla sutil para profundidad
+                scene.fog = new THREE.Fog('#d2c5a8', 22, 70);
+
+                const fs = 17;
+                let aspect = W / H;
+                const camera = new THREE.OrthographicCamera(
+                    -fs * aspect / 2, fs * aspect / 2, fs / 2, -fs / 2, 0.1, 200
+                );
+                camera.position.set(18, 14, 18);
+                camera.lookAt(0, 2, 0);
+
+                const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+                renderer.setSize(W, H);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+                scene.add(new THREE.AmbientLight(0xfff2e0, 0.55));
+                const dir = new THREE.DirectionalLight(0xffefd5, 1.0);  // sol cálido patagónico
+                dir.position.set(12, 22, 8);
+                dir.castShadow = true;
+                dir.shadow.mapSize.set(2048, 2048);
+                dir.shadow.camera.left = -25;
+                dir.shadow.camera.right = 25;
+                dir.shadow.camera.top = 25;
+                dir.shadow.camera.bottom = -25;
+                dir.shadow.camera.near = 0.5;
+                dir.shadow.camera.far = 60;
+                dir.shadow.bias = -0.0005;
+                scene.add(dir);
+                const warm = new THREE.DirectionalLight(0xc4b89c, 0.22);  // luz rebotada del terreno
+                warm.position.set(-6, 3, -4); scene.add(warm);
+
+                // Room dimensions (más grandes que antes)
+                const roomW = 12, roomD = 8, roomH = 4;
+                const lineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line });
+                const slabPad = 1; // slab extiende 1u más allá del shelter
+
+                // === TERRENO 3D sintético patagónico (grande + circular para evitar bordes visibles) ===
+                const pseudoNoise = (x, z) => {
+                    return Math.sin(x * 0.7 + z * 0.4) * 0.30 +
+                           Math.sin(x * 1.6 - z * 1.1) * 0.18 +
+                           Math.cos(x * 3.1 + z * 2.7) * 0.09 +
+                           Math.sin(x * 5.8 - z * 4.2) * 0.045;
+                };
+                // Plano circular grande con muchos segmentos
+                const terrainGeo = new THREE.CircleGeometry(80, 128);
+                const tPos = terrainGeo.attributes.position;
+                const tColors = new Float32Array(tPos.count * 3);
+                const colSand = new THREE.Color('#d6c4a0');
+                const colDirt = new THREE.Color('#a8956b');
+                const colDark = new THREE.Color('#7a6a52');
+                for (let i = 0; i < tPos.count; i++) {
+                    const x = tPos.getX(i), z = tPos.getY(i);
+                    const distToCenter = Math.sqrt(x*x + z*z);
+                    const flatFactor = Math.min(1, Math.max(0, (distToCenter - 7) / 6));
+                    const n = pseudoNoise(x * 0.15, z * 0.15);
+                    // Edge falloff: el borde baja un poco para no mostrarse plano
+                    const edgeFalloff = distToCenter > 65 ? -(distToCenter - 65) * 0.08 : 0;
+                    tPos.setZ(i, n * 0.5 * flatFactor + edgeFalloff);
+                    const t01 = (n + 0.6) / 1.2;
+                    const c = colSand.clone().lerp(colDirt, Math.min(1, t01));
+                    if (n > 0.25) c.lerp(colDark, (n - 0.25) * 2);
+                    tColors[i*3]     = c.r;
+                    tColors[i*3 + 1] = c.g;
+                    tColors[i*3 + 2] = c.b;
+                }
+                tPos.needsUpdate = true;
+                terrainGeo.setAttribute('color', new THREE.BufferAttribute(tColors, 3));
+                terrainGeo.computeVertexNormals();
+                const terrain = new THREE.Mesh(
+                    terrainGeo,
+                    new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })
+                );
+                terrain.rotation.x = -Math.PI / 2;
+                terrain.receiveShadow = true;
+                scene.add(terrain);
+
+                // === PIEDRAS realistas (icosahedron detail=1, más caras, formas variadas) ===
+                const rockColors = ['#8a7a5e', '#9a8a6e', '#7a6850', '#6e5e48', '#a59478', '#5e4f3a', '#7e6f55', '#615240'].map(c => new THREE.Color(c));
+                const seedRand = (n) => {
+                    const s = Math.sin(n * 9241.327) * 43758.5453;
+                    return s - Math.floor(s);
+                };
+                // 220 piedras con más variedad de tamaños y formas
+                for (let i = 0; i < 220; i++) {
+                    const angle = seedRand(i * 3 + 1) * Math.PI * 2;
+                    const dist = 9 + seedRand(i * 3 + 2) * 42;
+                    const x = Math.cos(angle) * dist;
+                    const z = Math.sin(angle) * dist;
+                    // Tamaños: 40% chicas, 40% medianas, 20% grandes
+                    const sizeRoll = seedRand(i * 3 + 3);
+                    let size;
+                    if (sizeRoll < 0.4)      size = 0.10 + seedRand(i * 5) * 0.18;       // chicas
+                    else if (sizeRoll < 0.8) size = 0.25 + seedRand(i * 5) * 0.35;       // medianas
+                    else                     size = 0.55 + seedRand(i * 5) * 0.55;       // grandes
+                    // Detail=1 → 80 caras (mucho más suave que detail=0)
+                    const geo = new THREE.IcosahedronGeometry(size, 1);
+                    // Deform fuerte e irregular para look natural
+                    const rPos = geo.attributes.position;
+                    for (let v = 0; v < rPos.count; v++) {
+                        const sx = rPos.getX(v), sy = rPos.getY(v), sz = rPos.getZ(v);
+                        const n1 = (seedRand(i * 100 + v * 7) - 0.5) * 0.45;
+                        const n2 = (seedRand(i * 200 + v * 11) - 0.5) * 0.25;
+                        rPos.setXYZ(v, sx * (1 + n1), sy * (1 + n2), sz * (1 + n1 * 0.7));
+                    }
+                    geo.computeVertexNormals();
+                    const rock = new THREE.Mesh(
+                        geo,
+                        new THREE.MeshLambertMaterial({
+                            color: rockColors[Math.floor(seedRand(i * 23) * rockColors.length)],
+                            flatShading: true
+                        })
+                    );
+                    // Asentar al piso (un poco hundidas)
+                    rock.position.set(x, size * 0.4, z);
+                    rock.rotation.set(
+                        seedRand(i * 13) * Math.PI * 2,
+                        seedRand(i * 17) * Math.PI * 2,
+                        seedRand(i * 19) * Math.PI * 2
+                    );
+                    rock.castShadow = true;
+                    rock.receiveShadow = true;
+                    scene.add(rock);
+                }
+
+                // === CORDILLERA DE LOS ANDES (más picos, más alto, con nieve, más volumen) ===
+                const buildMountainCluster = (centerX, centerZ, count, colorRange, scaleRange, withSnow) => {
+                    const matColors = colorRange.map(c => new THREE.Color(c));
+                    for (let i = 0; i < count; i++) {
+                        const a = (i / count) * Math.PI * 2 + seedRand(i * 31 + Math.abs(centerX)) * 0.6;
+                        const d = seedRand(i * 37 + Math.abs(centerZ)) * 6;
+                        const x = centerX + Math.cos(a) * d;
+                        const z = centerZ + Math.sin(a) * d;
+                        const h = scaleRange[0] + seedRand(i * 41) * (scaleRange[1] - scaleRange[0]);
+                        const r = h * (0.45 + seedRand(i * 43) * 0.35);
+                        const segs = 8 + Math.floor(seedRand(i * 47) * 5);  // 8-12 segmentos = más smooth
+                        const coneGeo = new THREE.ConeGeometry(r, h, segs, 4);  // 4 height segments
+                        // Deformar para look de montaña real, PERO sin tocar la punta (vertex top compartido)
+                        const cPos = coneGeo.attributes.position;
+                        const topY = h / 2;  // ConeGeometry: top vertex at y = +h/2
+                        for (let v = 0; v < cPos.count; v++) {
+                            const sx = cPos.getX(v), sy = cPos.getY(v), sz = cPos.getZ(v);
+                            // No tocar los 12% superiores — la cumbre queda limpia
+                            const distFromTop = topY - sy;
+                            if (distFromTop < h * 0.12) continue;
+                            // Deformación gradual: 0 cerca del top, máxima en la base
+                            const heightFromBase = (sy + h/2) / h;  // 0 = base, 1 = top
+                            const baseDeform = (1 - heightFromBase) * 0.35;
+                            const n = (seedRand(i * 100 + v * 13) - 0.5) * baseDeform;
+                            cPos.setXYZ(v, sx * (1 + n), sy, sz * (1 + n));
+                        }
+                        coneGeo.computeVertexNormals();
+                        const m = new THREE.Mesh(
+                            coneGeo,
+                            new THREE.MeshLambertMaterial({
+                                color: matColors[i % matColors.length],
+                                flatShading: true
+                            })
+                        );
+                        m.position.set(x, h/2, z);
+                        m.castShadow = false; // demasiado lejos, no aporta
+                        scene.add(m);
+                        // Nieve en la cumbre (solo en cordilleras altas)
+                        if (withSnow && h > 7) {
+                            const snowH = h * 0.25;
+                            const snowR = r * 0.42;
+                            const snowGeo = new THREE.ConeGeometry(snowR, snowH, segs, 1);
+                            const snowPos = snowGeo.attributes.position;
+                            for (let v = 0; v < snowPos.count; v++) {
+                                const sx = snowPos.getX(v), sy = snowPos.getY(v), sz = snowPos.getZ(v);
+                                const n = (seedRand(i * 300 + v * 19) - 0.5) * 0.15;
+                                snowPos.setXYZ(v, sx * (1 + n), sy, sz * (1 + n));
+                            }
+                            snowGeo.computeVertexNormals();
+                            const snow = new THREE.Mesh(
+                                snowGeo,
+                                new THREE.MeshLambertMaterial({ color: '#f4f1ea', flatShading: true })
+                            );
+                            snow.position.set(x, h - snowH/2 + 0.05, z);
+                            scene.add(snow);
+                        }
+                    }
+                };
+                // CORDILLERA LEJANA (Andes): muchos picos altos con nieve, violácea
+                buildMountainCluster(-12, -65, 22, ['#4e4868', '#5e5878', '#3e3858', '#6e6488'], [8, 15], true);
+                // Cordillera media (NE) — gris con nieve en los más altos
+                buildMountainCluster(38, -50, 16, ['#6e6478', '#7a7088', '#5a5068'], [6, 11], true);
+                // Cordillera media (NW)
+                buildMountainCluster(-50, -30, 14, ['#5e5474', '#6e6488', '#4e445e'], [6, 12], true);
+                // Lomadas tierra cercanas — sin nieve, color tierra
+                buildMountainCluster(-58, 8, 10, ['#9a8e76', '#a89878', '#8a7a5e', '#7e6f55'], [3, 5.5], false);
+                buildMountainCluster(55, 25, 10, ['#988870', '#a89878', '#7e6f55'], [3, 5], false);
+                buildMountainCluster(-25, 55, 8, ['#988870', '#a89878'], [2.5, 4.2], false);
+
+                // (camino removido — el suelo árido es uniforme)
+
+                // === SLAB de hormigón (más grande, soporta pilotis) ===
+                const slabGeo = new THREE.BoxGeometry(roomW + slabPad * 2, 0.2, roomD + slabPad * 2);
+                const slab = new THREE.Mesh(slabGeo, new THREE.MeshLambertMaterial({ color: '#a8a39a' }));
+                slab.position.set(0, 0.1, 0); slab.receiveShadow = true; scene.add(slab);
+                const slabEdges = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(slabGeo),
+                    new THREE.LineBasicMaterial({ color: '#6e6a62' })
+                );
+                slabEdges.position.copy(slab.position); scene.add(slabEdges);
+
+                // === PILOTI columns (acero, eleva el shelter 2m) ===
+                const pilotiMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
+                // 6 pilotis: 4 esquinas + 2 medio
+                const pilotiPositions = [
+                    [-roomW/2 + 0.4,  -roomD/2 + 0.4],
+                    [ roomW/2 - 0.4,  -roomD/2 + 0.4],
+                    [-roomW/2 + 0.4,   roomD/2 - 0.4],
+                    [ roomW/2 - 0.4,   roomD/2 - 0.4],
+                    [-roomW/2 + 0.4,   0],
+                    [ roomW/2 - 0.4,   0]
+                ];
+                pilotiPositions.forEach(([px, pz]) => {
+                    const pilGeo = new THREE.BoxGeometry(0.3, 2.0, 0.3);
+                    const pil = new THREE.Mesh(pilGeo, pilotiMat);
+                    pil.position.set(px, 0.2 + 1.0, pz);
+                    pil.castShadow = true;
+                    pil.receiveShadow = true;
+                    scene.add(pil);
+                    const pilEdges = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(pilGeo),
+                        new THREE.LineBasicMaterial({ color: '#1a1a22' })
+                    );
+                    pilEdges.position.copy(pil.position);
+                    scene.add(pilEdges);
+                });
+
+                // === VIGAS estructurales debajo del shelter (entre pilotis, soportan el piso) ===
+                const beamMat = new THREE.MeshLambertMaterial({ color: '#2e2e36' });
+                // Vigas largas (a lo largo de X) — 2 unidades
+                [-roomD/2 + 0.4, roomD/2 - 0.4].forEach(z => {
+                    const beam = new THREE.Mesh(
+                        new THREE.BoxGeometry(roomW - 0.6, 0.2, 0.3),
+                        beamMat
+                    );
+                    beam.position.set(0, 2.0, z);
+                    beam.castShadow = true;
+                    scene.add(beam);
+                });
+                // Viga central
+                const centerBeam = new THREE.Mesh(
+                    new THREE.BoxGeometry(roomW - 0.6, 0.2, 0.3),
+                    beamMat
+                );
+                centerBeam.position.set(0, 2.0, 0);
+                centerBeam.castShadow = true;
+                scene.add(centerBeam);
+                // Vigas perpendiculares
+                [-roomW/3, 0, roomW/3].forEach(x => {
+                    const beam = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.25, 0.2, roomD - 0.8),
+                        beamMat
+                    );
+                    beam.position.set(x, 2.0, 0);
+                    beam.castShadow = true;
+                    scene.add(beam);
+                });
+
+                // === CABLE TRAYS bajo el shelter (bandejas metálicas con cables agrupados, como en las fotos reales) ===
+                const trayMat = new THREE.MeshLambertMaterial({ color: '#5e5e68' });
+                const trayBaseMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
+                // 2 bandejas paralelas (a lo ancho del shelter)
+                [-roomD/4, roomD/4].forEach(zPos => {
+                    // Cuerpo principal de la bandeja (canal en U)
+                    const trayLen = roomW * 0.85;
+                    const trayBody = new THREE.Mesh(
+                        new THREE.BoxGeometry(trayLen, 0.04, 0.45),
+                        trayBaseMat
+                    );
+                    trayBody.position.set(0, 0.45, zPos);
+                    trayBody.receiveShadow = true;
+                    trayBody.castShadow = true;
+                    scene.add(trayBody);
+                    // Laterales de la bandeja (rebordes)
+                    [-0.225, 0.225].forEach(zEdge => {
+                        const side = new THREE.Mesh(
+                            new THREE.BoxGeometry(trayLen, 0.10, 0.025),
+                            trayBaseMat
+                        );
+                        side.position.set(0, 0.50, zPos + zEdge);
+                        scene.add(side);
+                    });
+                    // Travesaños transversales (cada 0.6m)
+                    const crossCount = Math.floor(trayLen / 0.7);
+                    for (let c = 0; c <= crossCount; c++) {
+                        const cx = -trayLen/2 + c * (trayLen / crossCount);
+                        const cross = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.04, 0.02, 0.45),
+                            trayBaseMat
+                        );
+                        cross.position.set(cx, 0.47, zPos);
+                        scene.add(cross);
+                    }
+                    // Cables agrupados dentro de la bandeja (haces de cables)
+                    const cableColors = ['#1f1f26', '#6b3a1f', '#8a6740', '#1f2e3f', '#3b3b45'];
+                    for (let i = 0; i < 5; i++) {
+                        const cab = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.030, 0.030, trayLen * 0.96, 8),
+                            new THREE.MeshLambertMaterial({ color: cableColors[i] })
+                        );
+                        cab.rotation.z = Math.PI / 2;
+                        cab.position.set(0, 0.55, zPos - 0.15 + (i / 4) * 0.30);
+                        cab.castShadow = true;
+                        scene.add(cab);
+                    }
+                });
+                // Soportes verticales que conectan las bandejas a las vigas (4 puntos)
+                [-roomW * 0.35, roomW * 0.35].forEach(xPos => {
+                    [-roomD/4, roomD/4].forEach(zPos => {
+                        const sup = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.05, 1.45, 0.05),
+                            trayBaseMat
+                        );
+                        sup.position.set(xPos, 1.20, zPos);
+                        sup.castShadow = true;
+                        scene.add(sup);
+                    });
+                });
+                // Caño metálico grande perpendicular (saliendo del shelter por un lateral)
+                const bigPipeMat = new THREE.MeshLambertMaterial({ color: '#787880' });
+                const bigPipe = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.12, 0.12, roomD * 1.2, 12),
+                    bigPipeMat
+                );
+                bigPipe.rotation.x = Math.PI / 2;
+                bigPipe.position.set(-roomW * 0.30, 0.85, 0);
+                bigPipe.castShadow = true;
+                scene.add(bigPipe);
+                // Codos del caño grande
+                const elbow1 = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.13, 12, 8),
+                    bigPipeMat
+                );
+                elbow1.position.set(-roomW * 0.30, 0.85, -roomD * 0.60);
+                scene.add(elbow1);
+                const elbow2 = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.13, 12, 8),
+                    bigPipeMat
+                );
+                elbow2.position.set(-roomW * 0.30, 0.85,  roomD * 0.60);
+                scene.add(elbow2);
+
+                // === PLATAFORMA + ESCALERA + BARANDAS AMARILLAS (en la puerta, lado largo) ===
+                // Plataforma de grating al frente de la puerta (puerta sigue siendo a -roomW/4, roomD/2)
+                const platformGeo = new THREE.BoxGeometry(2.5, 0.08, 1.6);
+                const platformMat = new THREE.MeshLambertMaterial({ color: '#4a4a52' });
+                const platform = new THREE.Mesh(platformGeo, platformMat);
+                platform.position.set(-roomW/4, 2.21 - 0.04, roomD/2 + 0.8);
+                platform.castShadow = true;
+                platform.receiveShadow = true;
+                scene.add(platform);
+                // Patrón de grating sobre la plataforma (líneas)
+                for (let g = -3; g <= 3; g++) {
+                    const gline = new THREE.LineSegments(
+                        new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(-roomW/4 - 1.2, 2.21 + 0.005, roomD/2 + 0.8 + g * 0.2),
+                            new THREE.Vector3(-roomW/4 + 1.2, 2.21 + 0.005, roomD/2 + 0.8 + g * 0.2)
+                        ]),
+                        new THREE.LineBasicMaterial({ color: '#2a2a32' })
+                    );
+                    scene.add(gline);
+                }
+
+                // Escalera: 6 escalones del piso (y~0.2) a la plataforma (y~2.2)
+                const stairW = 1.2, stepCount = 7;
+                const stairFrontZ = roomD/2 + 1.6 + 1.4; // frente de la escalera
+                const stepHeight = (2.21 - 0.2) / stepCount;
+                const stepDepth = 1.4 / stepCount;
+                for (let s = 0; s < stepCount; s++) {
+                    const step = new THREE.Mesh(
+                        new THREE.BoxGeometry(stairW, 0.06, stepDepth + 0.05),
+                        platformMat
+                    );
+                    step.position.set(
+                        -roomW/4,
+                        0.2 + s * stepHeight + stepHeight / 2,
+                        roomD/2 + 1.6 + (stepCount - s - 1) * stepDepth + stepDepth / 2
+                    );
+                    step.castShadow = true;
+                    step.receiveShadow = true;
+                    scene.add(step);
+                }
+                // Vigas laterales de la escalera (zoquetes)
+                [-stairW/2, stairW/2].forEach(xOff => {
+                    const stringer = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.08, 0.15, 2.4),
+                        beamMat
+                    );
+                    stringer.position.set(-roomW/4 + xOff, 1.0, roomD/2 + 2.3);
+                    stringer.rotation.x = Math.atan2(2.0, 1.4); // ángulo de la escalera
+                    stringer.castShadow = true;
+                    scene.add(stringer);
+                });
+
+                // Barandas amarillas (tubos)
+                const handrailMat = new THREE.MeshLambertMaterial({ color: '#f5c542' });
+                const buildRailing = (points) => {
+                    // points = array de Vector3, conecta cada par consecutivo con cilindros
+                    for (let i = 0; i < points.length - 1; i++) {
+                        const a = points[i], b = points[i+1];
+                        const len = a.distanceTo(b);
+                        const rail = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.035, 0.035, len, 8),
+                            handrailMat
+                        );
+                        rail.position.copy(a.clone().add(b).multiplyScalar(0.5));
+                        rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3().subVectors(b, a).normalize());
+                        rail.castShadow = true;
+                        scene.add(rail);
+                    }
+                };
+                // Postes verticales de la baranda (en plataforma y borde superior de escalera)
+                const postPositions = [
+                    [-roomW/4 - 1.25, roomD/2 + 0.0],
+                    [-roomW/4 - 1.25, roomD/2 + 0.8],
+                    [-roomW/4 - 1.25, roomD/2 + 1.6],
+                    [-roomW/4 + 1.25, roomD/2 + 0.0],
+                    [-roomW/4 + 1.25, roomD/2 + 0.8],
+                    [-roomW/4 + 1.25, roomD/2 + 1.6]
+                ];
+                postPositions.forEach(([px, pz]) => {
+                    const post = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.04, 0.04, 1.0, 8),
+                        handrailMat
+                    );
+                    post.position.set(px, 2.21 + 0.5, pz);
+                    post.castShadow = true;
+                    scene.add(post);
+                });
+                // Tubos horizontales superior (barandilla superior)
+                buildRailing([
+                    new THREE.Vector3(-roomW/4 - 1.25, 2.21 + 1.0, roomD/2 + 0.0),
+                    new THREE.Vector3(-roomW/4 - 1.25, 2.21 + 1.0, roomD/2 + 1.6)
+                ]);
+                buildRailing([
+                    new THREE.Vector3(-roomW/4 + 1.25, 2.21 + 1.0, roomD/2 + 0.0),
+                    new THREE.Vector3(-roomW/4 + 1.25, 2.21 + 1.0, roomD/2 + 1.6)
+                ]);
+                // Tubo medio (mid-rail)
+                buildRailing([
+                    new THREE.Vector3(-roomW/4 - 1.25, 2.21 + 0.5, roomD/2 + 0.0),
+                    new THREE.Vector3(-roomW/4 - 1.25, 2.21 + 0.5, roomD/2 + 1.6)
+                ]);
+                buildRailing([
+                    new THREE.Vector3(-roomW/4 + 1.25, 2.21 + 0.5, roomD/2 + 0.0),
+                    new THREE.Vector3(-roomW/4 + 1.25, 2.21 + 0.5, roomD/2 + 1.6)
+                ]);
+                // (sin cierre horizontal extra: la baranda de plataforma termina donde empieza la diagonal de la escalera)
+                // Postes intermedios de la escalera (siguen los escalones bajando)
+                // Escalera va desde (z = roomD/2 + 1.6, y = 2.21) hasta (z = roomD/2 + 3.0, y = 0.2)
+                const stairTopZ = roomD/2 + 1.6;
+                const stairBottomZ = roomD/2 + 3.0;
+                const stairTopY = 2.21;
+                const stairBottomY = 0.2;
+                // 3 postes intermedios + 1 inferior por lado
+                [-roomW/4 - 1.25, -roomW/4 + 1.25].forEach(px => {
+                    // Postes a lo largo de la escalera (4 puntos: top, 1/3, 2/3, bottom)
+                    const stairPosts = [
+                        { z: stairTopZ + 0.0, y: stairTopY },
+                        { z: stairTopZ + 0.5, y: stairTopY - 0.65 },
+                        { z: stairTopZ + 1.0, y: stairTopY - 1.35 },
+                        { z: stairBottomZ,    y: stairBottomY }
+                    ];
+                    // Postes verticales en cada punto
+                    stairPosts.forEach(p => {
+                        const postH = 1.0;
+                        const post = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.04, 0.04, postH, 8),
+                            handrailMat
+                        );
+                        post.position.set(px, p.y + postH / 2, p.z);
+                        post.castShadow = true;
+                        scene.add(post);
+                    });
+                    // Conexión superior (tubo a lo largo de la diagonal, top de los postes)
+                    const upTop = stairPosts.map(p => new THREE.Vector3(px, p.y + 1.0, p.z));
+                    for (let s = 0; s < upTop.length - 1; s++) {
+                        buildRailing([upTop[s], upTop[s+1]]);
+                    }
+                    // Conexión medio-rail (mitad de los postes)
+                    const upMid = stairPosts.map(p => new THREE.Vector3(px, p.y + 0.5, p.z));
+                    for (let s = 0; s < upMid.length - 1; s++) {
+                        buildRailing([upMid[s], upMid[s+1]]);
+                    }
+                });
+
+                // === Floor interior ===
+                const floor = new THREE.Mesh(
+                    new THREE.PlaneGeometry(roomW, roomD),
+                    new THREE.MeshLambertMaterial({ color: TH_COLOR.room })
+                );
+                floor.rotation.x = -Math.PI / 2;
+                floor.position.y = 2.21;
+                scene.add(floor);
+
+                // Floor grid
+                const grid = new THREE.GridHelper(Math.max(roomW, roomD), 12, TH_COLOR.lineSoft, TH_COLOR.grid);
+                grid.material.transparent = true; grid.material.opacity = 0.4;
+                grid.position.y = 0.22; scene.add(grid);
+
+                // === 4 PAREDES + TECHO (opacidad togglable) ===
+                const wallMeshes = [];
+                const wallColor = '#f4f0e6'; // shelter cream
+                const makeWallMat = () => new THREE.MeshLambertMaterial({
+                    color: wallColor, transparent: true, opacity: 0.22, side: THREE.DoubleSide
+                });
+                const backWallM  = makeWallMat();
+                const frontWallM = makeWallMat();
+                const leftWallM  = makeWallMat();
+                const rightWallM = makeWallMat();
+                const roofM      = makeWallMat();
+
+                const backWall = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), backWallM);
+                backWall.position.set(0, roomH/2 + 2.21, -roomD/2);
+                scene.add(backWall); wallMeshes.push(backWallM);
+
+                const frontWall = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), frontWallM);
+                frontWall.position.set(0, roomH/2 + 2.21, roomD/2);
+                scene.add(frontWall); wallMeshes.push(frontWallM);
+
+                const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), leftWallM);
+                leftWall.position.set(-roomW/2, roomH/2 + 2.21, 0);
+                leftWall.rotation.y = Math.PI / 2;
+                scene.add(leftWall); wallMeshes.push(leftWallM);
+
+                const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), rightWallM);
+                rightWall.position.set(roomW/2, roomH/2 + 2.21, 0);
+                rightWall.rotation.y = -Math.PI / 2;
+                scene.add(rightWall); wallMeshes.push(rightWallM);
+
+                const roofMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), roofM);
+                roofMesh.position.set(0, roomH + 2.21, 0);
+                roofMesh.rotation.x = Math.PI / 2;
+                scene.add(roofMesh); wallMeshes.push(roofM);
+
+                // Room outline (siempre visible)
+                const roomEdges = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(new THREE.BoxGeometry(roomW, roomH, roomD)), lineMat
+                );
+                roomEdges.position.y = roomH/2 + 2.21;
+                scene.add(roomEdges);
+
+                // === DETALLES EXTERIORES (antena, vent, puerta) ===
+                // Antena en techo
+                const antPole = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.025, 0.025, 1.4),
+                    new THREE.MeshLambertMaterial({ color: '#777' })
+                );
+                antPole.position.set(-roomW/2 + 1, roomH + 2.21 + 0.7, -roomD/2 + 0.6);
+                scene.add(antPole);
+                const antTop = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.08, 8, 6),
+                    new THREE.MeshBasicMaterial({ color: '#ef4444' })
+                );
+                antTop.position.set(-roomW/2 + 1, roomH + 2.21 + 1.45, -roomD/2 + 0.6);
+                scene.add(antTop);
+                // Vent lateral (en pared derecha exterior)
+                const ventGeo = new THREE.BoxGeometry(0.08, 0.7, 1.0);
+                const ventMesh = new THREE.Mesh(ventGeo, new THREE.MeshLambertMaterial({ color: '#d6d0c0' }));
+                ventMesh.position.set(roomW/2 + 0.05, roomH/2 + 0.5 + 2.21, -roomD/4);
+                scene.add(ventMesh);
+                const ventEdges = new THREE.LineSegments(new THREE.EdgesGeometry(ventGeo), lineMat);
+                ventEdges.position.copy(ventMesh.position); scene.add(ventEdges);
+                // === PUERTA DOBLE DE EMERGENCIA (abre a los 2 lados) ===
+                const doorTotalW = 1.4, doorH = 2.2;
+                const doorY = 1.1 + 2.21;
+                const doorCenterX = -roomW/4;
+                const doorZ = roomD/2 + 0.005;
+                // Hoja izquierda
+                const leafW = doorTotalW / 2;
+                const leftLeaf = new THREE.Mesh(
+                    new THREE.PlaneGeometry(leafW, doorH),
+                    new THREE.MeshLambertMaterial({ color: '#9c958a' })
+                );
+                leftLeaf.position.set(doorCenterX - leafW/2, doorY, doorZ);
+                scene.add(leftLeaf);
+                // Hoja derecha
+                const rightLeaf = new THREE.Mesh(
+                    new THREE.PlaneGeometry(leafW, doorH),
+                    new THREE.MeshLambertMaterial({ color: '#9c958a' })
+                );
+                rightLeaf.position.set(doorCenterX + leafW/2, doorY, doorZ);
+                scene.add(rightLeaf);
+                // Marco exterior (rectángulo)
+                const doorFrame = new THREE.LineSegments(
+                    new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(doorCenterX - doorTotalW/2, 2.21,        doorZ + 0.006),
+                        new THREE.Vector3(doorCenterX - doorTotalW/2, 2.21 + doorH, doorZ + 0.006),
+                        new THREE.Vector3(doorCenterX + doorTotalW/2, 2.21 + doorH, doorZ + 0.006),
+                        new THREE.Vector3(doorCenterX + doorTotalW/2, 2.21,        doorZ + 0.006),
+                        new THREE.Vector3(doorCenterX - doorTotalW/2, 2.21,        doorZ + 0.006)
+                    ]),
+                    lineMat
+                );
+                scene.add(doorFrame);
+                // Línea divisoria central (donde se abren las hojas)
+                const doorSplit = new THREE.LineSegments(
+                    new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(doorCenterX, 2.21,        doorZ + 0.006),
+                        new THREE.Vector3(doorCenterX, 2.21 + doorH, doorZ + 0.006)
+                    ]),
+                    lineMat
+                );
+                scene.add(doorSplit);
+                // Barras horizontales tipo crash-bar (push to open)
+                [-leafW/2, leafW/2].forEach(xOff => {
+                    const crashBar = new THREE.Mesh(
+                        new THREE.BoxGeometry(leafW * 0.85, 0.06, 0.04),
+                        new THREE.MeshLambertMaterial({ color: '#3a3a42' })
+                    );
+                    crashBar.position.set(doorCenterX + xOff, doorY, doorZ + 0.04);
+                    scene.add(crashBar);
+                });
+                // Cartel "EXIT / EMERGENCY" verde arriba de la puerta
+                const exitSign = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.55, 0.15, 0.04),
+                    new THREE.MeshBasicMaterial({ color: '#16a34a' })
+                );
+                exitSign.position.set(doorCenterX, 2.21 + doorH + 0.13, doorZ + 0.03);
+                scene.add(exitSign);
+                // Bisagras (2 por hoja)
+                const hingeMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
+                [-doorTotalW/2 + 0.04, doorTotalW/2 - 0.04].forEach(xPos => {
+                    [0.3, doorH - 0.3].forEach(yOff => {
+                        const hinge = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.03, 0.03, 0.12, 8),
+                            hingeMat
+                        );
+                        hinge.position.set(doorCenterX + xPos, 2.21 + yOff, doorZ + 0.025);
+                        hinge.rotation.x = Math.PI / 2;
+                        scene.add(hinge);
+                    });
+                });
+
+                // === VFDs (6 cabinets en grilla 3x2 distribuidos en el piso) ===
+                const heatMeshes = [];
+                const heatWaves = [];
+                const eqW = 1.3, eqH = 2.6, eqD = 0.9;
+                const vfdPositions = [
+                    { x: -4.0, z: -1.4 },
+                    { x:  0.0, z: -1.4 },
+                    { x:  4.0, z: -1.4 },
+                    { x: -4.0, z:  1.4 },
+                    { x:  0.0, z:  1.4 },
+                    { x:  4.0, z:  1.4 }
+                ];
+                vfdPositions.forEach((pos, i) => {
+                    const x = pos.x, z = pos.z;
+                    const y = eqH/2 + 2.21;
+                    const body = new THREE.Mesh(
+                        new THREE.BoxGeometry(eqW, eqH, eqD),
+                        new THREE.MeshLambertMaterial({ color: TH_COLOR.equipBody })
+                    );
+                    body.position.set(x, y, z); scene.add(body);
+                    const edges = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(new THREE.BoxGeometry(eqW, eqH, eqD)), lineMat
+                    );
+                    edges.position.set(x, y, z); scene.add(edges);
+                    // Persianas frontales y traseras
+                    for (let k = 0; k < 7; k++) {
+                        const vy = y - 1.0 + k * 0.28;
+                        ['front', 'back'].forEach(side => {
+                            const zOff = side === 'front' ? (eqD/2 + 0.005) : -(eqD/2 + 0.005);
+                            const vent = new THREE.LineSegments(
+                                new THREE.BufferGeometry().setFromPoints([
+                                    new THREE.Vector3(x - eqW*0.35, vy, z + zOff),
+                                    new THREE.Vector3(x + eqW*0.35, vy, z + zOff)
+                                ]),
+                                new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.55 })
+                            );
+                            scene.add(vent);
+                        });
+                    }
+                    // Etiqueta naranja (advertencia calor)
+                    const label = new THREE.Mesh(
+                        new THREE.PlaneGeometry(0.55, 0.2),
+                        new THREE.MeshBasicMaterial({ color: '#f97316' })
+                    );
+                    label.position.set(x, y + eqH/2 - 0.3, z + eqD/2 + 0.006);
+                    scene.add(label);
+                    // Halo muy sutil sobre el equipo (apenas un brillo cálido, NO una bola que pulsa)
+                    const heat = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.9, 16, 12),
+                        new THREE.MeshBasicMaterial({ color: TH_COLOR.heat, transparent: true, opacity: 0.08, depthWrite: false })
+                    );
+                    heat.position.set(x, eqH + 2.21, z);
+                    heat.userData.phase = i * 0.65;
+                    scene.add(heat); heatMeshes.push(heat);
+                    // Ondas de calor ascendiendo — sutiles, finas, ligeramente irregulares
+                    for (let r = 0; r < 4; r++) {
+                        const wave = new THREE.Mesh(
+                            new THREE.RingGeometry(0.25, 0.28, 24),
+                            new THREE.MeshBasicMaterial({ color: TH_COLOR.heat, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })
+                        );
+                        wave.rotation.x = -Math.PI / 2;
+                        wave.position.set(x, eqH + 2.21, z);
+                        wave.userData = { phase: (i * 0.35 + r * 0.25) % 1, baseX: x, baseZ: z };
+                        scene.add(wave); heatWaves.push(wave);
+                    }
+                });
+
+                // === Dynamic groups ===
+                const hvacGroup = new THREE.Group(); scene.add(hvacGroup);
+                const presGroup = new THREE.Group(); scene.add(presGroup);
+                const esclavoGroup = new THREE.Group(); scene.add(esclavoGroup);
+                const cableGroup = new THREE.Group(); scene.add(cableGroup);
+
+                // === MAESTRO (montado en pared interior IZQUIERDA, con pantalla) ===
+                const mW = 0.35, mH = 1.7, mD = 0.9;  // depth ancha (largo en Z)
+                const masterX = -roomW/2 + mW/2 + 0.04;
+                const masterY = mH/2 + 0.9 + 2.21;
+                const masterZ = 0;
+                const masterBody = new THREE.Mesh(
+                    new THREE.BoxGeometry(mW, mH, mD),
+                    new THREE.MeshLambertMaterial({ color: TH_COLOR.master })
+                );
+                masterBody.position.set(masterX, masterY, masterZ); scene.add(masterBody);
+                const masterEdges = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(new THREE.BoxGeometry(mW, mH, mD)), lineMat
+                );
+                masterEdges.position.set(masterX, masterY, masterZ); scene.add(masterEdges);
+                // PANTALLA HMI (texto ECOMONITOR generado via canvas texture, aspect 16:9 compacto)
+                const screenCanvas = document.createElement('canvas');
+                screenCanvas.width = 512; screenCanvas.height = 288;
+                const sctx = screenCanvas.getContext('2d');
+                // Fondo negro tipo HMI
+                sctx.fillStyle = '#0a1020';
+                sctx.fillRect(0, 0, 512, 288);
+                // Header
+                sctx.fillStyle = '#0a1f2a';
+                sctx.fillRect(0, 0, 512, 44);
+                sctx.fillStyle = '#9ab63b';
+                sctx.beginPath(); sctx.arc(22, 22, 6, 0, Math.PI*2); sctx.fill();
+                sctx.fillStyle = '#9ab63b';
+                sctx.font = 'bold 24px "Geist Mono", monospace';
+                sctx.fillText('ECO', 36, 30);
+                sctx.fillStyle = '#0098c6';
+                sctx.fillText('NITOR', 92, 30);
+                sctx.fillStyle = '#64748b';
+                sctx.font = '12px "Geist Mono", monospace';
+                sctx.fillText('SALA PRINCIPAL · YPF S.A.', 220, 28);
+                // Cards
+                const drawCard = (x, y, w, h, label, value, unit, color) => {
+                    sctx.fillStyle = '#142036'; sctx.fillRect(x, y, w, h);
+                    sctx.strokeStyle = '#1f3148'; sctx.lineWidth = 1; sctx.strokeRect(x, y, w, h);
+                    sctx.fillStyle = '#5e7090'; sctx.font = '10px "Geist Mono"'; sctx.fillText(label, x + 8, y + 20);
+                    sctx.fillStyle = color; sctx.font = 'bold 36px "Geist Mono"'; sctx.fillText(value, x + 8, y + h - 16);
+                    sctx.fillStyle = '#5e7090'; sctx.font = '12px "Geist Mono"'; sctx.fillText(unit, x + 8 + sctx.measureText(value).width + 4, y + h - 16);
+                };
+                drawCard(18,  64, 152, 92, 'TEMPERATURA',    '21.4', '°C',  '#ffffff');
+                drawCard(180, 64, 152, 92, 'HUMEDAD',        '47',   '%',   '#0098c6');
+                drawCard(342, 64, 152, 92, 'PRESURIZACIÓN', '+25',  'Pa',  '#9ab63b');
+                // Gráfico
+                sctx.fillStyle = '#0a1f2a';
+                sctx.fillRect(18, 170, 476, 110);
+                sctx.fillStyle = '#9ab63b'; sctx.font = '10px "Geist Mono"'; sctx.fillText('● SALA', 28, 188);
+                sctx.fillStyle = '#fb923c'; sctx.fillText('● EXTERIOR', 78, 188);
+                sctx.strokeStyle = '#9ab63b'; sctx.lineWidth = 2; sctx.beginPath();
+                sctx.moveTo(28, 240);
+                for (let i = 0; i <= 50; i++) {
+                    const xx = 28 + i * (450/50);
+                    const yy = 240 - Math.sin(i * 0.3) * 12 - Math.cos(i * 0.5) * 6;
+                    sctx.lineTo(xx, yy);
+                }
+                sctx.stroke();
+                sctx.strokeStyle = '#fb923c'; sctx.lineWidth = 2; sctx.beginPath();
+                sctx.moveTo(28, 252);
+                for (let i = 0; i <= 50; i++) {
+                    const xx = 28 + i * (450/50);
+                    const yy = 252 - Math.sin(i * 0.4 + 1) * 14 - Math.cos(i * 0.3) * 6;
+                    sctx.lineTo(xx, yy);
+                }
+                sctx.stroke();
+                const screenTex = new THREE.CanvasTexture(screenCanvas);
+                screenTex.colorSpace = THREE.SRGBColorSpace || undefined;
+                // Pantalla más chica con aspect ratio matching (16:9-ish)
+                const scrW = mD * 0.62;
+                const scrH = scrW * (288 / 512);
+                const screen = new THREE.Mesh(
+                    new THREE.PlaneGeometry(scrW, scrH),
+                    new THREE.MeshBasicMaterial({ map: screenTex })
+                );
+                screen.position.set(masterX + mW/2 + 0.005, masterY + 0.25, masterZ);
+                screen.rotation.y = Math.PI / 2;
+                scene.add(screen);
+                // Marco metálico oscuro
+                const halfH = scrH / 2;
+                const halfW = scrW / 2;
+                const screenFrame = new THREE.LineSegments(
+                    new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(masterX + mW/2 + 0.006, masterY + 0.25 - halfH, masterZ - halfW),
+                        new THREE.Vector3(masterX + mW/2 + 0.006, masterY + 0.25 + halfH, masterZ - halfW),
+                        new THREE.Vector3(masterX + mW/2 + 0.006, masterY + 0.25 + halfH, masterZ + halfW),
+                        new THREE.Vector3(masterX + mW/2 + 0.006, masterY + 0.25 - halfH, masterZ + halfW),
+                        new THREE.Vector3(masterX + mW/2 + 0.006, masterY + 0.25 - halfH, masterZ - halfW)
+                    ]),
+                    new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 })
+                );
+                scene.add(screenFrame);
+                // LEDs status debajo de la pantalla
+                const ledMat = new THREE.MeshBasicMaterial({ color: TH_COLOR.titular });
+                const led1 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), ledMat);
+                led1.position.set(masterX + mW/2 + 0.008, masterY - 0.55, masterZ - 0.18);
+                scene.add(led1);
+                const led2 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), new THREE.MeshBasicMaterial({ color: TH_COLOR.masterAccent }));
+                led2.position.set(masterX + mW/2 + 0.008, masterY - 0.55, masterZ + 0);
+                scene.add(led2);
+                const led3 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), new THREE.MeshBasicMaterial({ color: '#475569' }));
+                led3.position.set(masterX + mW/2 + 0.008, masterY - 0.55, masterZ + 0.18);
+                scene.add(led3);
+                // Punto de salida del cable Modbus: ARRIBA del master (sale por el TOP)
+                const masterOutputPos = new THREE.Vector3(masterX + 0.1, masterY + mH/2 + 0.05, masterZ);
+
+                // === Cloud (esferas puffy, cerca del Master) ===
+                // Master está en pared izquierda interior. Cloud arriba a la izquierda, cerca pero claramente afuera.
+                const cloudY = 7;
+                const cloudX = -roomW/2 - 1.8, cloudZ = -1.5;
+                const cloudGroup = new THREE.Group();
+                const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+                // Cluster de esferas overlapping para look "puffy"
+                const cloudBlobs = [
+                    { x: 0,     y: 0,     z: 0,    r: 0.55 },
+                    { x: 0.55,  y: 0.05,  z: 0,    r: 0.45 },
+                    { x: -0.5,  y: 0.02,  z: 0.1,  r: 0.5  },
+                    { x: 0.25,  y: 0.32,  z: -0.05,r: 0.4  },
+                    { x: -0.25, y: 0.28,  z: 0.05, r: 0.38 },
+                    { x: 0.1,   y: -0.1,  z: 0.15, r: 0.42 }
+                ];
+                cloudBlobs.forEach(b => {
+                    const sph = new THREE.Mesh(new THREE.SphereGeometry(b.r, 18, 14), cloudMat);
+                    sph.position.set(cloudX + b.x, cloudY + b.y, cloudZ + b.z);
+                    cloudGroup.add(sph);
+                });
+                scene.add(cloudGroup);
+                // Pequeño icono Wi-Fi (3 arcos concéntricos) en el centro de la nube
+                for (let i = 0; i < 3; i++) {
+                    const arcGeo = new THREE.RingGeometry(0.18 + i*0.1, 0.22 + i*0.1, 24, 1, Math.PI * 0.85, Math.PI * 0.3);
+                    const arcMat = new THREE.MeshBasicMaterial({
+                        color: TH_COLOR.cloudGreen, transparent: true, opacity: 0.85, side: THREE.DoubleSide
+                    });
+                    const arc = new THREE.Mesh(arcGeo, arcMat);
+                    arc.rotation.x = -Math.PI / 2;
+                    arc.position.set(cloudX, cloudY + 0.7, cloudZ);
+                    scene.add(arc);
+                }
+                const cloudPos = new THREE.Vector3(cloudX, cloudY, cloudZ);
+
+                // === WiFi pulses (4 anillos GRANDES viajando Master→Cloud, visibles en 3D) ===
+                const wifiRings = [];
+                const dirToCloud = new THREE.Vector3().subVectors(cloudPos, masterOutputPos).normalize();
+                for (let i = 0; i < 4; i++) {
+                    const ringGeo = new THREE.RingGeometry(0.32, 0.42, 32);
+                    const ringMat = new THREE.MeshBasicMaterial({
+                        color: TH_COLOR.cloudGreen, transparent: true, opacity: 0,
+                        side: THREE.DoubleSide, depthWrite: false
+                    });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    // Orienta el anillo perpendicular a la trayectoria master→cloud
+                    ring.lookAt(masterOutputPos.clone().add(dirToCloud));
+                    ring.position.copy(masterOutputPos);
+                    ring.userData.phase = i / 4;
+                    scene.add(ring); wifiRings.push(ring);
+                }
+
+                sceneObj.current = {
+                    THREE, scene, camera, renderer,
+                    hvacGroup, presGroup, esclavoGroup, cableGroup,
+                    heatMeshes, heatWaves, wifiRings, wallMeshes,
+                    masterOutputPos, cloudPos,
+                    roomW, roomD, roomH,
+                    targetView: 'iso'
+                };
+
+                // Habilitar sombras en todos los Mesh Lambert (skip terrain ya tiene receive, basic materials no participan)
+                const enableShadows = (group) => {
+                    group.traverse(o => {
+                        if (o.isMesh && o.material && o.material.type === 'MeshLambertMaterial' && o !== terrain) {
+                            o.castShadow = true;
+                            if (!o.material.transparent || o.material.opacity > 0.7) {
+                                o.receiveShadow = true;
+                            }
+                        }
+                    });
+                };
+                enableShadows(scene);
+
+                // Resize
+                const onResize = () => {
+                    W = container.clientWidth;
+                    aspect = W / H;
+                    camera.left = -fs * aspect / 2;
+                    camera.right = fs * aspect / 2;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(W, H);
+                };
+                const ro = new ResizeObserver(onResize); ro.observe(container);
+
+                // === Orbit controls (drag + zoom) ===
+                // Spherical coords alrededor del target
+                const orbit = {
+                    targetAzimuth: Math.PI / 4,   // iso default
+                    targetPolar:   0.95,           // iso default (más alto que top)
+                    targetRadius:  32,
+                    targetZoom:    1.0,
+                    actualAzimuth: Math.PI / 4,
+                    actualPolar:   0.95,
+                    actualRadius:  32,
+                    actualZoom:    1.0,
+                    isDragging:    false,
+                    prevMouse:     { x: 0, y: 0 }
+                };
+                sceneObj.current.orbit = orbit;
+
+                const onPointerDown = (ev) => {
+                    orbit.isDragging = true;
+                    orbit.prevMouse = { x: ev.clientX, y: ev.clientY };
+                    canvas.style.cursor = 'grabbing';
+                };
+                const onPointerUp = () => {
+                    orbit.isDragging = false;
+                    canvas.style.cursor = 'grab';
+                };
+                const onPointerMove = (ev) => {
+                    if (!orbit.isDragging) return;
+                    const dx = ev.clientX - orbit.prevMouse.x;
+                    const dy = ev.clientY - orbit.prevMouse.y;
+                    orbit.targetAzimuth -= dx * 0.0075;
+                    orbit.targetPolar  -= dy * 0.0075;
+                    // Clamp polar para evitar voltearse (entre casi top-down y casi al ras del suelo)
+                    orbit.targetPolar = Math.max(0.05, Math.min(Math.PI / 2 - 0.02, orbit.targetPolar));
+                    orbit.prevMouse = { x: ev.clientX, y: ev.clientY };
+                };
+                const onWheel = (ev) => {
+                    ev.preventDefault();
+                    const factor = ev.deltaY > 0 ? 0.93 : 1.07;
+                    orbit.targetZoom = Math.max(0.5, Math.min(2.4, orbit.targetZoom * factor));
+                };
+                canvas.addEventListener('pointerdown', onPointerDown);
+                window.addEventListener('pointerup', onPointerUp);
+                window.addEventListener('pointermove', onPointerMove);
+                canvas.addEventListener('wheel', onWheel, { passive: false });
+
+                // Animation loop
+                let t = 0;
+                const camLook = new THREE.Vector3(0, 2, 0);
+
+                // Heartbeat envelope (lub-dub pattern over 1.8s cycle)
+                const heartbeat = (phase) => {
+                    const p = phase % 1.0;
+                    if (p < 0.08) return Math.sin(p / 0.08 * Math.PI);
+                    if (p < 0.18) return 0;
+                    if (p < 0.26) return Math.sin((p - 0.18) / 0.08 * Math.PI) * 0.7;
+                    return 0;
+                };
+
+                const animate = () => {
+                    t += 0.016;
+                    // Halo cálido sutil
+                    heatMeshes.forEach(h => {
+                        const ph = t + h.userData.phase;
+                        const s = 1 + 0.07 * Math.sin(ph * 1.0);
+                        h.scale.set(s, s, s);
+                        h.material.opacity = 0.06 + 0.04 * (0.5 + 0.5 * Math.sin(ph * 1.0));
+                    });
+                    // Ondas de calor subiendo — finas y graduales
+                    sceneObj.current.heatWaves?.forEach(w => {
+                        const u = ((t * 0.28 + w.userData.phase) % 1);
+                        w.position.y = eqH + 2.21 + u * 2.0;
+                        const sc = 1 + u * 1.8;
+                        w.scale.set(sc, sc, sc);
+                        w.material.opacity = (1 - u) * 0.22 * Math.max(0, Math.sin(u * Math.PI));
+                    });
+                    // Fan rotation
+                    hvacGroup.children.forEach(u => {
+                        if (u.userData && u.userData.fan && u.userData.spinSpeed > 0) {
+                            u.userData.fan.rotation.y += u.userData.spinSpeed;
+                        }
+                    });
+                    presGroup.children.forEach(u => {
+                        if (u.userData && u.userData.fan && u.userData.spinSpeed > 0) {
+                            u.userData.fan.rotation.y += u.userData.spinSpeed;
+                        }
+                    });
+                    // WiFi pulses con heartbeat (lub-dub) viajando de Master a Cloud
+                    wifiRings.forEach(r => {
+                        const cycle = t * 0.55 + r.userData.phase;
+                        const beat = heartbeat(cycle);
+                        const u = (cycle % 1);
+                        r.position.x = masterOutputPos.x + (cloudPos.x - masterOutputPos.x) * u;
+                        r.position.y = masterOutputPos.y + (cloudPos.y - masterOutputPos.y) * u;
+                        r.position.z = masterOutputPos.z + (cloudPos.z - masterOutputPos.z) * u;
+                        const sc = 1 + u * 2.5;
+                        r.scale.set(sc, sc, sc);
+                        r.material.opacity = beat * 0.9;
+                    });
+                    // Camera: orbit con lerp para transiciones suaves
+                    orbit.actualAzimuth += (orbit.targetAzimuth - orbit.actualAzimuth) * 0.12;
+                    orbit.actualPolar   += (orbit.targetPolar   - orbit.actualPolar)   * 0.12;
+                    orbit.actualRadius  += (orbit.targetRadius  - orbit.actualRadius)  * 0.12;
+                    orbit.actualZoom    += (orbit.targetZoom    - orbit.actualZoom)    * 0.15;
+                    const lookTarget = sceneObj.current.targetView === 'iso'
+                        ? new THREE.Vector3(0, 3.5, 0)
+                        : new THREE.Vector3(0, 0, 0);
+                    camLook.lerp(lookTarget, 0.07);
+                    camera.position.set(
+                        camLook.x + orbit.actualRadius * Math.sin(orbit.actualPolar) * Math.cos(orbit.actualAzimuth),
+                        camLook.y + orbit.actualRadius * Math.cos(orbit.actualPolar),
+                        camLook.z + orbit.actualRadius * Math.sin(orbit.actualPolar) * Math.sin(orbit.actualAzimuth)
+                    );
+                    camera.lookAt(camLook);
+                    camera.zoom = orbit.actualZoom;
+                    camera.updateProjectionMatrix();
+                    renderer.render(scene, camera);
+                    animRef.current = requestAnimationFrame(animate);
+                };
+                animate();
+
+                return () => {
+                    cancelAnimationFrame(animRef.current);
+                    ro.disconnect();
+                    canvas.removeEventListener('pointerdown', onPointerDown);
+                    window.removeEventListener('pointerup', onPointerUp);
+                    window.removeEventListener('pointermove', onPointerMove);
+                    canvas.removeEventListener('wheel', onWheel);
+                    renderer.dispose();
+                    scene.traverse(o => {
+                        if (o.geometry) o.geometry.dispose();
+                        if (o.material) {
+                            if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+                            else o.material.dispose();
+                        }
+                    });
+                };
+            }, []);
+
+            // Rebuild HVAC + PRES + Esclavos + cable when units change
+            useEffect(() => {
+                const obj = sceneObj.current;
+                if (!obj) return;
+                const { THREE, hvacGroup, presGroup, esclavoGroup, cableGroup, roomW, roomD, roomH, masterOutputPos } = obj;
+                const lineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line });
+
+                const clearGroup = (g) => {
+                    while (g.children.length) {
+                        const c = g.children[0];
+                        c.traverse?.(ch => {
+                            if (ch.geometry) ch.geometry.dispose();
+                            if (ch.material) ch.material.dispose();
+                        });
+                        g.remove(c);
+                    }
+                };
+                clearGroup(hvacGroup);
+                clearGroup(presGroup);
+                clearGroup(esclavoGroup);
+                clearGroup(cableGroup);
+
+                const colorByState = (state) => state === 'TITULAR' ? TH_COLOR.titular
+                                              : state === 'APOYO'   ? TH_COLOR.apoyo
+                                              : TH_COLOR.suplente;
+                const spinByState = (state) => state === 'TITULAR' ? 0.05
+                                            : state === 'APOYO'   ? 0.09
+                                            : 0;
+
+                // === HVACs + PRES distribuidos optimizando ambas paredes laterales ===
+                // Combinamos todos los equipos en una lista única y los repartimos entre L/R
+                const allEquipment = [
+                    ...hvacUnits.map((u, i) => ({ type: 'HVAC', unit: u, idx: i })),
+                    ...presUnits.map((u, i) => ({ type: 'PRES', unit: u, idx: i }))
+                ];
+                const totalEq = allEquipment.length;
+                const leftCount = Math.ceil(totalEq / 2);
+                const rightCount = totalEq - leftCount;
+                const zSpread = roomD * 0.72;
+                // Asignar side + z a cada equipo
+                allEquipment.forEach((eq, gi) => {
+                    eq.side = gi < leftCount ? 'left' : 'right';
+                    const posInRow = eq.side === 'left' ? gi : gi - leftCount;
+                    const cntRow   = eq.side === 'left' ? leftCount : rightCount;
+                    eq.z = cntRow <= 1 ? 0 : -zSpread/2 + posInRow * (zSpread / (cntRow - 1));
+                });
+                const n = hvacUnits.length;
+                const hvacInfo = []; // {x, y, z, side, equipPos, idx}
+
+                const buildHvac = (idx, side, z) => {
+                    const u = hvacUnits[idx];
+                    const color = colorByState(u.state);
+                    const spin  = spinByState(u.state);
+                    // Wall outside position (HVAC mochila hanging on exterior side wall)
+                    const wallX = side === 'left' ? -roomW/2 : roomW/2;
+                    const outSign = side === 'left' ? -1 : 1;   // -1 = afuera por la izq, +1 = afuera por la der
+                    // HVAC mochila: alto vertical, mounted at mid-height of wall, body protrudes out
+                    const unitW = 0.95;   // ancho hacia afuera del shelter
+                    const unitH = 2.0;    // alto vertical (mochila)
+                    const unitD = 1.0;    // profundidad a lo largo del shelter
+                    const y = 2.21 + roomH * 0.55;  // altura centro del HVAC (mid wall exterior)
+                    const bodyX = wallX + outSign * (unitW / 2 + 0.04);  // cuerpo afuera de la pared
+
+                    const g = new THREE.Group();
+                    // Cuerpo blanco crema del HVAC mochila
+                    const bGeo = new THREE.BoxGeometry(unitW, unitH, unitD);
+                    const body = new THREE.Mesh(bGeo, new THREE.MeshLambertMaterial({ color: '#f1eee5' }));
+                    body.position.set(bodyX, y, z);
+                    g.add(body);
+                    const eds = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
+                    eds.position.copy(body.position); g.add(eds);
+                    // Banda de color (indicador de estado) en la parte superior
+                    const stateBand = new THREE.Mesh(
+                        new THREE.BoxGeometry(unitW + 0.01, 0.18, unitD + 0.01),
+                        new THREE.MeshLambertMaterial({ color })
+                    );
+                    stateBand.position.set(bodyX, y + unitH/2 - 0.12, z);
+                    g.add(stateBand);
+                    // === VENTILADOR REALISTA (recessed con hub + blades 3D) ===
+                    const fanFaceX = bodyX + outSign * (unitW/2 + 0.005);
+                    const fanY = y - 0.3;
+                    // Cavidad recessed (disco oscuro inset en la mochila)
+                    const recess = new THREE.Mesh(
+                        new THREE.CircleGeometry(0.34, 32),
+                        new THREE.MeshLambertMaterial({ color: '#15151c' })
+                    );
+                    recess.position.set(fanFaceX - outSign * 0.02, fanY, z);
+                    recess.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
+                    g.add(recess);
+                    // Anillo exterior de la grilla (torus)
+                    const grilleRing = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.36, 0.025, 8, 32),
+                        new THREE.MeshLambertMaterial({ color: '#2a2a32' })
+                    );
+                    grilleRing.position.set(fanFaceX, fanY, z);
+                    grilleRing.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
+                    g.add(grilleRing);
+                    // Barras horizontales de la grilla (protección)
+                    for (let bar = -2; bar <= 2; bar++) {
+                        const grilleBar = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.01, 0.012, 0.7),
+                            new THREE.MeshLambertMaterial({ color: '#2a2a32' })
+                        );
+                        grilleBar.position.set(fanFaceX + outSign * 0.001, fanY + bar * 0.12, z);
+                        g.add(grilleBar);
+                    }
+                    // FAN GROUP: hub central + 3 aspas planas (sin pitch — no atraviesan la mochila)
+                    const fan = new THREE.Group();
+                    // Hub
+                    fan.add(new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.05, 0.05, 0.06, 14),
+                        new THREE.MeshLambertMaterial({ color: '#1f1f26' })
+                    ));
+                    // 3 aspas, todas planas en el mismo plano (rotation.x = 0)
+                    for (let bi = 0; bi < 3; bi++) {
+                        const angle = (bi / 3) * Math.PI * 2;
+                        const blade = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.30, 0.04, 0.10),  // largo, grueso, fino
+                            new THREE.MeshLambertMaterial({ color: '#9c9ca6' })
+                        );
+                        // Posicionar radialmente desde el hub
+                        blade.position.set(Math.cos(angle) * 0.17, 0, Math.sin(angle) * 0.17);
+                        blade.rotation.y = angle;
+                        // SIN pitch — todas las aspas planas en el mismo plano
+                        fan.add(blade);
+                    }
+                    // Orientar el fan para que el eje de rotación sea la normal de la pared
+                    fan.rotation.z = outSign === -1 ? Math.PI/2 : -Math.PI/2;
+                    // RECESSED PROFUNDO dentro de la mochila (las aspas no salen del cuerpo)
+                    fan.position.set(fanFaceX - outSign * 0.12, fanY, z);
+                    g.add(fan);
+                    // Persiana de admisión (recuadro rectangular abajo)
+                    const intake = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.005, 0.5, 0.7),
+                        new THREE.MeshLambertMaterial({ color: '#5e5e66' })
+                    );
+                    intake.position.set(fanFaceX, y + 0.5, z);
+                    g.add(intake);
+                    // Líneas horizontales de la persiana
+                    for (let k = 0; k < 5; k++) {
+                        const louver = new THREE.LineSegments(
+                            new THREE.BufferGeometry().setFromPoints([
+                                new THREE.Vector3(fanFaceX + outSign * 0.005, y + 0.3 + k * 0.1, z - 0.32),
+                                new THREE.Vector3(fanFaceX + outSign * 0.005, y + 0.3 + k * 0.1, z + 0.32)
+                            ]),
+                            new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.55 })
+                        );
+                        g.add(louver);
+                    }
+                    // CAÑO DE ESCAPE (encima del HVAC, sale por arriba)
+                    const exhaust = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.08, 0.08, 0.4, 10),
+                        new THREE.MeshLambertMaterial({ color: '#a8a8b0' })
+                    );
+                    exhaust.position.set(bodyX, y + unitH/2 + 0.2, z - unitD/2 + 0.18);
+                    g.add(exhaust);
+
+                    // SOPORTE TRIANGULAR de acero (debajo del HVAC, contra la pared)
+                    const bracketMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
+                    const bracketBase = y - unitH/2;       // base donde apoya
+                    const bracketDepth = unitW * 0.9;
+                    // Viga horizontal (sostiene el HVAC)
+                    const bHoriz = new THREE.Mesh(
+                        new THREE.BoxGeometry(bracketDepth, 0.08, 0.15),
+                        bracketMat
+                    );
+                    bHoriz.position.set(bodyX, bracketBase, z);
+                    bHoriz.castShadow = true;
+                    g.add(bHoriz);
+                    // Diagonal del bracket (de la pared al final de la horizontal)
+                    const diagLen = Math.sqrt(Math.pow(bracketDepth, 2) + Math.pow(bracketDepth * 0.9, 2));
+                    const bDiag = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.08, 0.08, 0.15),
+                        bracketMat
+                    );
+                    bDiag.scale.y = diagLen / 0.08;
+                    // Posicionar diagonal: desde (wallX, bracketBase - bracketDepth*0.9, z) hasta (bodyX + outSign*unitW/2, bracketBase, z)
+                    const from = new THREE.Vector3(wallX, bracketBase - bracketDepth * 0.9, z);
+                    const to   = new THREE.Vector3(bodyX + outSign * unitW/2 * 0.95, bracketBase, z);
+                    bDiag.position.copy(from.clone().add(to).multiplyScalar(0.5));
+                    bDiag.quaternion.setFromUnitVectors(
+                        new THREE.Vector3(0, 1, 0),
+                        new THREE.Vector3().subVectors(to, from).normalize()
+                    );
+                    bDiag.castShadow = true;
+                    g.add(bDiag);
+                    // Pegado a la pared (viga vertical corta donde se ancla)
+                    const bWall = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.08, 0.9, 0.15),
+                        bracketMat
+                    );
+                    bWall.position.set(wallX, bracketBase - 0.45, z);
+                    g.add(bWall);
+
+                    // === REJILLAS INTERIORES (en la pared del shelter, alineadas con el HVAC) ===
+                    const interiorX = wallX + (-outSign) * 0.025;  // 2.5cm hacia el interior de la pared
+                    const grilleColor = '#d4d4d8';
+                    const grilleLineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.7 });
+                    // Rejilla de INYECCIÓN (arriba — sale aire frío hacia la sala)
+                    const injHeight = 0.45, injWidth = 0.85;
+                    const inj = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.025, injHeight, injWidth),
+                        new THREE.MeshLambertMaterial({ color: grilleColor })
+                    );
+                    inj.position.set(interiorX, y + 0.95, z);
+                    g.add(inj);
+                    const injEds = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.025, injHeight, injWidth)),
+                        grilleLineMat
+                    );
+                    injEds.position.copy(inj.position); g.add(injEds);
+                    // Louvers horizontales (8 líneas en la cara interior)
+                    for (let lou = 0; lou < 8; lou++) {
+                        const louLine = new THREE.LineSegments(
+                            new THREE.BufferGeometry().setFromPoints([
+                                new THREE.Vector3(interiorX - outSign * 0.014, y + 0.95 - injHeight/2 + 0.04 + lou * (injHeight - 0.08) / 7, z - injWidth/2 + 0.03),
+                                new THREE.Vector3(interiorX - outSign * 0.014, y + 0.95 - injHeight/2 + 0.04 + lou * (injHeight - 0.08) / 7, z + injWidth/2 - 0.03)
+                            ]),
+                            grilleLineMat
+                        );
+                        g.add(louLine);
+                    }
+                    // Indicador "↓ INY" (flecha pequeña hacia abajo)
+                    const injArrow = new THREE.Mesh(
+                        new THREE.ConeGeometry(0.04, 0.07, 4),
+                        new THREE.MeshBasicMaterial({ color: TH_COLOR.cable })
+                    );
+                    injArrow.position.set(interiorX - outSign * 0.018, y + 0.95 - injHeight/2 - 0.08, z);
+                    injArrow.rotation.x = Math.PI;
+                    g.add(injArrow);
+
+                    // Rejilla de RETORNO (abajo — aire de la sala vuelve al HVAC)
+                    const retHeight = 0.45, retWidth = 0.85;
+                    const ret = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.025, retHeight, retWidth),
+                        new THREE.MeshLambertMaterial({ color: grilleColor })
+                    );
+                    ret.position.set(interiorX, y - 0.95, z);
+                    g.add(ret);
+                    const retEds = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.025, retHeight, retWidth)),
+                        grilleLineMat
+                    );
+                    retEds.position.copy(ret.position); g.add(retEds);
+                    for (let lou = 0; lou < 8; lou++) {
+                        const louLine = new THREE.LineSegments(
+                            new THREE.BufferGeometry().setFromPoints([
+                                new THREE.Vector3(interiorX - outSign * 0.014, y - 0.95 - retHeight/2 + 0.04 + lou * (retHeight - 0.08) / 7, z - retWidth/2 + 0.03),
+                                new THREE.Vector3(interiorX - outSign * 0.014, y - 0.95 - retHeight/2 + 0.04 + lou * (retHeight - 0.08) / 7, z + retWidth/2 - 0.03)
+                            ]),
+                            grilleLineMat
+                        );
+                        g.add(louLine);
+                    }
+                    // Indicador "↑ RET"
+                    const retArrow = new THREE.Mesh(
+                        new THREE.ConeGeometry(0.04, 0.07, 4),
+                        new THREE.MeshBasicMaterial({ color: TH_COLOR.heat })
+                    );
+                    retArrow.position.set(interiorX - outSign * 0.018, y - 0.95 + retHeight/2 + 0.08, z);
+                    g.add(retArrow);
+
+                    g.userData = { fan, spinSpeed: spin };
+                    hvacGroup.add(g);
+                    hvacInfo.push({
+                        x: bodyX, y, z, side, idx,
+                        wallX, outSign, interiorX,
+                        equipPos: new THREE.Vector3(bodyX, y, z)
+                    });
+                };
+
+                // Construir HVACs usando la asignación unificada
+                allEquipment.filter(e => e.type === 'HVAC').forEach(eq => {
+                    buildHvac(eq.idx, eq.side, eq.z);
+                });
+
+                // === Presurizadores como MOCHILAS CHICAS en pared lateral (junto a HVACs) ===
+                const presInfo = [];
+                // Mapeo de PRES idx → asignación unificada
+                const presAssignments = allEquipment.filter(e => e.type === 'PRES');
+                for (let i = 0; i < presUnits.length; i++) {
+                    const u = presUnits[i];
+                    const color = colorByState(u.state);
+                    const spin  = spinByState(u.state) * 0.8;
+                    // Usar la asignación unificada (slot junto a los HVACs)
+                    const assignment = presAssignments[i];
+                    const side = assignment.side;
+                    const wallX = side === 'left' ? -roomW/2 : roomW/2;
+                    const outSign = side === 'left' ? -1 : 1;
+                    const z = assignment.z;
+                    // Mochila más chica
+                    const unitW = 0.6;   // protrusión exterior
+                    const unitH = 1.3;   // altura (más chico que HVAC)
+                    const unitD = 0.65;  // profundidad
+                    const y = 2.21 + roomH * 0.55;  // misma altura que HVACs
+                    const bodyX = wallX + outSign * (unitW / 2 + 0.04);
+
+                    const g = new THREE.Group();
+                    // Cuerpo blanco más chico
+                    const bGeo = new THREE.BoxGeometry(unitW, unitH, unitD);
+                    const body = new THREE.Mesh(bGeo, new THREE.MeshLambertMaterial({ color: '#f1eee5' }));
+                    body.position.set(bodyX, y, z); g.add(body);
+                    const eds = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
+                    eds.position.copy(body.position); g.add(eds);
+                    // Banda de estado
+                    const stateBand = new THREE.Mesh(
+                        new THREE.BoxGeometry(unitW + 0.01, 0.12, unitD + 0.01),
+                        new THREE.MeshLambertMaterial({ color })
+                    );
+                    stateBand.position.set(bodyX, y + unitH/2 - 0.08, z);
+                    g.add(stateBand);
+                    // Fan más chico (igual estructura que HVAC pero escalado)
+                    const fanFaceX = bodyX + outSign * (unitW/2 + 0.005);
+                    const fanY = y - 0.15;
+                    // Recess
+                    const recess = new THREE.Mesh(
+                        new THREE.CircleGeometry(0.22, 24),
+                        new THREE.MeshLambertMaterial({ color: '#15151c' })
+                    );
+                    recess.position.set(fanFaceX - outSign * 0.02, fanY, z);
+                    recess.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
+                    g.add(recess);
+                    // Ring
+                    const ring = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.24, 0.018, 8, 24),
+                        new THREE.MeshLambertMaterial({ color: '#2a2a32' })
+                    );
+                    ring.position.set(fanFaceX, fanY, z);
+                    ring.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
+                    g.add(ring);
+                    // Fan: hub + 3 aspas planas chicas (mismo principio que HVAC)
+                    const fan = new THREE.Group();
+                    fan.add(new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.035, 0.035, 0.04, 12),
+                        new THREE.MeshLambertMaterial({ color: '#1f1f26' })
+                    ));
+                    for (let bi = 0; bi < 3; bi++) {
+                        const angle = (bi / 3) * Math.PI * 2;
+                        const blade = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.20, 0.03, 0.07),
+                            new THREE.MeshLambertMaterial({ color: '#9c9ca6' })
+                        );
+                        blade.position.set(Math.cos(angle) * 0.11, 0, Math.sin(angle) * 0.11);
+                        blade.rotation.y = angle;
+                        fan.add(blade);
+                    }
+                    fan.rotation.z = outSign === -1 ? Math.PI/2 : -Math.PI/2;
+                    // Recessed profundo
+                    fan.position.set(fanFaceX - outSign * 0.10, fanY, z);
+                    g.add(fan);
+
+                    // Bracket más chico (soporte triangular)
+                    const bracketMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
+                    const bracketBase = y - unitH/2;
+                    const bHoriz = new THREE.Mesh(
+                        new THREE.BoxGeometry(unitW * 0.85, 0.06, 0.12),
+                        bracketMat
+                    );
+                    bHoriz.position.set(bodyX, bracketBase, z); g.add(bHoriz);
+                    const bWall = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.06, 0.5, 0.12),
+                        bracketMat
+                    );
+                    bWall.position.set(wallX, bracketBase - 0.25, z); g.add(bWall);
+
+                    // Rejilla pequeña interior alineada con el presurizador
+                    const interiorX = wallX + (-outSign) * 0.025;
+                    const presRet = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.025, 0.4, 0.55),
+                        new THREE.MeshLambertMaterial({ color: '#d4d4d8' })
+                    );
+                    presRet.position.set(interiorX, y, z);
+                    g.add(presRet);
+                    const presRetEds = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.025, 0.4, 0.55)),
+                        new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.7 })
+                    );
+                    presRetEds.position.copy(presRet.position); g.add(presRetEds);
+
+                    g.userData = { fan, spinSpeed: spin };
+                    presGroup.add(g);
+                    presInfo.push({
+                        x: bodyX, y, z, side, idx: i,
+                        wallX, outSign, interiorX,
+                        equipPos: new THREE.Vector3(bodyX, y, z)
+                    });
+                }
+
+                // === ESCLAVOS — tablero pequeño en la pared interior, AL LADO de cada equipo (entre rejillas) ===
+                const escW = 0.4, escH = 0.6, escD = 0.18;
+                const esclavoData = [];
+
+                const buildEsclavo = (info, seq) => {
+                    // info trae wallX, outSign, interiorX, z, y (centro vertical del equipo)
+                    const interiorX = info.interiorX;
+                    const outSign = info.outSign;
+                    // El esclavo se monta al COSTADO del equipo, en la misma pared interior
+                    // Elegimos el lado (+z o -z) que tenga más espacio hasta los bordes del shelter
+                    const spaceForward  = (roomD/2 - 0.3) - info.z;   // espacio hacia +z
+                    const spaceBackward = info.z - (-roomD/2 + 0.3);  // espacio hacia -z
+                    const escZ = spaceForward > spaceBackward ? info.z + 0.65 : info.z - 0.65;
+                    const pos = new THREE.Vector3(interiorX, info.y, escZ);
+
+                    const g = new THREE.Group();
+                    const bGeo = new THREE.BoxGeometry(escD, escH, escW);
+                    const body = new THREE.Mesh(bGeo, new THREE.MeshLambertMaterial({ color: '#e2e8f0' }));
+                    body.position.copy(pos); g.add(body);
+                    const eds = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
+                    eds.position.copy(pos); g.add(eds);
+                    // Línea de gozne (hinge vertical en un lado, indica que es tablero con tapa)
+                    const hingeY1 = pos.y - escH/2 + 0.04, hingeY2 = pos.y + escH/2 - 0.04;
+                    const hinge = new THREE.LineSegments(
+                        new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(pos.x + (-outSign) * (escD/2 + 0.005), hingeY1, pos.z - escW/2 + 0.04),
+                            new THREE.Vector3(pos.x + (-outSign) * (escD/2 + 0.005), hingeY2, pos.z - escW/2 + 0.04)
+                        ]),
+                        new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.6 })
+                    );
+                    g.add(hinge);
+                    // LED indicador (verde) en frente
+                    const led = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 8, 6),
+                        new THREE.MeshBasicMaterial({ color: TH_COLOR.titular })
+                    );
+                    led.position.set(pos.x + (-outSign) * (escD/2 + 0.008), pos.y + escH/3, pos.z + escW/3);
+                    g.add(led);
+                    // Etiqueta de ID (placa chica)
+                    const idPlate = new THREE.Mesh(
+                        new THREE.PlaneGeometry(escW * 0.6, 0.08),
+                        new THREE.MeshBasicMaterial({ color: '#1f1f26' })
+                    );
+                    idPlate.position.set(pos.x + (-outSign) * (escD/2 + 0.006), pos.y + escH/3 - 0.12, pos.z);
+                    idPlate.rotation.y = outSign === -1 ? Math.PI/2 : -Math.PI/2;
+                    g.add(idPlate);
+                    esclavoGroup.add(g);
+                    esclavoData.push({ pos, equipPos: info.equipPos.clone(), side: info.side, seq });
+                };
+
+                hvacInfo.forEach((hp, i) => buildEsclavo(hp, i));
+                presInfo.forEach((pp, i) => buildEsclavo(pp, hvacInfo.length + i));
+
+                // (Conduits exterior removidos — el cable pasa internamente por la pared.
+                //  Solo dejamos un pequeño accesorio visual donde el cable entra a cada esclavo)
+
+                // === CABLE MODBUS daisy chain GRUESO con TubeGeometry ===
+                if (esclavoData.length > 0) {
+                    const cableY = roomH * 0.92 + 2.21;
+                    // Sequence: master → todos los esclavos en orden (left first, then right, then back)
+                    const leftEs  = esclavoData.filter(e => e.side === 'left');
+                    const rightEs = esclavoData.filter(e => e.side === 'right');
+                    const orderedEs = [...leftEs, ...rightEs.slice().reverse()];
+
+                    const pts = [masterOutputPos.clone()];
+                    // Sube del master al techo
+                    pts.push(new THREE.Vector3(masterOutputPos.x, cableY, masterOutputPos.z));
+                    // Visita cada esclavo: baja al esclavo, retorna al techo
+                    orderedEs.forEach(e => {
+                        pts.push(new THREE.Vector3(e.pos.x, cableY, e.pos.z));
+                        pts.push(new THREE.Vector3(e.pos.x, e.pos.y + escH/2 + 0.05, e.pos.z));
+                        pts.push(new THREE.Vector3(e.pos.x, cableY, e.pos.z));
+                    });
+
+                    // Curve suave a través de los puntos (CatmullRom para evitar codos agudos)
+                    if (pts.length >= 2) {
+                        const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
+                        // TUBO GRUESO — cable visible desde lejos
+                        const tubeGeo = new THREE.TubeGeometry(curve, Math.max(64, pts.length * 8), 0.05, 8, false);
+                        const tubeMat = new THREE.MeshLambertMaterial({ color: TH_COLOR.cable });
+                        const tube = new THREE.Mesh(tubeGeo, tubeMat);
+                        tube.castShadow = true;
+                        cableGroup.add(tube);
+                        // Glow externo (semi-transparente más grueso)
+                        const glowGeo = new THREE.TubeGeometry(curve, Math.max(64, pts.length * 8), 0.10, 8, false);
+                        const glowMat = new THREE.MeshBasicMaterial({
+                            color: TH_COLOR.cable, transparent: true, opacity: 0.18, depthWrite: false
+                        });
+                        cableGroup.add(new THREE.Mesh(glowGeo, glowMat));
+                    }
+                }
+
+                // Habilitar sombras en los grupos dinámicos
+                [hvacGroup, presGroup, esclavoGroup, cableGroup].forEach(g => {
+                    g.traverse(o => {
+                        if (o.isMesh && o.material && o.material.type === 'MeshLambertMaterial') {
+                            o.castShadow = true;
+                            o.receiveShadow = true;
+                        }
+                    });
+                });
+            }, [hvacUnits, presUnits]);
+
+            // Toggle interior/exterior — actualiza opacidad de paredes
+            useEffect(() => {
+                const obj = sceneObj.current;
+                if (!obj || !obj.wallMeshes) return;
+                const targetOpacity = interiorVisible ? 0.18 : 0.92;
+                obj.wallMeshes.forEach(m => { m.opacity = targetOpacity; });
+            }, [interiorVisible]);
+
+            // View toggle: actualiza orbit targets para transición suave
+            useEffect(() => {
+                const obj = sceneObj.current;
+                if (!obj) return;
+                obj.targetView = view;
+                if (obj.orbit) {
+                    if (view === 'iso') {
+                        obj.orbit.targetAzimuth = Math.PI / 4;
+                        obj.orbit.targetPolar   = 0.95;
+                        obj.orbit.targetRadius  = 32;
+                    } else { // top
+                        obj.orbit.targetAzimuth = Math.PI / 4;
+                        obj.orbit.targetPolar   = 0.05;
+                        obj.orbit.targetRadius  = 32;
+                    }
+                }
+            }, [view]);
+
+            return (
+                <div ref={containerRef} className="relative w-full" style={{ background: '#0a0a12' }}>
+                    <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '560px', cursor: 'grab' }}></canvas>
+                    <div className="absolute top-3 left-4 z-10 text-[11px] font-bold uppercase tracking-widest pointer-events-none" style={{ color: TH_COLOR.master, opacity: 0.85 }}>
+                        Simulación
+                    </div>
+                    <div className="absolute top-3 right-4 z-10 text-[10px] font-mono pointer-events-none" style={{ color: '#475569' }}>
+                        {interiorVisible ? 'INTERIOR VISIBLE' : 'EXTERIOR CERRADO'}
+                    </div>
+                    <div className="absolute bottom-3 left-4 z-10 flex flex-wrap gap-3 text-[10px] font-bold tracking-widest font-mono pointer-events-none" style={{ color: '#475569' }}>
+                        <span className="inline-flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', background: TH_COLOR.titular, borderRadius: '2px' }}></span>TITULAR</span>
+                        <span className="inline-flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', background: TH_COLOR.suplente, borderRadius: '2px' }}></span>SUPLENTE</span>
+                        <span className="inline-flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', background: TH_COLOR.apoyo, borderRadius: '2px' }}></span>APOYO</span>
+                        <span className="inline-flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', background: TH_COLOR.heat, borderRadius: '50%' }}></span>VFD calor</span>
+                    </div>
+                    <div className="absolute bottom-3 right-4 z-10 text-[10px] font-mono pointer-events-none flex flex-col gap-1 items-end" style={{ color: TH_COLOR.master }}>
+                        <span><span style={{ display: 'inline-block', width: '20px', height: '2px', background: TH_COLOR.cable, marginRight: '6px', verticalAlign: 'middle' }}></span>RS-485 daisy chain</span>
+                        <span style={{ color: '#94a3b8' }}><span style={{ display: 'inline-block', width: '20px', height: '1px', background: '#94a3b8', marginRight: '6px', verticalAlign: 'middle' }}></span>Comando Esclavo → equipo</span>
+                    </div>
+                </div>
+            );
         };
 
         function ComoFuncionaSim() {
@@ -2131,6 +3592,7 @@
             const [rotationPeriod, setRotationPeriod] = useState('week');
             const [overloadEnabled, setOverloadEnabled] = useState(true);
             const [view, setView]                 = useState('iso'); // 'iso' | 'top'
+            const [interiorVisible, setInteriorVisible] = useState(true); // ver interior vs exterior cerrado
 
             const [hvacUnits, setHvacUnits]       = useState([]);
             const [presUnits, setPresUnits]       = useState([]);
@@ -2246,49 +3708,15 @@
                 }]);
             };
 
-            // Brand-aligned palette by state
-            const stateStyles = {
-                TITULAR:  'border-eco-lightgreen/60 bg-eco-green/15 text-eco-lightgreen shadow-[0_0_18px_rgba(154,182,59,0.35)]',
-                SUPLENTE: 'border-slate-700 bg-slate-900/60 text-slate-400',
-                APOYO:    'border-amber-400/60 bg-amber-500/15 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.45)] animate-pulse'
+            // Gantt timeline colors (inline so they always render)
+            const ganttBg = {
+                TITULAR:  { background: '#9ab63b', boxShadow: '0 0 6px rgba(154,182,59,0.8)' },
+                SUPLENTE: { background: '#1e293b' },
+                APOYO:    { background: '#fbbf24', boxShadow: '0 0 6px rgba(251,191,36,0.8)' }
             };
-            const ganttColor = {
-                TITULAR:  'bg-eco-lightgreen shadow-[0_0_6px_rgba(154,182,59,0.8)]',
-                SUPLENTE: 'bg-slate-800',
-                APOYO:    'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
-            };
-
-            // Position computation: 2 rows for HVACs, master left, PRES right
-            const hvacPositions = useMemo(() => {
-                const topCount = Math.ceil(hvacTotal / 2);
-                const botCount = hvacTotal - topCount;
-                const spread = (count) => {
-                    if (count <= 0) return [];
-                    if (count === 1) return ['50%'];
-                    const step = 100 / (count + 1);
-                    return Array.from({ length: count }, (_, i) => `${(i + 1) * step}%`);
-                };
-                return { top: spread(topCount), bottom: spread(botCount) };
-            }, [hvacTotal]);
-
-            const topHvacs    = hvacUnits.slice(0, Math.ceil(hvacTotal / 2));
-            const bottomHvacs = hvacUnits.slice(Math.ceil(hvacTotal / 2));
 
             const activeCount   = hvacUnits.filter(u => u.state === 'TITULAR' || u.state === 'APOYO').length;
             const standbyCount  = hvacUnits.filter(u => u.state === 'SUPLENTE').length;
-
-            // Build daisy-chain path: master → top row (L→R) → bottom row (R→L) → pres
-            const chainPath = useMemo(() => {
-                const nodes = [];
-                nodes.push({ x: 7, y: 50 });                          // master
-                hvacPositions.top.forEach(pct => nodes.push({ x: parseFloat(pct) * 0.7 + 14, y: 22 }));
-                [...hvacPositions.bottom].reverse().forEach(pct => nodes.push({ x: parseFloat(pct) * 0.7 + 14, y: 78 }));
-                presUnits.forEach((_, i) => {
-                    const y = presTotal === 1 ? 50 : (i === 0 ? 30 : 70);
-                    nodes.push({ x: 92, y });
-                });
-                return nodes.map((n, i) => `${i === 0 ? 'M' : 'L'} ${n.x} ${n.y}`).join(' ');
-            }, [hvacPositions, presUnits, presTotal]);
 
             return (
                 <div className="sim-panel w-full overflow-hidden">
@@ -2312,6 +3740,10 @@
                                 <button onClick={() => setView('iso')} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${view === 'iso' ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>3D</button>
                                 <button onClick={() => setView('top')} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${view === 'top' ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>Top</button>
                             </div>
+                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-1 flex">
+                                <button onClick={() => setInteriorVisible(true)} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Interior</button>
+                                <button onClick={() => setInteriorVisible(false)} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${!interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Exterior</button>
+                            </div>
                         </div>
                     </div>
 
@@ -2323,11 +3755,12 @@
                             </div>
                             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                                 <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">
-                                        HVAC instalados <span className="text-eco-lightgreen font-mono">[{hvacTotal}]</span>
-                                    </label>
-                                    <input type="range" min="1" max="8" value={hvacTotal} onChange={handleTotalChange} className="sim-input-range w-full" />
-                                    <div className="flex justify-between text-[9px] text-slate-600 font-mono mt-1"><span>1</span><span>8</span></div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">HVAC instalados</label>
+                                    <select value={hvacTotal} onChange={handleTotalChange} className="sim-select w-full">
+                                        {Array.from({ length: 8 }, (_, i) => i + 1).map(n => (
+                                            <option key={n} value={n}>{n} {n === 1 ? 'unidad' : 'unidades'}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">Presurizadores</label>
@@ -2388,117 +3821,9 @@
                         </div>
                     </div>
 
-                    {/* Visualization (Blueprint con cable + cloud + WiFi) */}
-                    <div className="relative bg-[#020617] sim-scanlines" style={{ minHeight: '460px' }}>
-                        {/* Subtle radar grid */}
-                        <div className="absolute inset-0 pointer-events-none" style={{
-                            backgroundImage: 'linear-gradient(to right, rgba(0,152,198,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,152,198,0.06) 1px, transparent 1px)',
-                            backgroundSize: '36px 36px'
-                        }}></div>
+                    {/* Visualization (Three.js scene — sala blueprint blanca con equipo + HVAC + Master) */}
+                    <Sala3D hvacUnits={hvacUnits} presUnits={presUnits} view={view} interiorVisible={interiorVisible} />
 
-                        {/* Cloud node (top-right) */}
-                        <div className="absolute right-5 top-5 z-30 flex flex-col items-center">
-                            <div className="bg-slate-950 border border-eco-lightgreen/40 rounded-xl px-3 py-2 flex items-center gap-2 shadow-[0_0_25px_rgba(154,182,59,0.15)]">
-                                <Icon name="cloud" size={18} className="text-eco-lightgreen" />
-                                <div className="leading-tight">
-                                    <div className="text-[10px] text-white font-bold">CLOUD</div>
-                                    <div className="text-[8px] text-slate-500 font-mono uppercase">MQTT · TLS</div>
-                                </div>
-                            </div>
-                            <div className="text-[9px] font-mono text-eco-lightgreen/60 mt-1">↓ sync</div>
-                        </div>
-
-                        {/* The 3D / Top scene */}
-                        <div className={`relative w-full ${view === 'iso' ? 'sim-iso-tilt' : 'sim-top-flat'}`} style={{ height: '460px' }}>
-                            {/* Room outline */}
-                            <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
-                                <rect x="14" y="18" width="76" height="64" fill="none" stroke="rgba(34,211,238,0.35)" strokeWidth="0.25" strokeDasharray="1.4 1.4" rx="2" />
-                                <path d="M 14 16 L 14 20 M 12 18 L 16 18" stroke="rgba(34,211,238,0.6)" strokeWidth="0.3"/>
-                                <path d="M 90 16 L 90 20 M 88 18 L 92 18" stroke="rgba(34,211,238,0.6)" strokeWidth="0.3"/>
-                                <path d="M 14 80 L 14 84 M 12 82 L 16 82" stroke="rgba(34,211,238,0.6)" strokeWidth="0.3"/>
-                                <path d="M 90 80 L 90 84 M 88 82 L 92 82" stroke="rgba(34,211,238,0.6)" strokeWidth="0.3"/>
-
-                                {/* Daisy chain cable (la guirnalda Modbus RS-485) */}
-                                <path d={chainPath} fill="none" stroke="#0098c6" strokeWidth="0.45" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
-                                <path d={chainPath} fill="none" stroke="#22d3ee" strokeWidth="0.18" strokeLinecap="round" strokeDasharray="0.4 1" opacity="0.6">
-                                    <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="3s" repeatCount="indefinite"/>
-                                </path>
-
-                                {/* WiFi link master → cloud (top right area, route up-then-right) */}
-                                <path d="M 7 50 Q 7 12 92 12" fill="none" stroke="rgba(154,182,59,0.35)" strokeWidth="0.25" strokeDasharray="0.5 1.5" />
-                            </svg>
-
-                            {/* WiFi pulses concentric around master, going up */}
-                            <svg className="absolute pointer-events-none" style={{ left: '4%', top: '40%', width: '6%', height: '24%', overflow: 'visible' }} viewBox="0 0 20 50">
-                                <g transform="translate(10 10)">
-                                    <circle r="6" cx="0" cy="0" fill="none" stroke="#9ab63b" className="sim-wifi-pulse" />
-                                    <circle r="6" cx="0" cy="0" fill="none" stroke="#9ab63b" className="sim-wifi-pulse" />
-                                    <circle r="6" cx="0" cy="0" fill="none" stroke="#9ab63b" className="sim-wifi-pulse" />
-                                </g>
-                            </svg>
-
-                            {/* Watermark */}
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]">
-                                <span className="text-5xl md:text-7xl font-black tracking-[0.4em] text-white">SALA · ELÉCTRICA</span>
-                            </div>
-
-                            {/* Master node (left, the tablero principal) */}
-                            <div className="absolute z-20" style={{ left: '4%', top: '50%', transform: 'translate(-50%, -50%)' }}>
-                                <div className="bg-slate-950 border-2 border-eco-blue rounded-lg p-3 shadow-[0_0_30px_rgba(0,71,143,0.5)] flex flex-col items-center min-w-[88px]">
-                                    <Icon name="hard-drive" size={26} className="text-eco-lightblue mb-1" />
-                                    <div className="flex gap-1 mb-1">
-                                        <span className="w-1.5 h-3 bg-eco-lightgreen rounded-sm animate-pulse" style={{ boxShadow: '0 0 6px #9ab63b' }}></span>
-                                        <span className="w-1.5 h-3 bg-eco-lightblue rounded-sm animate-pulse" style={{ animationDelay: '0.3s', boxShadow: '0 0 6px #0098c6' }}></span>
-                                        <span className="w-1.5 h-3 bg-slate-700 rounded-sm"></span>
-                                    </div>
-                                    <span className="text-[9px] font-mono text-eco-lightblue text-center uppercase tracking-widest leading-tight">Maestro<br/>+HMI</span>
-                                </div>
-                            </div>
-
-                            {/* Top row HVACs */}
-                            {topHvacs.map((u, i) => (
-                                <div key={u.id} className={`absolute z-10 border rounded-lg flex flex-col items-center p-2 w-[88px] backdrop-blur-sm transition-all duration-500 ${stateStyles[u.state]}`}
-                                    style={{ left: hvacPositions.top[i], top: '22%', transform: 'translate(-50%, -50%)' }}>
-                                    <Icon name="fan" size={18} className={u.state === 'TITULAR' ? 'sim-fan-spin opacity-90' : u.state === 'APOYO' ? 'sim-fan-spin-fast opacity-90' : 'opacity-50'} />
-                                    <span className="text-[10px] font-mono font-bold mt-1">{u.id}</span>
-                                    <span className="text-[8px] font-bold mt-1 px-1.5 py-0.5 rounded-sm uppercase tracking-wider" style={{ background: 'rgba(0,0,0,0.4)' }}>{u.state}</span>
-                                    <span className="text-[9px] font-mono mt-1 text-slate-300">{String(u.hours).padStart(4,'0')}h</span>
-                                </div>
-                            ))}
-
-                            {/* Bottom row HVACs */}
-                            {bottomHvacs.map((u, i) => (
-                                <div key={u.id} className={`absolute z-10 border rounded-lg flex flex-col items-center p-2 w-[88px] backdrop-blur-sm transition-all duration-500 ${stateStyles[u.state]}`}
-                                    style={{ left: hvacPositions.bottom[i], top: '78%', transform: 'translate(-50%, -50%)' }}>
-                                    <Icon name="fan" size={18} className={u.state === 'TITULAR' ? 'sim-fan-spin opacity-90' : u.state === 'APOYO' ? 'sim-fan-spin-fast opacity-90' : 'opacity-50'} />
-                                    <span className="text-[10px] font-mono font-bold mt-1">{u.id}</span>
-                                    <span className="text-[8px] font-bold mt-1 px-1.5 py-0.5 rounded-sm uppercase tracking-wider" style={{ background: 'rgba(0,0,0,0.4)' }}>{u.state}</span>
-                                    <span className="text-[9px] font-mono mt-1 text-slate-300">{String(u.hours).padStart(4,'0')}h</span>
-                                </div>
-                            ))}
-
-                            {/* Pressurizers (right) */}
-                            {presUnits.map((u, i) => (
-                                <div key={u.id} className={`absolute z-10 border rounded-lg flex flex-col items-center p-2 w-[88px] backdrop-blur-sm transition-all duration-500 ${stateStyles[u.state]}`}
-                                    style={{ left: '92%', top: presTotal === 1 ? '50%' : (i === 0 ? '30%' : '70%'), transform: 'translate(-50%, -50%)' }}>
-                                    <Icon name="wind" size={18} className={u.state === 'TITULAR' ? 'opacity-90' : 'opacity-50'} />
-                                    <span className="text-[10px] font-mono font-bold mt-1">{u.id}</span>
-                                    <span className="text-[8px] font-bold mt-1 px-1.5 py-0.5 rounded-sm uppercase tracking-wider" style={{ background: 'rgba(0,0,0,0.4)' }}>{u.state}</span>
-                                    <span className="text-[9px] font-mono mt-1 text-slate-300">{String(u.hours).padStart(4,'0')}h</span>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Legend overlay */}
-                        <div className="absolute bottom-3 left-4 z-30 flex gap-4 text-[10px] font-bold tracking-widest font-mono">
-                            <span className="text-eco-lightgreen inline-flex items-center gap-1.5"><span className="w-2 h-2 bg-eco-lightgreen rounded-sm" style={{boxShadow:'0 0 6px #9ab63b'}}></span>TITULAR</span>
-                            <span className="text-slate-400 inline-flex items-center gap-1.5"><span className="w-2 h-2 bg-slate-600 rounded-sm border border-slate-500"></span>SUPLENTE</span>
-                            <span className="text-amber-300 inline-flex items-center gap-1.5"><span className="w-2 h-2 bg-amber-400 rounded-sm" style={{boxShadow:'0 0 6px #fbbf24'}}></span>APOYO</span>
-                        </div>
-                        <div className="absolute bottom-3 right-4 z-30 text-[10px] font-mono text-eco-lightblue/80 flex items-center gap-2">
-                            <span className="w-6 h-px bg-eco-lightblue/60"></span> RS-485 LINK
-                        </div>
-                    </div>
 
                     {/* Timeline Gantt */}
                     <div className="p-4 border-t border-slate-800 bg-slate-900/30">
@@ -2522,7 +3847,7 @@
                                         <div className="flex bg-slate-950 rounded-sm border border-slate-800 overflow-hidden shadow-inner">
                                             {history.map((c, i) => {
                                                 const s = c.hvacs.find(u => u.id === unit.id)?.state;
-                                                return <div key={i} className={`w-10 h-4 border-r border-slate-900 ${ganttColor[s] || ''}`}></div>;
+                                                return <div key={i} className="w-10 h-4 border-r border-slate-900" style={ganttBg[s] || {}}></div>;
                                             })}
                                         </div>
                                     </div>
@@ -2537,7 +3862,7 @@
                                         <div className="flex bg-slate-950 rounded-sm border border-slate-800 overflow-hidden shadow-inner">
                                             {history.map((c, i) => {
                                                 const s = c.pres.find(u => u.id === unit.id)?.state;
-                                                return <div key={i} className={`w-10 h-4 border-r border-slate-900 ${ganttColor[s] || ''}`}></div>;
+                                                return <div key={i} className="w-10 h-4 border-r border-slate-900" style={ganttBg[s] || {}}></div>;
                                             })}
                                         </div>
                                     </div>
@@ -2549,12 +3874,25 @@
             );
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        (function mountSim() {
             const mount = document.getElementById('react-simulator-root');
-            if (mount && window.React && window.ReactDOM) {
-                ReactDOM.createRoot(mount).render(<ComoFuncionaSim />);
+            if (!mount) {
+                console.error('[Cómo funciona] mount node not found');
+                return;
             }
-        });
+            if (!window.React || !window.ReactDOM) {
+                console.error('[Cómo funciona] React/ReactDOM not loaded');
+                mount.innerHTML = '<div style="padding:2rem;color:#fca5a5;background:#450a0a;border-radius:12px;font-family:monospace;text-align:center">React no se cargó. Revisar consola.</div>';
+                return;
+            }
+            try {
+                ReactDOM.createRoot(mount).render(<ComoFuncionaSim />);
+                if (window.lucide) window.lucide.createIcons();
+            } catch (err) {
+                console.error('[Cómo funciona] render error:', err);
+                mount.innerHTML = '<div style="padding:2rem;color:#fca5a5;background:#450a0a;border-radius:12px;font-family:monospace;text-align:center">Error renderizando simulador: ' + (err && err.message ? err.message : String(err)) + '</div>';
+            }
+        })();
     </script>
 </body>
 
