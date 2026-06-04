@@ -54,6 +54,10 @@
 
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <style>
         html {
             scroll-behavior: smooth;
@@ -224,7 +228,113 @@
         @media (prefers-reduced-motion: reduce) {
             .reveal, .reveal-stagger > * { opacity: 1; transform: none; transition: none; }
             .animate-float, .animate-shimmer { animation: none; }
+            .sim-wifi-pulse { animation: none; }
+            .sim-iso-tilt { transform: none !important; }
+            .sim-data-packet { animation: none; }
         }
+
+        /* === Simulador "Cómo funciona" === */
+        .sim-panel {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(51, 65, 85, 0.6);
+            border-radius: 14px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .sim-input-range {
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(154, 182, 59, 0.15);
+            border: 1px solid rgba(154, 182, 59, 0.35);
+            height: 6px;
+            border-radius: 4px;
+        }
+        .sim-input-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 18px;
+            width: 8px;
+            background: #9ab63b;
+            cursor: pointer;
+            box-shadow: 0 0 12px #9ab63b;
+            border-radius: 3px;
+        }
+        .sim-input-range::-moz-range-thumb {
+            height: 18px;
+            width: 8px;
+            background: #9ab63b;
+            cursor: pointer;
+            border: 0;
+            border-radius: 3px;
+            box-shadow: 0 0 12px #9ab63b;
+        }
+
+        .sim-select {
+            background: #020617;
+            border: 1px solid #334155;
+            color: #cbd5e1;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-size: 12px;
+            outline: none;
+        }
+        .sim-select:focus { border-color: #9ab63b; }
+
+        .sim-scanlines::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.18) 50%, rgba(0,0,0,0.18) 100%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        .sim-iso-tilt {
+            transform: perspective(1600px) rotateX(22deg) rotateZ(-2deg);
+            transform-origin: center center;
+            transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sim-top-flat {
+            transform: perspective(1600px) rotateX(0deg) rotateZ(0deg);
+            transform-origin: center center;
+            transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes wifiPulse {
+            0%   { stroke-opacity: 0;   stroke-width: 1.5; r: 6;  }
+            30%  { stroke-opacity: 1;   stroke-width: 2;   r: 14; }
+            100% { stroke-opacity: 0;   stroke-width: 0.5; r: 28; }
+        }
+        .sim-wifi-pulse {
+            animation: wifiPulse 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+            transform-origin: center;
+        }
+        .sim-wifi-pulse:nth-child(2) { animation-delay: 0.8s; }
+        .sim-wifi-pulse:nth-child(3) { animation-delay: 1.6s; }
+
+        @keyframes dataPacket {
+            0%   { offset-distance: 0%;   opacity: 0; }
+            8%   { opacity: 1; }
+            92%  { opacity: 1; }
+            100% { offset-distance: 100%; opacity: 0; }
+        }
+        .sim-data-packet {
+            animation: dataPacket 3.5s linear infinite;
+        }
+
+        .sim-no-scroll::-webkit-scrollbar { display: none; }
+        .sim-no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes spinSlow {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        .sim-fan-spin { animation: spinSlow 2.2s linear infinite; }
+        .sim-fan-spin-fast { animation: spinSlow 0.9s linear infinite; }
     </style>
 </head>
 
@@ -247,6 +357,8 @@
                         class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">La Solución</a>
                     <a href="#arquitectura"
                         class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">Arquitectura</a>
+                    <a href="#como-funciona"
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">Cómo funciona</a>
                     <a href="#instalacion"
                         class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">Instalación</a>
                     <a href="#precios"
@@ -268,6 +380,7 @@
             <a href="#problematica" class="block text-base font-medium text-gray-600">La Problemática</a>
             <a href="#solucion" class="block text-base font-medium text-gray-600">La Solución</a>
             <a href="#arquitectura" class="block text-base font-medium text-gray-600">Arquitectura</a>
+            <a href="#como-funciona" class="block text-base font-medium text-gray-600">Cómo funciona</a>
             <a href="#instalacion" class="block text-base font-medium text-gray-600">Instalación</a>
             <a href="#precios" class="block text-base font-medium text-gray-600">Planes</a>
             <button class="open-login-btn block text-base font-medium text-eco-blue w-full text-left">Acceso a
@@ -1165,6 +1278,22 @@
             <div class="grid md:grid-cols-2 gap-12 items-center">
                 <div class="order-2 md:order-1 relative">
                     <div class="flex flex-col gap-4 relative">
+
+                        <div class="w-full max-w-md ml-auto flex flex-col items-end gap-1">
+                            <div class="inline-flex items-center gap-2 bg-slate-900/80 border border-eco-lightgreen/40 rounded-full px-3 py-1.5 shadow-[0_0_18px_rgba(154,182,59,0.18)]">
+                                <i data-lucide="cloud" class="w-4 h-4 text-eco-lightgreen"></i>
+                                <span class="text-[11px] text-eco-lightgreen font-mono font-bold tracking-wider">CLOUD · MQTT</span>
+                            </div>
+                            <svg width="36" height="42" viewBox="0 0 36 42" class="mr-6 overflow-visible">
+                                <line x1="18" y1="2" x2="18" y2="40" stroke="#9ab63b" stroke-width="1" stroke-dasharray="2 3" opacity="0.5"/>
+                                <g transform="translate(18 22)">
+                                    <circle r="6" fill="none" stroke="#9ab63b" class="sim-wifi-pulse"/>
+                                    <circle r="6" fill="none" stroke="#9ab63b" class="sim-wifi-pulse"/>
+                                    <circle r="6" fill="none" stroke="#9ab63b" class="sim-wifi-pulse"/>
+                                </g>
+                            </svg>
+                        </div>
+
                         <div
                             class="bg-slate-900/80 backdrop-blur-sm p-6 rounded-xl border-2 border-eco-lightblue shadow-2xl shadow-eco-lightblue/20 relative z-10 w-full max-w-md ml-auto">
                             <div class="flex justify-between items-start mb-2">
@@ -1182,8 +1311,9 @@
                             </div>
                         </div>
 
-                        <div
-                            class="hidden md:block absolute right-1/2 top-20 bottom-16 w-1 bg-gradient-to-b from-eco-blue to-eco-green z-0 -mr-0.5">
+                        <div class="hidden md:block absolute right-1/2 top-32 bottom-16 z-0 -mr-0.5 pointer-events-none">
+                            <div class="w-1 h-full bg-eco-lightblue/70 rounded-full shadow-[0_0_8px_rgba(0,152,198,0.6)]"></div>
+                            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-950 border border-eco-lightblue/50 rounded px-2 py-0.5 text-[9px] font-mono text-eco-lightblue uppercase tracking-widest whitespace-nowrap">RS-485</div>
                         </div>
 
                         <div
@@ -1246,6 +1376,32 @@
                             de manera autónoma con sus sensores locales.</p>
                     </div>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="como-funciona" class="py-24 lg:py-32 bg-eco-dark relative overflow-hidden">
+        <div class="absolute inset-0 opacity-[0.05] pointer-events-none"
+            style="background-image: radial-gradient(rgba(0,152,198,0.4) 1px, transparent 1px); background-size: 28px 28px;">
+        </div>
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[400px] bg-eco-blue/15 rounded-full filter blur-[120px] pointer-events-none"></div>
+        <div class="absolute bottom-0 right-0 w-[500px] h-[500px] bg-eco-green/10 rounded-full filter blur-[120px] pointer-events-none"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-12 reveal">
+                <h3 class="text-3xl md:text-5xl font-bold text-white mb-4"
+                    style="letter-spacing: -0.03em; text-wrap: balance;">Cómo funciona en tu sala</h3>
+                <p class="text-gray-300 max-w-2xl mx-auto">Configurá la cantidad de HVAC y presurizadores y mirá
+                    cómo Ecomonitor distribuye horas entre titulares y suplentes, activa apoyo en picos térmicos
+                    y sincroniza al cloud por Wi-Fi.</p>
+            </div>
+
+            <div id="react-simulator-root" class="reveal"></div>
+
+            <div class="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-gray-400 font-mono">
+                <span class="inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-eco-lightblue"></span>Modbus RS-485 · 3 hilos · daisy chain</span>
+                <span class="inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-eco-lightgreen"></span>Wi-Fi · MQTT cloud sync</span>
+                <span class="inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Apoyo: backup activado por estrés térmico</span>
             </div>
         </div>
     </section>
@@ -1954,6 +2110,450 @@
                     }
                 }, 300);
             });
+        });
+    </script>
+
+    <script type="text/babel" data-presets="env,react">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        const PERIOD_HOURS  = { day: 24,  week: 168, month: 720 };
+        const PERIOD_LABELS = { day: '24 hs', week: '1 semana', month: '1 mes' };
+
+        const Icon = ({ name, className, size = 16, style }) => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} className={className} style={{ ...style, width: size, height: size }}></i>;
+        };
+
+        function ComoFuncionaSim() {
+            const [hvacTotal, setHvacTotal]       = useState(4);
+            const [hvacBackup, setHvacBackup]     = useState(1);
+            const [presTotal, setPresTotal]       = useState(1);
+            const [rotationPeriod, setRotationPeriod] = useState('week');
+            const [overloadEnabled, setOverloadEnabled] = useState(true);
+            const [view, setView]                 = useState('iso'); // 'iso' | 'top'
+
+            const [hvacUnits, setHvacUnits]       = useState([]);
+            const [presUnits, setPresUnits]       = useState([]);
+            const [simulationTime, setSimulationTime] = useState(0);
+            const [isOverloadActive, setIsOverloadActive] = useState(false);
+            const [history, setHistory]           = useState([]);
+
+            useEffect(() => {
+                const activeNeeded = Math.max(0, hvacTotal - hvacBackup);
+                const newHvacs = Array.from({ length: hvacTotal }, (_, i) => ({
+                    id: `HVAC-${i + 1}`, type: 'HVAC', hours: 0,
+                    state: i < activeNeeded ? 'TITULAR' : 'SUPLENTE'
+                }));
+                const newPres = Array.from({ length: presTotal }, (_, i) => ({
+                    id: `PRES-${i + 1}`, type: 'PRES', hours: 0,
+                    state: i === 0 ? 'TITULAR' : 'SUPLENTE'
+                }));
+                setHvacUnits(newHvacs);
+                setPresUnits(newPres);
+                setSimulationTime(0);
+                setIsOverloadActive(false);
+                setHistory([{ cycle: 0, time: 0,
+                    hvacs: newHvacs.map(u => ({ id: u.id, state: u.state })),
+                    pres:  newPres.map(u => ({ id: u.id, state: u.state }))
+                }]);
+            }, [hvacTotal, hvacBackup, presTotal]);
+
+            const handleTotalChange = (e) => {
+                const val = parseInt(e.target.value);
+                setHvacTotal(val);
+                const maxBackup = Math.floor(val / 2);
+                if (hvacBackup > maxBackup) setHvacBackup(maxBackup);
+            };
+
+            const advanceTime = () => {
+                const addedHours = PERIOD_HOURS[rotationPeriod];
+                const newTime = simulationTime + addedHours;
+                setSimulationTime(newTime);
+                setIsOverloadActive(false);
+
+                let updatedHvacs = hvacUnits.map(u => ({
+                    ...u,
+                    hours: (u.state === 'TITULAR' || u.state === 'APOYO') ? u.hours + addedHours : u.hours
+                }));
+                let updatedPres = presUnits.map(u => ({
+                    ...u,
+                    hours: u.state === 'TITULAR' ? u.hours + addedHours : u.hours
+                }));
+
+                const activeNeeded = Math.max(0, hvacTotal - hvacBackup);
+                updatedHvacs.sort((a, b) => a.hours - b.hours);
+                updatedHvacs = updatedHvacs.map((u, i) => ({
+                    ...u,
+                    state: i < activeNeeded ? 'TITULAR' : 'SUPLENTE'
+                }));
+                updatedHvacs.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+
+                if (presTotal > 1) {
+                    updatedPres.sort((a, b) => a.hours - b.hours);
+                    updatedPres = updatedPres.map((u, i) => ({ ...u, state: i === 0 ? 'TITULAR' : 'SUPLENTE' }));
+                    updatedPres.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+                } else if (presTotal === 1) {
+                    updatedPres[0].state = 'TITULAR';
+                }
+
+                setHvacUnits(updatedHvacs);
+                setPresUnits(updatedPres);
+                setHistory(prev => [...prev, {
+                    cycle: prev.length, time: newTime,
+                    hvacs: updatedHvacs.map(u => ({ id: u.id, state: u.state })),
+                    pres:  updatedPres.map(u => ({ id: u.id, state: u.state }))
+                }]);
+            };
+
+            const triggerOverload = () => {
+                if (!overloadEnabled || isOverloadActive) return;
+                const bestStandby = [...hvacUnits]
+                    .filter(u => u.state === 'SUPLENTE')
+                    .sort((a, b) => a.hours - b.hours)[0];
+                if (!bestStandby) return;
+                const updated = hvacUnits.map(u =>
+                    u.id === bestStandby.id ? { ...u, state: 'APOYO' } : u
+                );
+                setHvacUnits(updated);
+                setIsOverloadActive(true);
+                setHistory(prev => {
+                    const next = [...prev];
+                    next[next.length - 1] = {
+                        ...next[next.length - 1],
+                        hvacs: updated.map(u => ({ id: u.id, state: u.state }))
+                    };
+                    return next;
+                });
+            };
+
+            const reset = () => {
+                const activeNeeded = Math.max(0, hvacTotal - hvacBackup);
+                const freshHvacs = Array.from({ length: hvacTotal }, (_, i) => ({
+                    id: `HVAC-${i + 1}`, type: 'HVAC', hours: 0,
+                    state: i < activeNeeded ? 'TITULAR' : 'SUPLENTE'
+                }));
+                const freshPres = Array.from({ length: presTotal }, (_, i) => ({
+                    id: `PRES-${i + 1}`, type: 'PRES', hours: 0,
+                    state: i === 0 ? 'TITULAR' : 'SUPLENTE'
+                }));
+                setHvacUnits(freshHvacs);
+                setPresUnits(freshPres);
+                setSimulationTime(0);
+                setIsOverloadActive(false);
+                setHistory([{ cycle: 0, time: 0,
+                    hvacs: freshHvacs.map(u => ({ id: u.id, state: u.state })),
+                    pres:  freshPres.map(u => ({ id: u.id, state: u.state }))
+                }]);
+            };
+
+            // Brand-aligned palette by state
+            const stateStyles = {
+                TITULAR:  'border-eco-lightgreen/60 bg-eco-green/15 text-eco-lightgreen shadow-[0_0_18px_rgba(154,182,59,0.35)]',
+                SUPLENTE: 'border-slate-700 bg-slate-900/60 text-slate-400',
+                APOYO:    'border-amber-400/60 bg-amber-500/15 text-amber-300 shadow-[0_0_22px_rgba(251,191,36,0.45)] animate-pulse'
+            };
+            const ganttColor = {
+                TITULAR:  'bg-eco-lightgreen shadow-[0_0_6px_rgba(154,182,59,0.8)]',
+                SUPLENTE: 'bg-slate-800',
+                APOYO:    'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
+            };
+
+            // Position computation: 2 rows for HVACs, master left, PRES right
+            const hvacPositions = useMemo(() => {
+                const topCount = Math.ceil(hvacTotal / 2);
+                const botCount = hvacTotal - topCount;
+                const spread = (count) => {
+                    if (count <= 0) return [];
+                    if (count === 1) return ['50%'];
+                    const step = 100 / (count + 1);
+                    return Array.from({ length: count }, (_, i) => `${(i + 1) * step}%`);
+                };
+                return { top: spread(topCount), bottom: spread(botCount) };
+            }, [hvacTotal]);
+
+            const topHvacs    = hvacUnits.slice(0, Math.ceil(hvacTotal / 2));
+            const bottomHvacs = hvacUnits.slice(Math.ceil(hvacTotal / 2));
+
+            const activeCount   = hvacUnits.filter(u => u.state === 'TITULAR' || u.state === 'APOYO').length;
+            const standbyCount  = hvacUnits.filter(u => u.state === 'SUPLENTE').length;
+
+            // Build daisy-chain path: master → top row (L→R) → bottom row (R→L) → pres
+            const chainPath = useMemo(() => {
+                const nodes = [];
+                nodes.push({ x: 7, y: 50 });                          // master
+                hvacPositions.top.forEach(pct => nodes.push({ x: parseFloat(pct) * 0.7 + 14, y: 22 }));
+                [...hvacPositions.bottom].reverse().forEach(pct => nodes.push({ x: parseFloat(pct) * 0.7 + 14, y: 78 }));
+                presUnits.forEach((_, i) => {
+                    const y = presTotal === 1 ? 50 : (i === 0 ? 30 : 70);
+                    nodes.push({ x: 92, y });
+                });
+                return nodes.map((n, i) => `${i === 0 ? 'M' : 'L'} ${n.x} ${n.y}`).join(' ');
+            }, [hvacPositions, presUnits, presTotal]);
+
+            return (
+                <div className="sim-panel w-full overflow-hidden">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-5 border-b border-slate-800 bg-slate-900/40">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-eco-blue/20 border border-eco-blue/40 flex items-center justify-center text-eco-lightblue">
+                                <Icon name="cpu" size={20} />
+                            </div>
+                            <div>
+                                <div className="text-white font-bold text-base">Simulador de sala</div>
+                                <div className="text-[11px] text-slate-400 font-mono">ROOM_01 · MASTER + N×HVAC + M×PRES</div>
+                            </div>
+                        </div>
+                        <div className="mt-4 md:mt-0 flex items-center gap-3">
+                            <div className="bg-slate-950 border border-slate-800 px-4 py-2 rounded-lg">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mr-2">Uptime</span>
+                                <span className="text-lg font-mono font-bold text-white">{String(simulationTime).padStart(4, '0')}<span className="text-xs text-eco-lightgreen ml-1">h</span></span>
+                            </div>
+                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-1 flex">
+                                <button onClick={() => setView('iso')} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${view === 'iso' ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>3D</button>
+                                <button onClick={() => setView('top')} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${view === 'top' ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>Top</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Config + Execution */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-0 border-b border-slate-800">
+                        <div className="md:col-span-7 p-5 border-r border-slate-800">
+                            <div className="text-[11px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] mb-4 flex items-center gap-2">
+                                <Icon name="sliders" size={14} /> Parámetros
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">
+                                        HVAC instalados <span className="text-eco-lightgreen font-mono">[{hvacTotal}]</span>
+                                    </label>
+                                    <input type="range" min="1" max="8" value={hvacTotal} onChange={handleTotalChange} className="sim-input-range w-full" />
+                                    <div className="flex justify-between text-[9px] text-slate-600 font-mono mt-1"><span>1</span><span>8</span></div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">Presurizadores</label>
+                                    <select value={presTotal} onChange={(e) => setPresTotal(parseInt(e.target.value))} className="sim-select w-full">
+                                        <option value={0}>0 (ninguno)</option>
+                                        <option value={1}>1 unidad</option>
+                                        <option value={2}>2 unidades</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">HVAC suplentes</label>
+                                    <select value={hvacBackup} onChange={(e) => setHvacBackup(parseInt(e.target.value))} className="sim-select w-full">
+                                        {Array.from({ length: Math.floor(hvacTotal / 2) + 1 }, (_, i) => i).map(n => (
+                                            <option key={n} value={n}>{n === 0 ? '0 (todos titulares)' : `N-${n} (${n} en reserva)`}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">Ciclo de rotación</label>
+                                    <select value={rotationPeriod} onChange={(e) => setRotationPeriod(e.target.value)} className="sim-select w-full">
+                                        <option value="day">24 h (1 día)</option>
+                                        <option value="week">168 h (1 semana)</option>
+                                        <option value="month">720 h (1 mes)</option>
+                                    </select>
+                                </div>
+                                <div className="col-span-2 flex items-center justify-between pt-3 border-t border-slate-800">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        <Icon name="zap" size={12} className={overloadEnabled ? 'text-amber-400' : 'text-slate-600'} />
+                                        Protocolo de apoyo
+                                    </span>
+                                    <button onClick={() => setOverloadEnabled(!overloadEnabled)} className={`relative inline-flex h-5 w-10 rounded-full transition-colors border border-slate-700 ${overloadEnabled ? 'bg-amber-500/25' : 'bg-slate-800'}`}>
+                                        <span className={`h-3 w-3 m-0.5 bg-white rounded-full transition-transform mt-1 ml-1 ${overloadEnabled ? 'translate-x-5 shadow-[0_0_8px_rgba(251,191,36,0.9)]' : 'translate-x-0 bg-slate-500'}`} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="md:col-span-5 p-5 flex flex-col gap-3">
+                            <div className="text-[11px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] mb-1 flex items-center gap-2">
+                                <Icon name="terminal" size={14} /> Ejecución
+                            </div>
+                            <button onClick={advanceTime} className="w-full py-3.5 bg-eco-green/15 hover:bg-eco-green/25 text-eco-lightgreen border border-eco-lightgreen/40 hover:border-eco-lightgreen text-sm font-bold rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-widest shadow-[inset_0_0_15px_rgba(154,182,59,0.08)]">
+                                <Icon name="fast-forward" size={16} /> Avanzar {PERIOD_LABELS[rotationPeriod]}
+                            </button>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={triggerOverload} disabled={!overloadEnabled || isOverloadActive || standbyCount === 0} className="py-2.5 bg-slate-950/50 hover:bg-amber-500/15 border border-slate-800 hover:border-amber-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400 hover:text-amber-300 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
+                                    <Icon name="alert-triangle" size={13} /> Forzar apoyo
+                                </button>
+                                <button onClick={reset} className="py-2.5 bg-slate-950/50 hover:bg-red-950/30 border border-slate-800 hover:border-red-900 text-slate-500 hover:text-red-300 text-[11px] font-bold rounded-lg transition-all uppercase tracking-wider">
+                                    Reset
+                                </button>
+                            </div>
+                            <div className="mt-2 flex justify-between text-[10px] font-mono text-slate-500 pt-3 border-t border-slate-800">
+                                <span>Activos: <span className="text-eco-lightgreen">{activeCount}</span></span>
+                                <span>Reserva: <span className="text-slate-300">{standbyCount}</span></span>
+                                <span>Ciclos: <span className="text-eco-lightblue">{history.length - 1}</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Visualization (Blueprint con cable + cloud + WiFi) */}
+                    <div className="relative bg-[#020617] sim-scanlines" style={{ minHeight: '460px' }}>
+                        {/* Subtle radar grid */}
+                        <div className="absolute inset-0 pointer-events-none" style={{
+                            backgroundImage: 'linear-gradient(to right, rgba(0,152,198,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,152,198,0.06) 1px, transparent 1px)',
+                            backgroundSize: '36px 36px'
+                        }}></div>
+
+                        {/* Cloud node (top-right) */}
+                        <div className="absolute right-5 top-5 z-30 flex flex-col items-center">
+                            <div className="bg-slate-950 border border-eco-lightgreen/40 rounded-xl px-3 py-2 flex items-center gap-2 shadow-[0_0_25px_rgba(154,182,59,0.15)]">
+                                <Icon name="cloud" size={18} className="text-eco-lightgreen" />
+                                <div className="leading-tight">
+                                    <div className="text-[10px] text-white font-bold">CLOUD</div>
+                                    <div className="text-[8px] text-slate-500 font-mono uppercase">MQTT · TLS</div>
+                                </div>
+                            </div>
+                            <div className="text-[9px] font-mono text-eco-lightgreen/60 mt-1">↓ sync</div>
+                        </div>
+
+                        {/* The 3D / Top scene */}
+                        <div className={`relative w-full ${view === 'iso' ? 'sim-iso-tilt' : 'sim-top-flat'}`} style={{ height: '460px' }}>
+                            {/* Room outline */}
+                            <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
+                                <rect x="14" y="18" width="76" height="64" fill="none" stroke="rgba(34,211,238,0.35)" strokeWidth="0.25" strokeDasharray="1.4 1.4" rx="2" />
+                                <path d="M 14 16 L 14 20 M 12 18 L 16 18" stroke="rgba(34,211,238,0.6)" strokeWidth="0.3"/>
+                                <path d="M 90 16 L 90 20 M 88 18 L 92 18" stroke="rgba(34,211,238,0.6)" strokeWidth="0.3"/>
+                                <path d="M 14 80 L 14 84 M 12 82 L 16 82" stroke="rgba(34,211,238,0.6)" strokeWidth="0.3"/>
+                                <path d="M 90 80 L 90 84 M 88 82 L 92 82" stroke="rgba(34,211,238,0.6)" strokeWidth="0.3"/>
+
+                                {/* Daisy chain cable (la guirnalda Modbus RS-485) */}
+                                <path d={chainPath} fill="none" stroke="#0098c6" strokeWidth="0.45" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+                                <path d={chainPath} fill="none" stroke="#22d3ee" strokeWidth="0.18" strokeLinecap="round" strokeDasharray="0.4 1" opacity="0.6">
+                                    <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="3s" repeatCount="indefinite"/>
+                                </path>
+
+                                {/* WiFi link master → cloud (top right area, route up-then-right) */}
+                                <path d="M 7 50 Q 7 12 92 12" fill="none" stroke="rgba(154,182,59,0.35)" strokeWidth="0.25" strokeDasharray="0.5 1.5" />
+                            </svg>
+
+                            {/* WiFi pulses concentric around master, going up */}
+                            <svg className="absolute pointer-events-none" style={{ left: '4%', top: '40%', width: '6%', height: '24%', overflow: 'visible' }} viewBox="0 0 20 50">
+                                <g transform="translate(10 10)">
+                                    <circle r="6" cx="0" cy="0" fill="none" stroke="#9ab63b" className="sim-wifi-pulse" />
+                                    <circle r="6" cx="0" cy="0" fill="none" stroke="#9ab63b" className="sim-wifi-pulse" />
+                                    <circle r="6" cx="0" cy="0" fill="none" stroke="#9ab63b" className="sim-wifi-pulse" />
+                                </g>
+                            </svg>
+
+                            {/* Watermark */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]">
+                                <span className="text-5xl md:text-7xl font-black tracking-[0.4em] text-white">SALA · ELÉCTRICA</span>
+                            </div>
+
+                            {/* Master node (left, the tablero principal) */}
+                            <div className="absolute z-20" style={{ left: '4%', top: '50%', transform: 'translate(-50%, -50%)' }}>
+                                <div className="bg-slate-950 border-2 border-eco-blue rounded-lg p-3 shadow-[0_0_30px_rgba(0,71,143,0.5)] flex flex-col items-center min-w-[88px]">
+                                    <Icon name="hard-drive" size={26} className="text-eco-lightblue mb-1" />
+                                    <div className="flex gap-1 mb-1">
+                                        <span className="w-1.5 h-3 bg-eco-lightgreen rounded-sm animate-pulse" style={{ boxShadow: '0 0 6px #9ab63b' }}></span>
+                                        <span className="w-1.5 h-3 bg-eco-lightblue rounded-sm animate-pulse" style={{ animationDelay: '0.3s', boxShadow: '0 0 6px #0098c6' }}></span>
+                                        <span className="w-1.5 h-3 bg-slate-700 rounded-sm"></span>
+                                    </div>
+                                    <span className="text-[9px] font-mono text-eco-lightblue text-center uppercase tracking-widest leading-tight">Maestro<br/>+HMI</span>
+                                </div>
+                            </div>
+
+                            {/* Top row HVACs */}
+                            {topHvacs.map((u, i) => (
+                                <div key={u.id} className={`absolute z-10 border rounded-lg flex flex-col items-center p-2 w-[88px] backdrop-blur-sm transition-all duration-500 ${stateStyles[u.state]}`}
+                                    style={{ left: hvacPositions.top[i], top: '22%', transform: 'translate(-50%, -50%)' }}>
+                                    <Icon name="fan" size={18} className={u.state === 'TITULAR' ? 'sim-fan-spin opacity-90' : u.state === 'APOYO' ? 'sim-fan-spin-fast opacity-90' : 'opacity-50'} />
+                                    <span className="text-[10px] font-mono font-bold mt-1">{u.id}</span>
+                                    <span className="text-[8px] font-bold mt-1 px-1.5 py-0.5 rounded-sm uppercase tracking-wider" style={{ background: 'rgba(0,0,0,0.4)' }}>{u.state}</span>
+                                    <span className="text-[9px] font-mono mt-1 text-slate-300">{String(u.hours).padStart(4,'0')}h</span>
+                                </div>
+                            ))}
+
+                            {/* Bottom row HVACs */}
+                            {bottomHvacs.map((u, i) => (
+                                <div key={u.id} className={`absolute z-10 border rounded-lg flex flex-col items-center p-2 w-[88px] backdrop-blur-sm transition-all duration-500 ${stateStyles[u.state]}`}
+                                    style={{ left: hvacPositions.bottom[i], top: '78%', transform: 'translate(-50%, -50%)' }}>
+                                    <Icon name="fan" size={18} className={u.state === 'TITULAR' ? 'sim-fan-spin opacity-90' : u.state === 'APOYO' ? 'sim-fan-spin-fast opacity-90' : 'opacity-50'} />
+                                    <span className="text-[10px] font-mono font-bold mt-1">{u.id}</span>
+                                    <span className="text-[8px] font-bold mt-1 px-1.5 py-0.5 rounded-sm uppercase tracking-wider" style={{ background: 'rgba(0,0,0,0.4)' }}>{u.state}</span>
+                                    <span className="text-[9px] font-mono mt-1 text-slate-300">{String(u.hours).padStart(4,'0')}h</span>
+                                </div>
+                            ))}
+
+                            {/* Pressurizers (right) */}
+                            {presUnits.map((u, i) => (
+                                <div key={u.id} className={`absolute z-10 border rounded-lg flex flex-col items-center p-2 w-[88px] backdrop-blur-sm transition-all duration-500 ${stateStyles[u.state]}`}
+                                    style={{ left: '92%', top: presTotal === 1 ? '50%' : (i === 0 ? '30%' : '70%'), transform: 'translate(-50%, -50%)' }}>
+                                    <Icon name="wind" size={18} className={u.state === 'TITULAR' ? 'opacity-90' : 'opacity-50'} />
+                                    <span className="text-[10px] font-mono font-bold mt-1">{u.id}</span>
+                                    <span className="text-[8px] font-bold mt-1 px-1.5 py-0.5 rounded-sm uppercase tracking-wider" style={{ background: 'rgba(0,0,0,0.4)' }}>{u.state}</span>
+                                    <span className="text-[9px] font-mono mt-1 text-slate-300">{String(u.hours).padStart(4,'0')}h</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Legend overlay */}
+                        <div className="absolute bottom-3 left-4 z-30 flex gap-4 text-[10px] font-bold tracking-widest font-mono">
+                            <span className="text-eco-lightgreen inline-flex items-center gap-1.5"><span className="w-2 h-2 bg-eco-lightgreen rounded-sm" style={{boxShadow:'0 0 6px #9ab63b'}}></span>TITULAR</span>
+                            <span className="text-slate-400 inline-flex items-center gap-1.5"><span className="w-2 h-2 bg-slate-600 rounded-sm border border-slate-500"></span>SUPLENTE</span>
+                            <span className="text-amber-300 inline-flex items-center gap-1.5"><span className="w-2 h-2 bg-amber-400 rounded-sm" style={{boxShadow:'0 0 6px #fbbf24'}}></span>APOYO</span>
+                        </div>
+                        <div className="absolute bottom-3 right-4 z-30 text-[10px] font-mono text-eco-lightblue/80 flex items-center gap-2">
+                            <span className="w-6 h-px bg-eco-lightblue/60"></span> RS-485 LINK
+                        </div>
+                    </div>
+
+                    {/* Timeline Gantt */}
+                    <div className="p-4 border-t border-slate-800 bg-slate-900/30">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Icon name="activity" size={14} className="text-eco-lightgreen" />
+                            <h4 className="text-[11px] font-bold text-eco-lightgreen uppercase tracking-[0.18em]">Telemetría · historial de rotación</h4>
+                        </div>
+                        <div className="overflow-x-auto sim-no-scroll pb-2">
+                            <div className="min-w-max">
+                                <div className="flex mb-2 ml-28 border-b border-slate-800 pb-1">
+                                    {history.map((h, i) => (
+                                        <div key={i} className="w-10 text-center text-[9px] font-mono text-slate-600">C{String(i).padStart(2,'0')}</div>
+                                    ))}
+                                </div>
+                                {hvacUnits.map(unit => (
+                                    <div key={unit.id} className="flex items-center mb-0.5 hover:bg-slate-800/30 p-0.5 rounded transition-colors">
+                                        <div className="w-28 flex flex-col items-end pr-3 leading-tight border-r border-slate-800 mr-2">
+                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{unit.id}</span>
+                                            <span className="text-[9px] font-mono text-eco-lightblue/70">{String(unit.hours).padStart(4,'0')}h</span>
+                                        </div>
+                                        <div className="flex bg-slate-950 rounded-sm border border-slate-800 overflow-hidden shadow-inner">
+                                            {history.map((c, i) => {
+                                                const s = c.hvacs.find(u => u.id === unit.id)?.state;
+                                                return <div key={i} className={`w-10 h-4 border-r border-slate-900 ${ganttColor[s] || ''}`}></div>;
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                                {presUnits.length > 0 && <div className="h-2"></div>}
+                                {presUnits.map(unit => (
+                                    <div key={unit.id} className="flex items-center mb-0.5 hover:bg-slate-800/30 p-0.5 rounded transition-colors">
+                                        <div className="w-28 flex flex-col items-end pr-3 leading-tight border-r border-slate-800 mr-2">
+                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{unit.id}</span>
+                                            <span className="text-[9px] font-mono text-eco-lightblue/70">{String(unit.hours).padStart(4,'0')}h</span>
+                                        </div>
+                                        <div className="flex bg-slate-950 rounded-sm border border-slate-800 overflow-hidden shadow-inner">
+                                            {history.map((c, i) => {
+                                                const s = c.pres.find(u => u.id === unit.id)?.state;
+                                                return <div key={i} className={`w-10 h-4 border-r border-slate-900 ${ganttColor[s] || ''}`}></div>;
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const mount = document.getElementById('react-simulator-root');
+            if (mount && window.React && window.ReactDOM) {
+                ReactDOM.createRoot(mount).render(<ComoFuncionaSim />);
+            }
         });
     </script>
 </body>
