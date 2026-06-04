@@ -403,9 +403,6 @@
                 class="absolute top-1/3 right-10 w-[500px] h-[500px] bg-eco-green/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000">
             </div>
 
-            <div
-                class="absolute left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-30 animate-scan shadow-[0_0_15px_rgba(6,182,212,0.8)]">
-            </div>
         </div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -454,19 +451,65 @@
                         <div class="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
                         <div class="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
 
-                        <div class="relative bg-[#0a0f1c]">
-                            <img src="hmi-principal.jpg" alt="Pantalla HMI EcoMonitor — Sala Principal"
-                                class="block w-full h-auto select-none" draggable="false">
+                        <div class="relative bg-[#0a1020] aspect-[16/9] flex flex-col font-mono select-none">
+                            <div class="flex items-center justify-between px-3 py-2 bg-[#0a1f2a] border-b border-slate-800">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-eco-lightgreen animate-pulse" style="box-shadow:0 0 6px #9ab63b"></span>
+                                    <span class="font-bold text-sm md:text-base"><span class="text-eco-lightgreen">ECO</span><span class="text-eco-lightblue">MONITOR</span></span>
+                                </div>
+                                <div class="text-[8px] md:text-[10px] text-slate-400 hidden sm:block">SALA PRINCIPAL · YPF S.A.</div>
+                                <div class="text-[10px] md:text-xs text-cyan-400 font-bold">14:23:36</div>
+                            </div>
 
-                            <div class="pointer-events-none absolute inset-0 z-10"
-                                style="background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 49.5%, rgba(0,180,255,0.10) 50%, rgba(255,255,255,0) 50.5%, rgba(255,255,255,0) 100%); background-size: 100% 4px;"></div>
+                            <div class="px-3 py-1.5 bg-eco-green/10 border-b border-eco-green/20 flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-eco-lightgreen"></span>
+                                <span class="text-[9px] md:text-[10px] font-bold text-eco-lightgreen tracking-widest">SALA OPERANDO CON NORMALIDAD</span>
+                            </div>
 
-                            <div class="pointer-events-none absolute left-0 right-0 h-[2px] z-10 animate-scan"
-                                style="background: linear-gradient(to right, transparent, rgba(34,211,238,0.7), transparent); box-shadow: 0 0 14px rgba(34,211,238,0.7);"></div>
+                            <div class="grid grid-cols-3 gap-2 p-2 md:p-3">
+                                <div class="bg-[#142036] border border-slate-800 rounded p-2">
+                                    <div class="text-[7px] md:text-[9px] text-slate-400 tracking-wider mb-1">TEMPERATURA</div>
+                                    <div class="text-lg md:text-2xl font-bold text-white">21.4<span class="text-[10px] text-slate-500 ml-0.5">°C</span></div>
+                                    <div class="text-[7px] text-slate-500 mt-1">SP 27.0°</div>
+                                </div>
+                                <div class="bg-[#142036] border border-slate-800 rounded p-2">
+                                    <div class="text-[7px] md:text-[9px] text-slate-400 tracking-wider mb-1">HUMEDAD</div>
+                                    <div class="text-lg md:text-2xl font-bold text-eco-lightblue">47<span class="text-[10px] text-slate-500 ml-0.5">%</span></div>
+                                    <div class="text-[7px] text-slate-500 mt-1">SP 50%</div>
+                                </div>
+                                <div class="bg-[#142036] border border-slate-800 rounded p-2">
+                                    <div class="text-[7px] md:text-[9px] text-slate-400 tracking-wider mb-1">PRESURIZACIÓN</div>
+                                    <div class="text-lg md:text-2xl font-bold text-eco-lightgreen">+25<span class="text-[10px] text-slate-500 ml-0.5">Pa</span></div>
+                                    <div class="text-[7px] text-slate-500 mt-1">SP 50 Pa</div>
+                                </div>
+                            </div>
 
-                            <div class="pointer-events-none absolute top-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded text-[9px] font-mono text-eco-lightgreen bg-black/40 backdrop-blur-sm border border-eco-lightgreen/30 z-20 flex items-center gap-1.5">
+                            <div class="flex-1 px-3 pb-3">
+                                <div class="bg-[#0a1f2a] rounded h-full border border-slate-800 p-2 flex flex-col">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <div class="flex items-center gap-3 text-[8px] md:text-[10px]">
+                                            <span class="text-eco-lightgreen font-bold">● SALA · 21.4°</span>
+                                            <span class="text-orange-400 font-bold">● EXTERIOR · 28.0°</span>
+                                        </div>
+                                        <span class="text-[8px] text-slate-500">CLIMA · 1H · EN VIVO</span>
+                                    </div>
+                                    <svg class="w-full flex-1" viewBox="0 0 100 30" preserveAspectRatio="none">
+                                        <line x1="0" y1="8" x2="100" y2="8" stroke="#334155" stroke-width="0.15" stroke-dasharray="0.5 0.8"/>
+                                        <line x1="0" y1="15" x2="100" y2="15" stroke="#334155" stroke-width="0.15" stroke-dasharray="0.5 0.8"/>
+                                        <line x1="0" y1="22" x2="100" y2="22" stroke="#334155" stroke-width="0.15" stroke-dasharray="0.5 0.8"/>
+                                        <polyline fill="none" stroke="#fb923c" stroke-width="0.5"
+                                            points="0,18 8,17 16,16 24,15 32,15 40,14 48,13 56,12 64,11 72,10 80,9 88,9 96,8 100,8"/>
+                                        <polyline fill="none" stroke="#9ab63b" stroke-width="0.5"
+                                            points="0,22 8,21.5 16,22 24,21.8 32,22 40,21.5 48,22 56,21.7 64,21.9 72,22 80,21.8 88,22 96,21.9 100,22"/>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div class="pointer-events-none absolute inset-0 z-10" style="background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 49.5%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0) 50.5%, rgba(255,255,255,0) 100%); background-size: 100% 3px;"></div>
+
+                            <div class="pointer-events-none absolute top-1 right-2 px-2 py-0.5 rounded text-[8px] md:text-[9px] font-mono text-eco-lightgreen bg-black/40 backdrop-blur-sm border border-eco-lightgreen/30 z-20 flex items-center gap-1.5">
                                 <span class="w-1.5 h-1.5 rounded-full bg-eco-lightgreen animate-pulse" style="box-shadow: 0 0 6px #9ab63b"></span>
-                                LIVE · HMI EcoMonitor
+                                LIVE
                             </div>
                         </div>
                     </div>
@@ -714,7 +757,7 @@
         </div>
     </section>
 
-    <section id="transformacion" class="py-24 lg:py-32 bg-slate-900 relative overflow-hidden">
+    <section id="transformacion" class="py-24 lg:py-32 bg-eco-dark relative overflow-hidden">
         <div class="absolute inset-0 opacity-[0.04] pointer-events-none"
             style="background: repeating-linear-gradient(45deg, transparent, transparent 14px, rgba(0,152,198,0.4) 14px, rgba(0,152,198,0.4) 15px);">
         </div>
@@ -1064,7 +1107,7 @@
         </div>
     </section>
 
-    <section id="arquitectura" class="py-24 lg:py-32 bg-slate-950 relative overflow-hidden">
+    <section id="arquitectura" class="py-24 lg:py-32 bg-eco-dark relative overflow-hidden">
         <div class="absolute inset-0 opacity-[0.06] pointer-events-none"
             style="background-image: linear-gradient(to right, rgba(0,152,198,0.4) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,152,198,0.4) 1px, transparent 1px); background-size: 60px 60px;">
         </div>
@@ -1270,7 +1313,7 @@
         </div>
     </section>
 
-    <section id="hil-teaser" class="py-16 bg-slate-950 relative overflow-hidden">
+    <section id="hil-teaser" class="py-16 bg-eco-dark relative overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div
                 class="bg-gradient-to-r from-eco-dark to-eco-blue rounded-2xl p-6 md:p-8 shadow-xl border border-eco-blue/30 relative overflow-hidden group">
@@ -1431,7 +1474,7 @@
         </div>
     </section>
 
-    <footer id="contacto" class="bg-gray-900 pt-16 pb-8 border-t border-gray-800">
+    <footer id="contacto" class="bg-eco-dark pt-16 pb-8 border-t border-gray-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
                 <div class="md:col-span-1">
