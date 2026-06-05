@@ -2381,14 +2381,14 @@
                 const scene = new THREE.Scene();
                 // === Paletas día / noche en formato Three.Color (cenit / medio / horizonte) ===
                 const SKY_DAY = {
-                    top:    new THREE.Color('#4ea8e8'),   // cenit azul mediodia saturado
-                    mid:    new THREE.Color('#c8e1f3'),   // medio cielo brillante
-                    bottom: new THREE.Color('#f0e8d2')    // horizonte calido claro
+                    top:    new THREE.Color('#5fb4ee'),   // cenit cielo brillante
+                    mid:    new THREE.Color('#bedaef'),   // medio cielo claro
+                    bottom: new THREE.Color('#fcf4e0')    // horizonte casi blanco-crema
                 };
                 const SKY_NIGHT = {
-                    top:    new THREE.Color('#04081a'),   // cenit casi negro
-                    mid:    new THREE.Color('#0d1838'),   // medio cielo navy
-                    bottom: new THREE.Color('#1f2a4a')    // horizonte azul-purpura
+                    top:    new THREE.Color('#020616'),   // cenit casi negro
+                    mid:    new THREE.Color('#0f1c3a'),   // medio cielo navy
+                    bottom: new THREE.Color('#2a3554')    // horizonte azul-purpura
                 };
 
                 // === SKYDOME: esfera grande con shader gradient (sin tiling, vector-quality) ===
@@ -2430,9 +2430,12 @@
                     fog: false
                 });
                 const skyDome = new THREE.Mesh(
-                    new THREE.SphereGeometry(SKY_RADIUS, 32, 16),
+                    new THREE.SphereGeometry(SKY_RADIUS, 64, 32),
                     skyDomeMat
                 );
+                skyDome.renderOrder = -10;          // dibujar PRIMERO (atras de todo)
+                skyDome.frustumCulled = false;       // que nunca lo descarte el frustum
+                skyDomeMat.depthTest = false;        // no comparar profundidad
                 scene.add(skyDome);
 
                 // === ESTRELLAS: 3 capas de THREE.Points en el hemisferio superior ===
@@ -2474,6 +2477,8 @@
                         blending: THREE.AdditiveBlending
                     });
                     const points = new THREE.Points(geo, mat);
+                    points.frustumCulled = false;  // garantiza que siempre se rendericen, sin importar la camara
+                    points.renderOrder = 1;        // que se dibujen DESPUES del skydome
                     return points;
                 };
                 const starsSmall  = makeStars(1500, 1.1, 0.65, 0.05); // mayoria de estrellas, puntito 1px
@@ -2577,11 +2582,13 @@
                 };
                 // Plano circular MUCHO más grande para que la niebla absorba el horizonte (no se vea el borde)
                 const TERRAIN_R = 180;
-                // Función pura: altura del terreno en cualquier (x,z) — la usan rocas y montañas para no flotar
-                const terrainHeightAt = (x, z) => {
-                    const d = Math.sqrt(x*x + z*z);
+                // Función pura: altura del terreno en world space (X, Z_world).
+                // El terreno es un CircleGeometry rotado -π/2 en X, así que el Y geometrico se mapea a -Z_world.
+                // Por eso negamos z al evaluar la noise function para que coincida con el vertex displacement.
+                const terrainHeightAt = (xWorld, zWorld) => {
+                    const d = Math.sqrt(xWorld*xWorld + zWorld*zWorld);
                     const flatFactor = Math.min(1, Math.max(0, (d - 7) / 6));
-                    const n = pseudoNoise(x * 0.15, z * 0.15);
+                    const n = pseudoNoise(xWorld * 0.15, (-zWorld) * 0.15);
                     const edgeFalloff = d > 140 ? -(d - 140) * 0.08 : 0;
                     return n * 0.5 * flatFactor + edgeFalloff;
                 };
@@ -2592,9 +2599,15 @@
                 const colDirt = new THREE.Color('#a8956b');
                 const colDark = new THREE.Color('#7a6a52');
                 for (let i = 0; i < tPos.count; i++) {
-                    const x = tPos.getX(i), z = tPos.getY(i);
-                    const n = pseudoNoise(x * 0.15, z * 0.15);
-                    tPos.setZ(i, terrainHeightAt(x, z));
+                    // Coordenadas geométricas del vértice (la rotación posterior mapea geomY → -worldZ)
+                    const xGeo = tPos.getX(i), yGeo = tPos.getY(i);
+                    // Para que terrainHeightAt(xWorld, zWorld) coincida con este vértice,
+                    // necesitamos: worldX = xGeo, worldZ = -yGeo
+                    const xWorld = xGeo, zWorld = -yGeo;
+                    const h = terrainHeightAt(xWorld, zWorld);
+                    tPos.setZ(i, h);
+                    // Para color uso una noise simple (no importa la orientación)
+                    const n = pseudoNoise(xGeo * 0.15, yGeo * 0.15);
                     const t01 = (n + 0.6) / 1.2;
                     const c = colSand.clone().lerp(colDirt, Math.min(1, t01));
                     if (n > 0.25) c.lerp(colDark, (n - 0.25) * 2);
@@ -2661,8 +2674,8 @@
                             flatShading: false  // suave (las piedras desgastadas no son facetadas)
                         })
                     );
-                    // Pegada al terreno real (muestreado), con leve hundimiento natural
-                    rock.position.set(x, terrainHeightAt(x, z) + size * scaleY * 0.30, z);
+                    // Pegada al terreno real (muestreado) — la mitad inferior queda enterrada
+                    rock.position.set(x, terrainHeightAt(x, z) + size * scaleY * 0.10, z);
                     rock.rotation.set(
                         seedRand(i * 13) * Math.PI * 2,
                         seedRand(i * 17) * Math.PI * 2,
@@ -2683,20 +2696,34 @@
                         const z = centerZ + Math.sin(a) * d;
                         const h = scaleRange[0] + seedRand(i * 41) * (scaleRange[1] - scaleRange[0]);
                         const r = h * (0.45 + seedRand(i * 43) * 0.35);
-                        const segs = 14 + Math.floor(seedRand(i * 47) * 6);  // 14-19 segmentos = silueta lisa
-                        const coneGeo = new THREE.ConeGeometry(r, h, segs, 5);  // 5 height segments
+                        const segs = 24;                        // mas segmentos fijos = silueta lisa
+                        const coneGeo = new THREE.ConeGeometry(r, h, segs, 1);  // 1 height segment (SIN bandas)
                         // Deformar para look de montaña real, PERO sin tocar la punta (vertex top compartido)
                         const cPos = coneGeo.attributes.position;
-                        const topY = h / 2;  // ConeGeometry: top vertex at y = +h/2
+                        const topY = h / 2;
+                        // Pre-cómputo: noise angular suave (mismo para toda la altura → silueta natural, sin escalones)
+                        const angleNoise = new Map();
+                        for (let v = 0; v < cPos.count; v++) {
+                            const sx = cPos.getX(v), sz = cPos.getZ(v);
+                            const ang = Math.round(Math.atan2(sz, sx) * 1000);  // mismo angulo => mismo offset
+                            if (!angleNoise.has(ang)) {
+                                // Onda suave de bumps a lo largo del perimetro
+                                const t = Math.atan2(sz, sx);
+                                const noise = Math.sin(t * 3 + i * 0.7) * 0.5 +
+                                              Math.sin(t * 5 - i * 1.3) * 0.3 +
+                                              Math.sin(t * 8 + i * 0.4) * 0.2;
+                                angleNoise.set(ang, noise);
+                            }
+                        }
                         for (let v = 0; v < cPos.count; v++) {
                             const sx = cPos.getX(v), sy = cPos.getY(v), sz = cPos.getZ(v);
-                            // No tocar los 12% superiores — la cumbre queda limpia
                             const distFromTop = topY - sy;
-                            if (distFromTop < h * 0.12) continue;
-                            // Deformación gradual: 0 cerca del top, máxima en la base
-                            const heightFromBase = (sy + h/2) / h;  // 0 = base, 1 = top
-                            const baseDeform = (1 - heightFromBase) * 0.35;
-                            const n = (seedRand(i * 100 + v * 13) - 0.5) * baseDeform;
+                            if (distFromTop < h * 0.10) continue;  // 10% superior limpio
+                            // Deformación que crece con la altura desde la base (max 25% en la base)
+                            const heightFromBase = (sy + h/2) / h;
+                            const baseDeform = Math.pow(1 - heightFromBase, 1.3) * 0.25;
+                            const ang = Math.round(Math.atan2(sz, sx) * 1000);
+                            const n = (angleNoise.get(ang) || 0) * baseDeform;
                             cPos.setXYZ(v, sx * (1 + n), sy, sz * (1 + n));
                         }
                         coneGeo.computeVertexNormals();
@@ -2707,9 +2734,10 @@
                                 flatShading: true
                             })
                         );
-                        // Pegamos la base al terreno (sample) y enterramos un poquito para no ver el "skirt"
+                        // Pegamos la base al terreno (sample) + hundimos 15% de la altura para tapar el "skirt"
                         const groundY = terrainHeightAt(x, z);
-                        m.position.set(x, groundY + h/2 - 0.4, z);
+                        const burial = h * 0.15;  // hundir 15% de la altura — proporcional al tamaño
+                        m.position.set(x, groundY + h/2 - burial, z);
                         m.castShadow = false; // demasiado lejos, no aporta
                         scene.add(m);
                         // Nieve en la cumbre (solo en cordilleras altas)
@@ -2734,8 +2762,8 @@
                                 snowGeo,
                                 new THREE.MeshLambertMaterial({ color: '#f4f1ea', flatShading: false })
                             );
-                            // Snow cap sigue la posicion ajustada de la montaña (groundY + h - snowH/2 - 0.4)
-                            snow.position.set(x, groundY + h - snowH/2 - 0.35, z);
+                            // Snow cap sigue la posicion ajustada de la montaña
+                            snow.position.set(x, groundY + h - snowH/2 - burial, z);
                             scene.add(snow);
                         }
                     }
