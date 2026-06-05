@@ -861,7 +861,7 @@
         </div>
     </nav>
 
-    <section class="relative pt-24 pb-10 sm:pt-28 sm:pb-14 lg:pt-32 lg:pb-16 overflow-hidden bg-eco-dark">
+    <section class="relative pt-24 pb-6 sm:pt-24 sm:pb-8 lg:pt-28 lg:pb-10 overflow-hidden bg-eco-dark">
 
         <div class="absolute inset-0 z-0 pointer-events-none">
             <div class="absolute inset-0 opacity-10"
@@ -881,11 +881,6 @@
             <div class="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
 
                 <div class="text-center lg:text-left max-w-2xl mx-auto lg:mx-0">
-                    <div
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 backdrop-blur-md text-eco-lightgreen font-semibold text-sm mb-6 border border-eco-lightgreen/20 shadow-sm">
-                        <i data-lucide="cpu" class="w-4 h-4"></i>
-                        By Ecocontrol
-                    </div>
                     <h1
                         class="font-extrabold text-white mb-5 sm:mb-6 lg:mb-7 drop-shadow-md"
                         style="font-size: clamp(1.875rem, 3vw + 0.75rem, 3.25rem); line-height: 1.1; letter-spacing: -0.025em; text-wrap: balance;">
@@ -907,15 +902,14 @@
                     </div>
                 </div>
 
-                <div
-                    class="relative w-full aspect-[16/9] flex items-center justify-center mt-10 lg:mt-0">
+                <div class="relative w-full mt-8 lg:mt-0">
 
-                    <div class="absolute inset-0 z-0">
+                    <div class="absolute inset-0 z-0 pointer-events-none">
                         <div class="absolute top-1/4 left-1/4 w-48 h-48 bg-eco-blue/30 rounded-full filter blur-[80px]"></div>
                         <div class="absolute bottom-1/4 right-1/4 w-48 h-48 bg-eco-green/20 rounded-full filter blur-[80px]"></div>
                     </div>
 
-                    <div class="relative w-full max-w-[680px] mx-auto rounded-xl bg-gray-900 border-[6px] border-gray-700 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden ring-1 ring-black/40">
+                    <div class="relative w-full max-w-[680px] mx-auto aspect-[16/9] rounded-xl bg-gray-900 border-[6px] border-gray-700 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden ring-1 ring-black/40">
                         <div class="absolute top-2 left-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
                         <div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
                         <div class="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
@@ -931,6 +925,15 @@
                                 <span class="w-1.5 h-1.5 rounded-full bg-eco-lightgreen animate-pulse" style="box-shadow: 0 0 6px #9ab63b"></span>
                                 LIVE
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Badge "By Ecocontrol" — bottom-right de la HMI -->
+                    <div class="relative w-full max-w-[680px] mx-auto mt-3 flex justify-end">
+                        <div
+                            class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 backdrop-blur-md text-eco-lightgreen font-semibold text-xs border border-eco-lightgreen/20 shadow-sm">
+                            <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
+                            By Ecocontrol
                         </div>
                     </div>
                 </div>
