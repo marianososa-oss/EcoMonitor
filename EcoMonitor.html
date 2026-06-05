@@ -20,6 +20,20 @@
     <script>
         tailwind.config = {
             theme: {
+                // Breakpoints custom segun la tabla de medidas del usuario:
+                //  ≤480px       moviles pequenos (sin prefijo)
+                //  481-575px    moviles grandes (xs:)
+                //  576-768px    tablets (sm:)
+                //  769-991px    pantallas medianas (md:)
+                //  992-1199px   escritorio estandar (lg:)
+                //  1200px+      escritorio grande (xl:)
+                screens: {
+                    'xs':  '481px',
+                    'sm':  '576px',
+                    'md':  '769px',
+                    'lg':  '992px',
+                    'xl':  '1200px',
+                },
                 extend: {
                     colors: {
                         eco: {
@@ -1872,7 +1886,7 @@
                     <div class="mb-5">
                         <img src="ecomonitor-blanco.png"
                             alt="Ecomonitor" class="footer-logo footer-logo-night h-10 w-auto object-contain">
-                        <img src="ecomonitor-footer-day.png"
+                        <img src="ecomonitor-footer-day.svg"
                             alt="Ecomonitor" class="footer-logo footer-logo-day h-10 w-auto object-contain">
                     </div>
                     <p class="text-gray-400 text-sm mb-6"><a href="https://www.ecocontrol.com.ar" target="_blank"
