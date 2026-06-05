@@ -2381,9 +2381,9 @@
                 const scene = new THREE.Scene();
                 // === Paletas día / noche en formato Three.Color (cenit / medio / horizonte) ===
                 const SKY_DAY = {
-                    top:    new THREE.Color('#3a8fd0'),   // cenit azul mediodia
-                    mid:    new THREE.Color('#a4cce8'),   // medio cielo
-                    bottom: new THREE.Color('#e3dcc4')    // horizonte calido
+                    top:    new THREE.Color('#4ea8e8'),   // cenit azul mediodia saturado
+                    mid:    new THREE.Color('#c8e1f3'),   // medio cielo brillante
+                    bottom: new THREE.Color('#f0e8d2')    // horizonte calido claro
                 };
                 const SKY_NIGHT = {
                     top:    new THREE.Color('#04081a'),   // cenit casi negro
@@ -2470,6 +2470,7 @@
                         transparent: true,
                         opacity,
                         depthWrite: false,
+                        fog: false,  // CRITICO: las estrellas estan mas lejos que fog.far, sin esto se las come la niebla
                         blending: THREE.AdditiveBlending
                     });
                     const points = new THREE.Points(geo, mat);
@@ -2521,9 +2522,10 @@
                 const baseStarOpacities = [0.65, 0.85, 1.00];
                 const applySceneTheme = (isDay) => {
                     const palette = isDay ? SKY_DAY : SKY_NIGHT;
-                    skyDomeMat.uniforms.topColor.value.copy(palette.top);
-                    skyDomeMat.uniforms.midColor.value.copy(palette.mid);
-                    skyDomeMat.uniforms.bottomColor.value.copy(palette.bottom);
+                    skyDomeMat.uniforms.topColor.value    = palette.top.clone();
+                    skyDomeMat.uniforms.midColor.value    = palette.mid.clone();
+                    skyDomeMat.uniforms.bottomColor.value = palette.bottom.clone();
+                    skyDomeMat.uniformsNeedUpdate = true;
                     if (isDay) {
                         scene.fog.color.copy(palette.bottom);
                         scene.fog.near = 42;
@@ -2575,6 +2577,14 @@
                 };
                 // Plano circular MUCHO más grande para que la niebla absorba el horizonte (no se vea el borde)
                 const TERRAIN_R = 180;
+                // Función pura: altura del terreno en cualquier (x,z) — la usan rocas y montañas para no flotar
+                const terrainHeightAt = (x, z) => {
+                    const d = Math.sqrt(x*x + z*z);
+                    const flatFactor = Math.min(1, Math.max(0, (d - 7) / 6));
+                    const n = pseudoNoise(x * 0.15, z * 0.15);
+                    const edgeFalloff = d > 140 ? -(d - 140) * 0.08 : 0;
+                    return n * 0.5 * flatFactor + edgeFalloff;
+                };
                 const terrainGeo = new THREE.CircleGeometry(TERRAIN_R, 160);
                 const tPos = terrainGeo.attributes.position;
                 const tColors = new Float32Array(tPos.count * 3);
@@ -2583,12 +2593,8 @@
                 const colDark = new THREE.Color('#7a6a52');
                 for (let i = 0; i < tPos.count; i++) {
                     const x = tPos.getX(i), z = tPos.getY(i);
-                    const distToCenter = Math.sqrt(x*x + z*z);
-                    const flatFactor = Math.min(1, Math.max(0, (distToCenter - 7) / 6));
                     const n = pseudoNoise(x * 0.15, z * 0.15);
-                    // Edge falloff: el borde baja un poco para no mostrarse plano
-                    const edgeFalloff = distToCenter > 140 ? -(distToCenter - 140) * 0.08 : 0;
-                    tPos.setZ(i, n * 0.5 * flatFactor + edgeFalloff);
+                    tPos.setZ(i, terrainHeightAt(x, z));
                     const t01 = (n + 0.6) / 1.2;
                     const c = colSand.clone().lerp(colDirt, Math.min(1, t01));
                     if (n > 0.25) c.lerp(colDark, (n - 0.25) * 2);
@@ -2655,8 +2661,8 @@
                             flatShading: false  // suave (las piedras desgastadas no son facetadas)
                         })
                     );
-                    // Hundir más para look natural
-                    rock.position.set(x, size * scaleY * 0.35, z);
+                    // Pegada al terreno real (muestreado), con leve hundimiento natural
+                    rock.position.set(x, terrainHeightAt(x, z) + size * scaleY * 0.30, z);
                     rock.rotation.set(
                         seedRand(i * 13) * Math.PI * 2,
                         seedRand(i * 17) * Math.PI * 2,
@@ -2701,7 +2707,9 @@
                                 flatShading: true
                             })
                         );
-                        m.position.set(x, h/2, z);
+                        // Pegamos la base al terreno (sample) y enterramos un poquito para no ver el "skirt"
+                        const groundY = terrainHeightAt(x, z);
+                        m.position.set(x, groundY + h/2 - 0.4, z);
                         m.castShadow = false; // demasiado lejos, no aporta
                         scene.add(m);
                         // Nieve en la cumbre (solo en cordilleras altas)
@@ -2726,7 +2734,8 @@
                                 snowGeo,
                                 new THREE.MeshLambertMaterial({ color: '#f4f1ea', flatShading: false })
                             );
-                            snow.position.set(x, h - snowH/2 + 0.05, z);
+                            // Snow cap sigue la posicion ajustada de la montaña (groundY + h - snowH/2 - 0.4)
+                            snow.position.set(x, groundY + h - snowH/2 - 0.35, z);
                             scene.add(snow);
                         }
                     }
