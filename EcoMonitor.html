@@ -2361,7 +2361,7 @@
         };
 
         // ===== Sala3D : Three.js shelter Neuquén con tableros Maestro+Esclavos =====
-        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible }) => {
+        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible, sceneTheme }) => {
             const containerRef = useRef(null);
             const canvasRef    = useRef(null);
             const sceneObj     = useRef(null);
@@ -2379,35 +2379,80 @@
                 const H = 560;
 
                 const scene = new THREE.Scene();
-                // === Paletas día/noche para la escena ===
-                const SKY_NIGHT = [
-                    [0,    '#9bb4c8'],   // cielo arriba (atardecer celeste-frio)
-                    [0.45, '#c4c2b0'],   // bruma
-                    [0.78, '#d8c5a0'],   // horizonte arenoso cálido
-                    [1,    '#b8a280']    // tierra cercana
-                ];
+                // === Paletas día / noche / atardecer para la escena ===
+                // Cada paleta = stops de gradient vertical (de cenit a horizonte)
                 const SKY_DAY = [
-                    [0,    '#7ab8e0'],   // cielo arriba (azul mediodía)
-                    [0.45, '#bbd9eb'],   // bruma clara
-                    [0.78, '#e3dcc4'],   // horizonte cálido claro
+                    [0,    '#5fa8d8'],   // cenit (azul mediodía saturado)
+                    [0.45, '#a7d0ea'],   // arriba bruma clara
+                    [0.78, '#e3dcc4'],   // horizonte cálido
                     [1,    '#c8b894']    // tierra cercana
                 ];
-                // Sky gradient como background — generado en canvas
+                const SKY_NIGHT = [
+                    [0,    '#0a1530'],   // cenit (azul navy oscuro)
+                    [0.45, '#172648'],   // arriba bruma nocturna
+                    [0.78, '#2c3856'],   // horizonte azul-purpura
+                    [1,    '#1b1f30']    // tierra cercana oscura
+                ];
+                // Sky canvas más grande para que entren estrellas y luna nítidas
+                const SKY_W = 256, SKY_H = 512;
                 const skyCanvas = document.createElement('canvas');
-                skyCanvas.width = 4; skyCanvas.height = 512;
+                skyCanvas.width = SKY_W; skyCanvas.height = SKY_H;
                 const skyCtx = skyCanvas.getContext('2d');
-                const paintSky = (stops) => {
-                    const grad = skyCtx.createLinearGradient(0, 0, 0, 512);
+                // PRNG determinista para que las estrellas no salten
+                const starRand = (n) => { const s = Math.sin(n * 12.9898) * 43758.5453; return s - Math.floor(s); };
+                const paintSky = (stops, isDay) => {
+                    const grad = skyCtx.createLinearGradient(0, 0, 0, SKY_H);
                     stops.forEach(([p, c]) => grad.addColorStop(p, c));
                     skyCtx.fillStyle = grad;
-                    skyCtx.fillRect(0, 0, 4, 512);
+                    skyCtx.fillRect(0, 0, SKY_W, SKY_H);
+                    if (!isDay) {
+                        // Estrellas en la franja superior (0–60% del alto = cielo profundo)
+                        for (let i = 0; i < 240; i++) {
+                            const x = starRand(i * 3.1) * SKY_W;
+                            const y = starRand(i * 7.7) * SKY_H * 0.55;
+                            const r = 0.5 + starRand(i * 11.3) * 1.4;
+                            const a = 0.35 + starRand(i * 17.9) * 0.65;
+                            // núcleo blanco
+                            skyCtx.globalAlpha = a;
+                            skyCtx.fillStyle = '#ffffff';
+                            skyCtx.beginPath();
+                            skyCtx.arc(x, y, r, 0, Math.PI * 2);
+                            skyCtx.fill();
+                            // halo tenue solo para las más brillantes
+                            if (r > 1.4 && a > 0.7) {
+                                skyCtx.globalAlpha = a * 0.18;
+                                skyCtx.beginPath();
+                                skyCtx.arc(x, y, r * 3.5, 0, Math.PI * 2);
+                                skyCtx.fill();
+                            }
+                        }
+                        // Luna creciente arriba a la derecha
+                        skyCtx.globalAlpha = 0.95;
+                        skyCtx.fillStyle = '#f6efd2';
+                        skyCtx.beginPath();
+                        skyCtx.arc(SKY_W * 0.78, SKY_H * 0.14, 14, 0, Math.PI * 2);
+                        skyCtx.fill();
+                        // sombra para creciente (desplazada para tapar parte del disco)
+                        skyCtx.globalAlpha = 1;
+                        skyCtx.fillStyle = stops[0][1];  // mismo color del cenit (oscurece el lado)
+                        skyCtx.beginPath();
+                        skyCtx.arc(SKY_W * 0.78 + 5, SKY_H * 0.14 - 1, 13, 0, Math.PI * 2);
+                        skyCtx.fill();
+                        // halo de la luna
+                        skyCtx.globalAlpha = 0.15;
+                        skyCtx.fillStyle = '#f6efd2';
+                        skyCtx.beginPath();
+                        skyCtx.arc(SKY_W * 0.78, SKY_H * 0.14, 28, 0, Math.PI * 2);
+                        skyCtx.fill();
+                        skyCtx.globalAlpha = 1;
+                    }
                 };
-                paintSky(SKY_NIGHT);
+                paintSky(SKY_NIGHT, false);
                 const skyTex = new THREE.CanvasTexture(skyCanvas);
                 skyTex.colorSpace = THREE.SRGBColorSpace || undefined;
                 scene.background = skyTex;
-                // Niebla sutil para profundidad
-                scene.fog = new THREE.Fog('#d2c5a8', 22, 70);
+                // Niebla sutil para profundidad (se ajusta por modo)
+                scene.fog = new THREE.Fog('#2c3856', 32, 120);
 
                 const fs = 17;
                 let aspect = W / H;
@@ -2425,7 +2470,7 @@
 
                 const ambient = new THREE.AmbientLight(0xfff2e0, 0.55);
                 scene.add(ambient);
-                const dir = new THREE.DirectionalLight(0xffefd5, 1.0);  // sol cálido patagónico
+                const dir = new THREE.DirectionalLight(0xffefd5, 1.0);  // luz principal (sol o luna)
                 dir.position.set(12, 22, 8);
                 dir.castShadow = true;
                 dir.shadow.mapSize.set(2048, 2048);
@@ -2443,27 +2488,38 @@
                 // === Aplicar tema día/noche a cielo + niebla + luces ===
                 const applySceneTheme = (isDay) => {
                     if (isDay) {
-                        paintSky(SKY_DAY);
+                        paintSky(SKY_DAY, true);
                         scene.fog.color.set('#e3dcc4');
-                        scene.fog.near = 28;
-                        scene.fog.far = 85;
-                        ambient.color.setHex(0xffffff); ambient.intensity = 0.80;
-                        dir.color.setHex(0xffffff);     dir.intensity = 1.35;
-                        warm.color.setHex(0xa89d80);    warm.intensity = 0.15;
+                        scene.fog.near = 38;
+                        scene.fog.far  = 140;
+                        ambient.color.setHex(0xffffff); ambient.intensity = 0.85;
+                        dir.color.setHex(0xffffff);     dir.intensity = 1.40;
+                        warm.color.setHex(0xa89d80);    warm.intensity = 0.18;
                     } else {
-                        paintSky(SKY_NIGHT);
-                        scene.fog.color.set('#d2c5a8');
-                        scene.fog.near = 22;
-                        scene.fog.far = 70;
-                        ambient.color.setHex(0xfff2e0); ambient.intensity = 0.55;
-                        dir.color.setHex(0xffefd5);     dir.intensity = 1.00;
-                        warm.color.setHex(0xc4b89c);    warm.intensity = 0.22;
+                        paintSky(SKY_NIGHT, false);
+                        scene.fog.color.set('#2c3856');
+                        scene.fog.near = 32;
+                        scene.fog.far  = 120;
+                        ambient.color.setHex(0x3b4870); ambient.intensity = 0.45;
+                        dir.color.setHex(0xa7b8e0);     dir.intensity = 0.55;
+                        warm.color.setHex(0x3a4060);    warm.intensity = 0.18;
                     }
                     skyTex.needsUpdate = true;
                 };
-                applySceneTheme(document.body.classList.contains('day-mode'));
+                // Estado del tema de la escena: 'auto' sigue al body.classList, 'day'/'night' lo sobrescribe
+                let sceneThemeOverride = 'auto';
+                const resolveTheme = () => {
+                    if (sceneThemeOverride === 'day')   return true;
+                    if (sceneThemeOverride === 'night') return false;
+                    return document.body.classList.contains('day-mode');
+                };
+                const setSceneThemeOverride = (v) => {
+                    sceneThemeOverride = v;
+                    applySceneTheme(resolveTheme());
+                };
+                applySceneTheme(resolveTheme());
                 const themeObserver = new MutationObserver(() => {
-                    applySceneTheme(document.body.classList.contains('day-mode'));
+                    if (sceneThemeOverride === 'auto') applySceneTheme(resolveTheme());
                 });
                 themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
@@ -2479,8 +2535,9 @@
                            Math.cos(x * 3.1 + z * 2.7) * 0.09 +
                            Math.sin(x * 5.8 - z * 4.2) * 0.045;
                 };
-                // Plano circular grande con muchos segmentos
-                const terrainGeo = new THREE.CircleGeometry(80, 128);
+                // Plano circular MUCHO más grande para que la niebla absorba el horizonte (no se vea el borde)
+                const TERRAIN_R = 180;
+                const terrainGeo = new THREE.CircleGeometry(TERRAIN_R, 160);
                 const tPos = terrainGeo.attributes.position;
                 const tColors = new Float32Array(tPos.count * 3);
                 const colSand = new THREE.Color('#d6c4a0');
@@ -2492,7 +2549,7 @@
                     const flatFactor = Math.min(1, Math.max(0, (distToCenter - 7) / 6));
                     const n = pseudoNoise(x * 0.15, z * 0.15);
                     // Edge falloff: el borde baja un poco para no mostrarse plano
-                    const edgeFalloff = distToCenter > 65 ? -(distToCenter - 65) * 0.08 : 0;
+                    const edgeFalloff = distToCenter > 140 ? -(distToCenter - 140) * 0.08 : 0;
                     tPos.setZ(i, n * 0.5 * flatFactor + edgeFalloff);
                     const t01 = (n + 0.6) / 1.2;
                     const c = colSand.clone().lerp(colDirt, Math.min(1, t01));
@@ -2518,38 +2575,50 @@
                     const s = Math.sin(n * 9241.327) * 43758.5453;
                     return s - Math.floor(s);
                 };
-                // 220 piedras con más variedad de tamaños y formas
-                for (let i = 0; i < 220; i++) {
+                // 280 piedras más realistas: detail=2, deformación elipsoidal + irregular,
+                // achatadas en eje vertical (las piedras reales no son esferas)
+                for (let i = 0; i < 280; i++) {
                     const angle = seedRand(i * 3 + 1) * Math.PI * 2;
-                    const dist = 9 + seedRand(i * 3 + 2) * 42;
+                    const dist = 9 + seedRand(i * 3 + 2) * 90;
                     const x = Math.cos(angle) * dist;
                     const z = Math.sin(angle) * dist;
-                    // Tamaños: 40% chicas, 40% medianas, 20% grandes
+                    // Tamaños: 50% chicas, 35% medianas, 15% grandes
                     const sizeRoll = seedRand(i * 3 + 3);
                     let size;
-                    if (sizeRoll < 0.4)      size = 0.10 + seedRand(i * 5) * 0.18;       // chicas
-                    else if (sizeRoll < 0.8) size = 0.25 + seedRand(i * 5) * 0.35;       // medianas
-                    else                     size = 0.55 + seedRand(i * 5) * 0.55;       // grandes
-                    // Detail=1 → 80 caras (mucho más suave que detail=0)
-                    const geo = new THREE.IcosahedronGeometry(size, 1);
-                    // Deform fuerte e irregular para look natural
+                    if (sizeRoll < 0.5)      size = 0.08 + seedRand(i * 5) * 0.16;
+                    else if (sizeRoll < 0.85) size = 0.22 + seedRand(i * 5) * 0.32;
+                    else                     size = 0.50 + seedRand(i * 5) * 0.55;
+                    // Detail=2 → 320 caras, muy suave
+                    const geo = new THREE.IcosahedronGeometry(size, 2);
+                    // Ejes elipsoidales: más anchas que altas (piedra real)
+                    const scaleX = 0.85 + seedRand(i * 71) * 0.5;
+                    const scaleY = 0.55 + seedRand(i * 73) * 0.35;  // achatada
+                    const scaleZ = 0.85 + seedRand(i * 79) * 0.5;
                     const rPos = geo.attributes.position;
                     for (let v = 0; v < rPos.count; v++) {
                         const sx = rPos.getX(v), sy = rPos.getY(v), sz = rPos.getZ(v);
-                        const n1 = (seedRand(i * 100 + v * 7) - 0.5) * 0.45;
-                        const n2 = (seedRand(i * 200 + v * 11) - 0.5) * 0.25;
-                        rPos.setXYZ(v, sx * (1 + n1), sy * (1 + n2), sz * (1 + n1 * 0.7));
+                        // Noise multi-frecuencia para superficie irregular pero suave
+                        const big   = (seedRand(i * 100 + v * 7) - 0.5) * 0.30;
+                        const med   = (seedRand(i * 200 + v * 11) - 0.5) * 0.18;
+                        const fine  = (seedRand(i * 300 + v * 17) - 0.5) * 0.08;
+                        const def   = big + med + fine;
+                        rPos.setXYZ(
+                            v,
+                            sx * scaleX * (1 + def),
+                            sy * scaleY * (1 + def * 0.6),
+                            sz * scaleZ * (1 + def * 0.85)
+                        );
                     }
                     geo.computeVertexNormals();
                     const rock = new THREE.Mesh(
                         geo,
                         new THREE.MeshLambertMaterial({
                             color: rockColors[Math.floor(seedRand(i * 23) * rockColors.length)],
-                            flatShading: true
+                            flatShading: false  // suave (las piedras desgastadas no son facetadas)
                         })
                     );
-                    // Asentar al piso (un poco hundidas)
-                    rock.position.set(x, size * 0.4, z);
+                    // Hundir más para look natural
+                    rock.position.set(x, size * scaleY * 0.35, z);
                     rock.rotation.set(
                         seedRand(i * 13) * Math.PI * 2,
                         seedRand(i * 17) * Math.PI * 2,
@@ -2570,8 +2639,8 @@
                         const z = centerZ + Math.sin(a) * d;
                         const h = scaleRange[0] + seedRand(i * 41) * (scaleRange[1] - scaleRange[0]);
                         const r = h * (0.45 + seedRand(i * 43) * 0.35);
-                        const segs = 8 + Math.floor(seedRand(i * 47) * 5);  // 8-12 segmentos = más smooth
-                        const coneGeo = new THREE.ConeGeometry(r, h, segs, 4);  // 4 height segments
+                        const segs = 14 + Math.floor(seedRand(i * 47) * 6);  // 14-19 segmentos = silueta lisa
+                        const coneGeo = new THREE.ConeGeometry(r, h, segs, 5);  // 5 height segments
                         // Deformar para look de montaña real, PERO sin tocar la punta (vertex top compartido)
                         const cPos = coneGeo.attributes.position;
                         const topY = h / 2;  // ConeGeometry: top vertex at y = +h/2
@@ -3310,7 +3379,8 @@
                     heatMeshes, heatWaves, wifiRings, wallMeshes,
                     masterOutputPos, cloudPos,
                     roomW, roomD, roomH,
-                    targetView: 'iso'
+                    targetView: 'iso',
+                    setSceneThemeOverride
                 };
 
                 // Habilitar sombras en todos los Mesh Lambert (skip terrain ya tiene receive, basic materials no participan)
@@ -4034,6 +4104,13 @@
                 }
             }, [view]);
 
+            // Scene theme override: 'auto' sigue al body.day-mode, 'day' o 'night' lo fijan
+            useEffect(() => {
+                const obj = sceneObj.current;
+                if (!obj || !obj.setSceneThemeOverride) return;
+                obj.setSceneThemeOverride(sceneTheme || 'auto');
+            }, [sceneTheme]);
+
             return (
                 <div ref={containerRef} className="relative w-full" style={{ background: '#0a0a12' }}>
                     <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '560px', cursor: 'grab' }}></canvas>
@@ -4065,6 +4142,7 @@
             const [overloadEnabled, setOverloadEnabled] = useState(true);
             const [view, setView]                 = useState('iso'); // 'iso' | 'top'
             const [interiorVisible, setInteriorVisible] = useState(true); // ver interior vs exterior cerrado
+            const [sceneTheme, setSceneTheme]     = useState('auto'); // 'auto' | 'day' | 'night' — tema de la escena 3D
 
             const [hvacUnits, setHvacUnits]       = useState([]);
             const [presUnits, setPresUnits]       = useState([]);
@@ -4216,6 +4294,11 @@
                                 <button onClick={() => setInteriorVisible(true)} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Interior</button>
                                 <button onClick={() => setInteriorVisible(false)} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${!interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Exterior</button>
                             </div>
+                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-1 flex" title="Tema de la escena 3D">
+                                <button onClick={() => setSceneTheme('auto')}  className={`px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${sceneTheme === 'auto'  ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>Auto</button>
+                                <button onClick={() => setSceneTheme('day')}   className={`px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${sceneTheme === 'day'   ? 'bg-amber-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Día</button>
+                                <button onClick={() => setSceneTheme('night')} className={`px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${sceneTheme === 'night' ? 'bg-indigo-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Noche</button>
+                            </div>
                         </div>
                     </div>
 
@@ -4294,7 +4377,7 @@
                     </div>
 
                     {/* Visualization (Three.js scene — sala blueprint blanca con equipo + HVAC + Master) */}
-                    <Sala3D hvacUnits={hvacUnits} presUnits={presUnits} view={view} interiorVisible={interiorVisible} />
+                    <Sala3D hvacUnits={hvacUnits} presUnits={presUnits} view={view} interiorVisible={interiorVisible} sceneTheme={sceneTheme} />
 
 
                     {/* Timeline Gantt */}
