@@ -2379,17 +2379,30 @@
                 const H = 560;
 
                 const scene = new THREE.Scene();
+                // === Paletas día/noche para la escena ===
+                const SKY_NIGHT = [
+                    [0,    '#9bb4c8'],   // cielo arriba (atardecer celeste-frio)
+                    [0.45, '#c4c2b0'],   // bruma
+                    [0.78, '#d8c5a0'],   // horizonte arenoso cálido
+                    [1,    '#b8a280']    // tierra cercana
+                ];
+                const SKY_DAY = [
+                    [0,    '#7ab8e0'],   // cielo arriba (azul mediodía)
+                    [0.45, '#bbd9eb'],   // bruma clara
+                    [0.78, '#e3dcc4'],   // horizonte cálido claro
+                    [1,    '#c8b894']    // tierra cercana
+                ];
                 // Sky gradient como background — generado en canvas
                 const skyCanvas = document.createElement('canvas');
                 skyCanvas.width = 4; skyCanvas.height = 512;
                 const skyCtx = skyCanvas.getContext('2d');
-                const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 512);
-                skyGrad.addColorStop(0,    '#9bb4c8');  // cielo arriba (celeste suave)
-                skyGrad.addColorStop(0.45, '#c4c2b0');  // bruma a media altura
-                skyGrad.addColorStop(0.78, '#d8c5a0');  // horizonte arenoso
-                skyGrad.addColorStop(1,    '#b8a280');  // tierra cercana
-                skyCtx.fillStyle = skyGrad;
-                skyCtx.fillRect(0, 0, 4, 512);
+                const paintSky = (stops) => {
+                    const grad = skyCtx.createLinearGradient(0, 0, 0, 512);
+                    stops.forEach(([p, c]) => grad.addColorStop(p, c));
+                    skyCtx.fillStyle = grad;
+                    skyCtx.fillRect(0, 0, 4, 512);
+                };
+                paintSky(SKY_NIGHT);
                 const skyTex = new THREE.CanvasTexture(skyCanvas);
                 skyTex.colorSpace = THREE.SRGBColorSpace || undefined;
                 scene.background = skyTex;
@@ -2410,7 +2423,8 @@
                 renderer.shadowMap.enabled = true;
                 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-                scene.add(new THREE.AmbientLight(0xfff2e0, 0.55));
+                const ambient = new THREE.AmbientLight(0xfff2e0, 0.55);
+                scene.add(ambient);
                 const dir = new THREE.DirectionalLight(0xffefd5, 1.0);  // sol cálido patagónico
                 dir.position.set(12, 22, 8);
                 dir.castShadow = true;
@@ -2425,6 +2439,33 @@
                 scene.add(dir);
                 const warm = new THREE.DirectionalLight(0xc4b89c, 0.22);  // luz rebotada del terreno
                 warm.position.set(-6, 3, -4); scene.add(warm);
+
+                // === Aplicar tema día/noche a cielo + niebla + luces ===
+                const applySceneTheme = (isDay) => {
+                    if (isDay) {
+                        paintSky(SKY_DAY);
+                        scene.fog.color.set('#e3dcc4');
+                        scene.fog.near = 28;
+                        scene.fog.far = 85;
+                        ambient.color.setHex(0xffffff); ambient.intensity = 0.80;
+                        dir.color.setHex(0xffffff);     dir.intensity = 1.35;
+                        warm.color.setHex(0xa89d80);    warm.intensity = 0.15;
+                    } else {
+                        paintSky(SKY_NIGHT);
+                        scene.fog.color.set('#d2c5a8');
+                        scene.fog.near = 22;
+                        scene.fog.far = 70;
+                        ambient.color.setHex(0xfff2e0); ambient.intensity = 0.55;
+                        dir.color.setHex(0xffefd5);     dir.intensity = 1.00;
+                        warm.color.setHex(0xc4b89c);    warm.intensity = 0.22;
+                    }
+                    skyTex.needsUpdate = true;
+                };
+                applySceneTheme(document.body.classList.contains('day-mode'));
+                const themeObserver = new MutationObserver(() => {
+                    applySceneTheme(document.body.classList.contains('day-mode'));
+                });
+                themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
                 // Room dimensions (más grandes que antes)
                 const roomW = 12, roomD = 8, roomH = 4;
@@ -3419,6 +3460,7 @@
                 return () => {
                     cancelAnimationFrame(animRef.current);
                     ro.disconnect();
+                    themeObserver.disconnect();
                     canvas.removeEventListener('pointerdown', onPointerDown);
                     window.removeEventListener('pointerup', onPointerUp);
                     window.removeEventListener('pointermove', onPointerMove);
