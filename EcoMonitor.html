@@ -2379,118 +2379,20 @@
                 const H = 560;
 
                 const scene = new THREE.Scene();
-                // === Paletas día / noche en formato Three.Color (cenit / medio / horizonte) ===
+                // === Paletas día (atardecer cálido) / noche (oscuro con fog) ===
+                // Cada paleta = solo background + fog (simple, sin estrellas ni shader)
                 const SKY_DAY = {
-                    top:    new THREE.Color('#5fb4ee'),   // cenit cielo brillante
-                    mid:    new THREE.Color('#bedaef'),   // medio cielo claro
-                    bottom: new THREE.Color('#fcf4e0')    // horizonte casi blanco-crema
+                    bg:  new THREE.Color('#c4c2b0'),   // atardecer Patagonia (warm sand/dusk)
+                    fog: new THREE.Color('#d8c5a0')    // niebla cálida
                 };
                 const SKY_NIGHT = {
-                    top:    new THREE.Color('#020616'),   // cenit casi negro
-                    mid:    new THREE.Color('#0f1c3a'),   // medio cielo navy
-                    bottom: new THREE.Color('#2a3554')    // horizonte azul-purpura
+                    bg:  new THREE.Color('#0c1228'),   // navy muy oscuro (cielo nocturno)
+                    fog: new THREE.Color('#1a2240')    // niebla nocturna azul-purpura
                 };
-
-                // === SKYDOME: esfera grande con shader gradient (sin tiling, vector-quality) ===
-                const SKY_RADIUS = 250;
-                const skyDomeMat = new THREE.ShaderMaterial({
-                    uniforms: {
-                        topColor:    { value: SKY_NIGHT.top.clone() },
-                        midColor:    { value: SKY_NIGHT.mid.clone() },
-                        bottomColor: { value: SKY_NIGHT.bottom.clone() }
-                    },
-                    vertexShader: `
-                        varying vec3 vWorldPos;
-                        void main() {
-                            vec4 wp = modelMatrix * vec4(position, 1.0);
-                            vWorldPos = wp.xyz;
-                            gl_Position = projectionMatrix * viewMatrix * wp;
-                        }
-                    `,
-                    fragmentShader: `
-                        uniform vec3 topColor;
-                        uniform vec3 midColor;
-                        uniform vec3 bottomColor;
-                        varying vec3 vWorldPos;
-                        void main() {
-                            // h = -1 (nadir) a +1 (cenit)
-                            float h = normalize(vWorldPos).y;
-                            // Curva: top arriba, mid a media altura, bottom en horizonte
-                            vec3 col;
-                            if (h > 0.25) {
-                                col = mix(midColor, topColor, smoothstep(0.25, 0.95, h));
-                            } else {
-                                col = mix(bottomColor, midColor, smoothstep(-0.05, 0.25, h));
-                            }
-                            gl_FragColor = vec4(col, 1.0);
-                        }
-                    `,
-                    side: THREE.BackSide,
-                    depthWrite: false,
-                    fog: false
-                });
-                const skyDome = new THREE.Mesh(
-                    new THREE.SphereGeometry(SKY_RADIUS, 64, 32),
-                    skyDomeMat
-                );
-                skyDome.renderOrder = -10;          // dibujar PRIMERO (atras de todo)
-                skyDome.frustumCulled = false;       // que nunca lo descarte el frustum
-                skyDomeMat.depthTest = false;        // no comparar profundidad
-                scene.add(skyDome);
-
-                // === ESTRELLAS: 3 capas de THREE.Points en el hemisferio superior ===
-                // Capa chicas (numerosas, tenues) + medianas + brillantes (pocas, con halo)
-                const makeStars = (count, size, opacity, minPhi) => {
-                    const geo = new THREE.BufferGeometry();
-                    const positions = new Float32Array(count * 3);
-                    const colors = new Float32Array(count * 3);
-                    const r = SKY_RADIUS * 0.92;
-                    for (let i = 0; i < count; i++) {
-                        // Hemisferio superior con leve bias hacia el cenit
-                        const u = Math.random();
-                        const v = Math.random();
-                        const theta = 2 * Math.PI * u;
-                        // phi=0 cenit, phi=pi/2 horizonte. Excluimos el horizonte (donde sale el sol/luna virtuales)
-                        const phi = Math.acos(minPhi + (1 - minPhi) * Math.pow(v, 0.7));
-                        positions[i*3]     = r * Math.sin(phi) * Math.cos(theta);
-                        positions[i*3 + 1] = r * Math.cos(phi);
-                        positions[i*3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-                        // Tinte sutil (azul-blanco, amarillo-blanco)
-                        const tintRoll = Math.random();
-                        if (tintRoll < 0.7) {
-                            colors[i*3] = 1.0; colors[i*3+1] = 1.0; colors[i*3+2] = 1.0;  // blanco
-                        } else if (tintRoll < 0.88) {
-                            colors[i*3] = 0.9; colors[i*3+1] = 0.95; colors[i*3+2] = 1.0;  // azul tenue
-                        } else {
-                            colors[i*3] = 1.0; colors[i*3+1] = 0.97; colors[i*3+2] = 0.85;  // amarillo tenue
-                        }
-                    }
-                    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-                    const mat = new THREE.PointsMaterial({
-                        size, sizeAttenuation: false,
-                        vertexColors: true,
-                        transparent: true,
-                        opacity,
-                        depthWrite: false,
-                        fog: false,  // CRITICO: las estrellas estan mas lejos que fog.far, sin esto se las come la niebla
-                        blending: THREE.AdditiveBlending
-                    });
-                    const points = new THREE.Points(geo, mat);
-                    points.frustumCulled = false;  // garantiza que siempre se rendericen, sin importar la camara
-                    points.renderOrder = 1;        // que se dibujen DESPUES del skydome
-                    return points;
-                };
-                const starsSmall  = makeStars(1500, 1.1, 0.65, 0.05); // mayoria de estrellas, puntito 1px
-                const starsMid    = makeStars(450,  2.0, 0.85, 0.1);  // medianas
-                const starsBright = makeStars(60,   3.3, 1.00, 0.15); // brillantes (con halo aditivo)
-                scene.add(starsSmall);
-                scene.add(starsMid);
-                scene.add(starsBright);
-                const starGroups = [starsSmall, starsMid, starsBright];
-
-                // Niebla sutil para profundidad (color se ajusta por modo)
-                scene.fog = new THREE.Fog('#1f2a4a', 32, 140);
+                // Background simple: solid color (sin shader, sin tiling, sin lunas raras)
+                scene.background = SKY_NIGHT.bg.clone();
+                // Niebla densa que absorbe el horizonte y simula la atmósfera
+                scene.fog = new THREE.Fog(SKY_NIGHT.fog.clone(), 22, 75);
 
                 const fs = 17;
                 let aspect = W / H;
@@ -2523,32 +2425,25 @@
                 const warm = new THREE.DirectionalLight(0xc4b89c, 0.22);  // luz rebotada del terreno
                 warm.position.set(-6, 3, -4); scene.add(warm);
 
-                // === Aplicar tema día/noche a cielo + niebla + luces + estrellas ===
-                const baseStarOpacities = [0.65, 0.85, 1.00];
+                // === Aplicar tema día/noche: solo background + fog + luces ===
                 const applySceneTheme = (isDay) => {
                     const palette = isDay ? SKY_DAY : SKY_NIGHT;
-                    skyDomeMat.uniforms.topColor.value    = palette.top.clone();
-                    skyDomeMat.uniforms.midColor.value    = palette.mid.clone();
-                    skyDomeMat.uniforms.bottomColor.value = palette.bottom.clone();
-                    skyDomeMat.uniformsNeedUpdate = true;
+                    scene.background = palette.bg.clone();
+                    scene.fog.color.copy(palette.fog);
                     if (isDay) {
-                        scene.fog.color.copy(palette.bottom);
-                        scene.fog.near = 42;
-                        scene.fog.far  = 160;
-                        ambient.color.setHex(0xffffff); ambient.intensity = 0.85;
-                        dir.color.setHex(0xffffff);     dir.intensity = 1.40;
-                        warm.color.setHex(0xa89d80);    warm.intensity = 0.18;
-                        // Estrellas invisibles de dia
-                        starGroups.forEach(g => { g.material.opacity = 0; g.visible = false; });
+                        // Atardecer Patagonia cálido
+                        scene.fog.near = 22;
+                        scene.fog.far  = 75;
+                        ambient.color.setHex(0xfff2e0); ambient.intensity = 0.65;
+                        dir.color.setHex(0xffefd5);     dir.intensity = 1.10;
+                        warm.color.setHex(0xc4b89c);    warm.intensity = 0.22;
                     } else {
-                        scene.fog.color.copy(palette.bottom);
-                        scene.fog.near = 38;
-                        scene.fog.far  = 150;
+                        // Noche oscura
+                        scene.fog.near = 18;
+                        scene.fog.far  = 65;
                         ambient.color.setHex(0x2a3658); ambient.intensity = 0.35;
-                        dir.color.setHex(0x96abd0);     dir.intensity = 0.50;
+                        dir.color.setHex(0x96abd0);     dir.intensity = 0.45;
                         warm.color.setHex(0x2e3450);    warm.intensity = 0.16;
-                        // Estrellas visibles de noche
-                        starGroups.forEach((g, i) => { g.material.opacity = baseStarOpacities[i]; g.visible = true; });
                     }
                 };
                 // Estado del tema de la escena: 'auto' sigue al body.classList, 'day'/'night' lo sobrescribe
@@ -2686,100 +2581,7 @@
                     scene.add(rock);
                 }
 
-                // === CORDILLERA DE LOS ANDES (más picos, más alto, con nieve, más volumen) ===
-                const buildMountainCluster = (centerX, centerZ, count, colorRange, scaleRange, withSnow) => {
-                    const matColors = colorRange.map(c => new THREE.Color(c));
-                    for (let i = 0; i < count; i++) {
-                        const a = (i / count) * Math.PI * 2 + seedRand(i * 31 + Math.abs(centerX)) * 0.6;
-                        const d = seedRand(i * 37 + Math.abs(centerZ)) * 6;
-                        const x = centerX + Math.cos(a) * d;
-                        const z = centerZ + Math.sin(a) * d;
-                        const h = scaleRange[0] + seedRand(i * 41) * (scaleRange[1] - scaleRange[0]);
-                        const r = h * (0.45 + seedRand(i * 43) * 0.35);
-                        const segs = 24;                        // mas segmentos fijos = silueta lisa
-                        const coneGeo = new THREE.ConeGeometry(r, h, segs, 1);  // 1 height segment (SIN bandas)
-                        // Deformar para look de montaña real, PERO sin tocar la punta (vertex top compartido)
-                        const cPos = coneGeo.attributes.position;
-                        const topY = h / 2;
-                        // Pre-cómputo: noise angular suave (mismo para toda la altura → silueta natural, sin escalones)
-                        const angleNoise = new Map();
-                        for (let v = 0; v < cPos.count; v++) {
-                            const sx = cPos.getX(v), sz = cPos.getZ(v);
-                            const ang = Math.round(Math.atan2(sz, sx) * 1000);  // mismo angulo => mismo offset
-                            if (!angleNoise.has(ang)) {
-                                // Onda suave de bumps a lo largo del perimetro
-                                const t = Math.atan2(sz, sx);
-                                const noise = Math.sin(t * 3 + i * 0.7) * 0.5 +
-                                              Math.sin(t * 5 - i * 1.3) * 0.3 +
-                                              Math.sin(t * 8 + i * 0.4) * 0.2;
-                                angleNoise.set(ang, noise);
-                            }
-                        }
-                        for (let v = 0; v < cPos.count; v++) {
-                            const sx = cPos.getX(v), sy = cPos.getY(v), sz = cPos.getZ(v);
-                            const distFromTop = topY - sy;
-                            if (distFromTop < h * 0.10) continue;  // 10% superior limpio
-                            // Deformación que crece con la altura desde la base (max 25% en la base)
-                            const heightFromBase = (sy + h/2) / h;
-                            const baseDeform = Math.pow(1 - heightFromBase, 1.3) * 0.25;
-                            const ang = Math.round(Math.atan2(sz, sx) * 1000);
-                            const n = (angleNoise.get(ang) || 0) * baseDeform;
-                            cPos.setXYZ(v, sx * (1 + n), sy, sz * (1 + n));
-                        }
-                        coneGeo.computeVertexNormals();
-                        const m = new THREE.Mesh(
-                            coneGeo,
-                            new THREE.MeshLambertMaterial({
-                                color: matColors[i % matColors.length],
-                                flatShading: true
-                            })
-                        );
-                        // Pegamos la base al terreno (sample) + hundimos 15% de la altura para tapar el "skirt"
-                        const groundY = terrainHeightAt(x, z);
-                        const burial = h * 0.15;  // hundir 15% de la altura — proporcional al tamaño
-                        m.position.set(x, groundY + h/2 - burial, z);
-                        m.castShadow = false; // demasiado lejos, no aporta
-                        scene.add(m);
-                        // Nieve en la cumbre (solo en cordilleras altas)
-                        if (withSnow && h > 7) {
-                            const snowH = h * 0.25;
-                            const snowR = r * 0.42;
-                            // Más segmentos para silueta limpia, 3 height segments para curvatura
-                            const snowGeo = new THREE.ConeGeometry(snowR, snowH, segs, 3);
-                            const snowPos = snowGeo.attributes.position;
-                            const snowTopY = snowH / 2;  // vertex superior del cono nieve
-                            for (let v = 0; v < snowPos.count; v++) {
-                                const sx = snowPos.getX(v), sy = snowPos.getY(v), sz = snowPos.getZ(v);
-                                const distFromTop = snowTopY - sy;
-                                // NO deformar los 18% superiores: la cumbre nevada queda limpia
-                                if (distFromTop < snowH * 0.18) continue;
-                                // Deformación muy sutil para textura natural
-                                const n = (seedRand(i * 300 + v * 19) - 0.5) * 0.10;
-                                snowPos.setXYZ(v, sx * (1 + n), sy, sz * (1 + n));
-                            }
-                            snowGeo.computeVertexNormals();
-                            const snow = new THREE.Mesh(
-                                snowGeo,
-                                new THREE.MeshLambertMaterial({ color: '#f4f1ea', flatShading: false })
-                            );
-                            // Snow cap sigue la posicion ajustada de la montaña
-                            snow.position.set(x, groundY + h - snowH/2 - burial, z);
-                            scene.add(snow);
-                        }
-                    }
-                };
-                // CORDILLERA LEJANA (Andes): muchos picos altos con nieve, violácea
-                buildMountainCluster(-12, -65, 22, ['#4e4868', '#5e5878', '#3e3858', '#6e6488'], [8, 15], true);
-                // Cordillera media (NE) — gris con nieve en los más altos
-                buildMountainCluster(38, -50, 16, ['#6e6478', '#7a7088', '#5a5068'], [6, 11], true);
-                // Cordillera media (NW)
-                buildMountainCluster(-50, -30, 14, ['#5e5474', '#6e6488', '#4e445e'], [6, 12], true);
-                // Lomadas tierra cercanas — sin nieve, color tierra
-                buildMountainCluster(-58, 8, 10, ['#9a8e76', '#a89878', '#8a7a5e', '#7e6f55'], [3, 5.5], false);
-                buildMountainCluster(55, 25, 10, ['#988870', '#a89878', '#7e6f55'], [3, 5], false);
-                buildMountainCluster(-25, 55, 8, ['#988870', '#a89878'], [2.5, 4.2], false);
-
-                // (camino removido — el suelo árido es uniforme)
+                // (Montañas removidas por simplicidad — el horizonte ahora lo absorbe la fog del cielo)
 
                 // === SLAB de hormigón (más grande, soporta pilotis) ===
                 const slabGeo = new THREE.BoxGeometry(roomW + slabPad * 2, 0.2, roomD + slabPad * 2);
