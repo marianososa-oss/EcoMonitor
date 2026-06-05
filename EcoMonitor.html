@@ -3328,7 +3328,9 @@
                 const onWheel = (ev) => {
                     ev.preventDefault();
                     const factor = ev.deltaY > 0 ? 0.93 : 1.07;
-                    orbit.targetZoom = Math.max(0.5, Math.min(2.4, orbit.targetZoom * factor));
+                    // Min 0.85: limita zoom-out para que el borde del terreno NUNCA se vea
+                    // Max 2.4: zoom-in razonable
+                    orbit.targetZoom = Math.max(0.85, Math.min(2.4, orbit.targetZoom * factor));
                 };
                 canvas.addEventListener('pointerdown', onPointerDown);
                 window.addEventListener('pointerup', onPointerUp);
