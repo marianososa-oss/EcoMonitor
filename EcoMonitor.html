@@ -336,6 +336,346 @@
         }
         .sim-fan-spin { animation: spinSlow 2.2s linear infinite; }
         .sim-fan-spin-fast { animation: spinSlow 0.9s linear infinite; }
+
+        /* === THEME TOGGLE BUTTON === */
+        .theme-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px; height: 40px;
+            border-radius: 9999px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.22);
+            color: #ffffff;
+            cursor: pointer;
+            transition: background 0.25s, border-color 0.25s, color 0.25s;
+            position: relative;
+        }
+        .theme-toggle:hover { background: rgba(255,255,255,0.22); }
+        .theme-toggle .theme-icon-sun { display: none; }
+        .theme-toggle .theme-icon-moon { display: inline-block; }
+        body.day-mode .theme-toggle {
+            background: rgba(0,71,143,0.08);
+            border-color: rgba(0,71,143,0.22);
+            color: #00478F;
+        }
+        body.day-mode .theme-toggle:hover { background: rgba(0,71,143,0.16); }
+        body.day-mode .theme-toggle .theme-icon-sun { display: inline-block; }
+        body.day-mode .theme-toggle .theme-icon-moon { display: none; }
+
+        /* === HMI IMAGE SWAP — usar !important para ganar contra utilidades de Tailwind === */
+        /* Por defecto (modo noche): mostramos la pantalla CLARA para contraste con el fondo oscuro */
+        .hmi-screen-day, .hero-hmi-day { display: none !important; }
+        .hmi-screen-night, .hero-hmi-night { display: block !important; }
+        /* En modo día: mostramos la pantalla OSCURA para contraste con el fondo blanco */
+        body.day-mode .hmi-screen-day, body.day-mode .hero-hmi-day { display: block !important; }
+        body.day-mode .hmi-screen-night, body.day-mode .hero-hmi-night { display: none !important; }
+
+        /* === DAY MODE OVERRIDES === */
+        body.day-mode {
+            background-color: #ffffff;
+            color: #1e293b;
+        }
+
+        /* Nav */
+        body.day-mode nav {
+            background: linear-gradient(to right, #ffffff 0%, #ffffff 55%, #f1f5f9 100%) !important;
+            border-bottom-color: rgba(0,71,143,0.15) !important;
+            box-shadow: 0 1px 0 rgba(0,71,143,0.05);
+        }
+        body.day-mode nav a {
+            color: #0f172a !important;
+            text-shadow: none !important;
+        }
+        body.day-mode nav a:hover { color: #4f7725 !important; }
+        body.day-mode nav #mobile-menu-btn { color: #00478F !important; }
+        body.day-mode nav .open-login-btn {
+            background: #00478F !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 14px rgba(0,71,143,0.28) !important;
+        }
+        body.day-mode nav .open-login-btn:hover { background: #003a78 !important; }
+
+        /* Secciones oscuras → claras */
+        body.day-mode section.bg-eco-dark,
+        body.day-mode footer.bg-eco-dark,
+        body.day-mode .bg-eco-dark { background-color: #ffffff !important; }
+
+        /* Patrón de líneas tecnológicas en día */
+        body.day-mode section.bg-eco-dark > div.absolute[style*="radial-gradient(#60a5fa"],
+        body.day-mode section.bg-eco-dark > div.absolute.opacity-10[style*="radial-gradient"] {
+            background-image: radial-gradient(rgba(0,71,143,0.22) 1px, transparent 1px) !important;
+            opacity: 0.45 !important;
+        }
+        body.day-mode .circuit-pattern {
+            background-image:
+                linear-gradient(to right, rgba(0,71,143,0.08) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,71,143,0.08) 1px, transparent 1px) !important;
+        }
+        /* Líneas tecnológicas adicionales sobre la sección de fortalezas en día */
+        body.day-mode #fortalezas {
+            background-image:
+                linear-gradient(to right, rgba(0,71,143,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,71,143,0.05) 1px, transparent 1px) !important;
+            background-size: 40px 40px !important;
+            border-color: rgba(0,71,143,0.08) !important;
+        }
+
+        /* Textos */
+        body.day-mode .text-white { color: #0f172a !important; text-shadow: none !important; }
+        body.day-mode .text-gray-300,
+        body.day-mode .text-slate-300 { color: #475569 !important; }
+        body.day-mode .text-gray-400,
+        body.day-mode .text-slate-400 { color: #64748b !important; }
+        body.day-mode .text-gray-500,
+        body.day-mode .text-slate-500 { color: #94a3b8 !important; }
+        body.day-mode .text-eco-lightblue { color: #00478F !important; }
+        body.day-mode .text-eco-lightgreen { color: #4f7725 !important; }
+
+        /* Cards / paneles */
+        body.day-mode .bg-slate-800,
+        body.day-mode .bg-slate-900,
+        body.day-mode .bg-slate-950,
+        body.day-mode .bg-gray-700,
+        body.day-mode .bg-gray-800,
+        body.day-mode .bg-gray-900,
+        body.day-mode .bg-gray-950 {
+            background-color: #f8fafc !important;
+        }
+        body.day-mode .bg-slate-800\/80,
+        body.day-mode .bg-slate-800\/50,
+        body.day-mode .bg-slate-900\/50,
+        body.day-mode .bg-slate-700\/50,
+        body.day-mode .bg-gray-700\/50,
+        body.day-mode .bg-gray-800\/50,
+        body.day-mode .bg-gray-800\/80 {
+            background-color: rgba(248,250,252,0.95) !important;
+        }
+        body.day-mode .border-slate-700,
+        body.day-mode .border-slate-800,
+        body.day-mode .border-gray-700,
+        body.day-mode .border-gray-600,
+        body.day-mode .border-gray-600\/50,
+        body.day-mode .border-white\/5,
+        body.day-mode .border-white\/10,
+        body.day-mode .border-white\/20 {
+            border-color: rgba(0,71,143,0.14) !important;
+        }
+        body.day-mode .bg-white\/5 { background-color: rgba(0,71,143,0.04) !important; }
+        body.day-mode .bg-white\/10 { background-color: rgba(0,71,143,0.07) !important; }
+        body.day-mode .bg-eco-green\/10 { background-color: rgba(79,119,37,0.10) !important; }
+        body.day-mode .bg-eco-green\/20 { background-color: rgba(79,119,37,0.16) !important; }
+        body.day-mode .bg-eco-lightgreen\/10 { background-color: rgba(154,182,59,0.12) !important; }
+        body.day-mode .bg-eco-lightgreen\/20 { background-color: rgba(154,182,59,0.20) !important; }
+        body.day-mode .border-eco-lightgreen\/20,
+        body.day-mode .border-eco-lightgreen\/30 { border-color: rgba(79,119,37,0.30) !important; }
+
+        /* CTA secundario (transparente con border) */
+        body.day-mode .border-gray-500 { border-color: rgba(0,71,143,0.25) !important; }
+
+        /* Atenuar blobs azules y verdes muy fuertes en día */
+        body.day-mode .bg-eco-blue\/20,
+        body.day-mode .bg-eco-blue\/10,
+        body.day-mode .bg-eco-blue\/30 { opacity: 0.5; }
+        body.day-mode .bg-eco-green\/10,
+        body.day-mode .bg-eco-green\/20 { opacity: 0.6; }
+
+        /* Drop shadows en textos en blanco no aplican en modo día */
+        body.day-mode .drop-shadow-sm,
+        body.day-mode .drop-shadow-md { filter: none !important; }
+
+        /* Tarjetas problemática mantienen tinte rojo/ámbar pero más suaves */
+        body.day-mode .bg-red-500\/20 { background-color: rgba(239,68,68,0.10) !important; }
+        body.day-mode .bg-amber-500\/20 { background-color: rgba(245,158,11,0.10) !important; }
+        body.day-mode .text-red-400 { color: #dc2626 !important; }
+        body.day-mode .text-amber-400 { color: #d97706 !important; }
+        body.day-mode .text-eco-blue { color: #00478F !important; }
+
+        /* HMI box border en día */
+        body.day-mode .ring-black\/40 { box-shadow: 0 0 0 1px rgba(0,71,143,0.10) !important; }
+
+        /* Simulador "Cómo funciona" — fondos oscuros del panel */
+        body.day-mode .sim-panel {
+            background: rgba(255,255,255,0.85) !important;
+            border-color: rgba(0,71,143,0.15) !important;
+            box-shadow: 0 8px 30px rgba(0,71,143,0.08) !important;
+        }
+        body.day-mode .sim-select { background: #ffffff !important; color: #1e293b !important; border-color: #cbd5e1 !important; }
+
+        /* Footer */
+        body.day-mode footer { background-color: #f8fafc !important; color: #1e293b !important; border-top: 1px solid rgba(0,71,143,0.1); }
+
+        /* === DAY MODE — Legibilidad reforzada === */
+
+        /* Forzar todos los headings a azul oscuro en modo día (mayor especificidad) */
+        body.day-mode h1, body.day-mode h2, body.day-mode h3, body.day-mode h4, body.day-mode h5, body.day-mode h6 {
+            color: #0f2c52 !important;
+            text-shadow: none !important;
+        }
+        body.day-mode strong { color: #0f2c52 !important; }
+        body.day-mode p { color: #334155 !important; }
+        body.day-mode li, body.day-mode span:not([class*="text-eco"]):not([class*="text-red"]):not([class*="text-amber"]):not([class*="text-orange"]):not([class*="text-yellow"]):not([class*="text-cyan"]):not([class*="text-green"]):not([class*="text-blue"]) {
+            color: inherit;
+        }
+
+        /* Cards de problemática: el gradiente oscuro + imagen tapan el texto. En día los cancelamos. */
+        body.day-mode .bg-gradient-to-t.from-slate-800 {
+            background-image: linear-gradient(to top, rgba(255,255,255,0.85), rgba(255,255,255,0.55) 60%, transparent) !important;
+        }
+        body.day-mode .from-slate-800 { --tw-gradient-from: rgba(255,255,255,0) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, transparent) !important; }
+        body.day-mode .via-slate-800\/90 { --tw-gradient-via: rgba(255,255,255,0) !important; }
+        /* Imágenes de stock con mix-blend-luminosity → ocultar en día */
+        body.day-mode .mix-blend-luminosity {
+            display: none !important;
+        }
+        /* Tintes de color en cards (red/amber/blue/green opacity-10) */
+        body.day-mode .bg-red-600.opacity-10,
+        body.day-mode .bg-red-500.opacity-10 {
+            opacity: 0.04 !important;
+        }
+        body.day-mode .bg-amber-500.opacity-10,
+        body.day-mode .bg-amber-400.opacity-10 {
+            opacity: 0.06 !important;
+        }
+        body.day-mode .bg-blue-600.opacity-10,
+        body.day-mode .bg-blue-500.opacity-10 {
+            opacity: 0.05 !important;
+        }
+
+        /* Acento por categoría: queda visible pero legible */
+        body.day-mode .text-red-400 { color: #b91c1c !important; }
+        body.day-mode .text-red-300 { color: #b91c1c !important; }
+        body.day-mode .text-amber-400 { color: #b45309 !important; }
+        body.day-mode .text-amber-300 { color: #b45309 !important; }
+        body.day-mode .text-orange-400 { color: #c2410c !important; }
+        body.day-mode .text-orange-300 { color: #c2410c !important; }
+        body.day-mode .text-yellow-400 { color: #a16207 !important; }
+        body.day-mode .text-cyan-400 { color: #0e7490 !important; }
+        body.day-mode .text-green-400 { color: #15803d !important; }
+        body.day-mode .text-blue-400 { color: #1d4ed8 !important; }
+
+        /* Tinte de fondo de los íconos de las cards */
+        body.day-mode .bg-red-500\/20 { background-color: rgba(239,68,68,0.12) !important; }
+        body.day-mode .bg-amber-500\/20 { background-color: rgba(245,158,11,0.14) !important; }
+        body.day-mode .bg-orange-500\/20 { background-color: rgba(249,115,22,0.12) !important; }
+        body.day-mode .bg-yellow-500\/20 { background-color: rgba(234,179,8,0.14) !important; }
+        body.day-mode .bg-cyan-500\/20 { background-color: rgba(6,182,212,0.14) !important; }
+        body.day-mode .bg-blue-500\/20 { background-color: rgba(59,130,246,0.14) !important; }
+        body.day-mode .bg-green-500\/20 { background-color: rgba(34,197,94,0.14) !important; }
+        body.day-mode .border-red-500\/30 { border-color: rgba(239,68,68,0.30) !important; }
+        body.day-mode .border-amber-500\/30,
+        body.day-mode .border-amber-400\/30 { border-color: rgba(245,158,11,0.30) !important; }
+        body.day-mode .border-orange-500\/30 { border-color: rgba(249,115,22,0.30) !important; }
+        body.day-mode .border-cyan-500\/30 { border-color: rgba(6,182,212,0.30) !important; }
+
+        /* Bordes verdes (info Modbus) más visibles en día */
+        body.day-mode .border-eco-lightgreen\/40,
+        body.day-mode .border-eco-lightgreen\/50 { border-color: rgba(79,119,37,0.40) !important; }
+        body.day-mode .bg-eco-lightgreen\/15 { background-color: rgba(154,182,59,0.18) !important; }
+
+        /* Selección de texto en modo día */
+        body.day-mode ::selection { background: #00478F; color: #ffffff; }
+
+        /* Inputs/selects del simulador "Cómo funciona" en día */
+        body.day-mode .sim-input-range {
+            background: rgba(0,71,143,0.10) !important;
+            border-color: rgba(0,71,143,0.25) !important;
+        }
+
+        /* Mobile menu */
+        body.day-mode #mobile-menu {
+            background-color: #ffffff !important;
+            border-color: rgba(0,71,143,0.12) !important;
+        }
+        body.day-mode #mobile-menu a { color: #0f172a !important; }
+
+        /* Caso especial: el "By Ecocontrol" badge — el verde claro se ve muy fino sobre blanco */
+        body.day-mode .text-eco-lightgreen.font-semibold,
+        body.day-mode .text-eco-lightgreen.font-bold { color: #3d5d1c !important; }
+
+        /* ============================================================
+           DAY MODE EXCEPTIONS — Secciones que SE MANTIENEN OSCURAS
+           porque su diseño fue concebido en oscuro (cards de datos,
+           flujos, paneles técnicos). En vez de invertir, las exentamos
+           y forzamos texto blanco para contraste.
+           ============================================================ */
+
+        /* 1. SECCIÓN "El camino de la alerta predictiva" (#flujo-alertas) */
+        body.day-mode #flujo-alertas {
+            background: linear-gradient(to bottom right, #002b5e, #001530) !important;
+            color: #ffffff !important;
+        }
+        body.day-mode #flujo-alertas h1,
+        body.day-mode #flujo-alertas h2,
+        body.day-mode #flujo-alertas h3,
+        body.day-mode #flujo-alertas h4 {
+            color: #ffffff !important;
+            text-shadow: none !important;
+        }
+        body.day-mode #flujo-alertas p,
+        body.day-mode #flujo-alertas .text-blue-100,
+        body.day-mode #flujo-alertas .text-blue-100\/80 { color: rgba(219, 234, 254, 0.92) !important; }
+        body.day-mode #flujo-alertas strong { color: #ffffff !important; }
+        body.day-mode #flujo-alertas .bg-white { background-color: #ffffff !important; }
+
+        /* 2. SECCIÓN "para que el instalador no se complique" (#instalacion) */
+        body.day-mode #instalacion .bg-slate-800\/60 {
+            background-color: rgba(15, 23, 42, 0.92) !important;
+            border-color: rgba(255, 255, 255, 0.10) !important;
+        }
+        body.day-mode #instalacion .bg-slate-800\/60 h4 { color: #ffffff !important; }
+        body.day-mode #instalacion .bg-slate-800\/60 p { color: rgba(203, 213, 225, 0.92) !important; }
+        body.day-mode #instalacion .bg-slate-800\/60 .text-gray-400 { color: rgba(203, 213, 225, 0.88) !important; }
+        body.day-mode #instalacion .bg-slate-800\/60 .text-eco-lightblue { color: #0098c6 !important; }
+        body.day-mode #instalacion .bg-slate-800\/60 .text-eco-lightgreen { color: #9ab63b !important; }
+        body.day-mode #instalacion .bg-slate-800\/60 .text-amber-400 { color: #fbbf24 !important; }
+        body.day-mode #instalacion .bg-slate-800\/60 .border-slate-700 { border-color: rgba(255,255,255,0.10) !important; }
+
+        /* 3. ARQUITECTURA: cards Controlador Maestro + Nodos Esclavos (columna izquierda) */
+        body.day-mode #arquitectura .bg-slate-900\/70,
+        body.day-mode #arquitectura .bg-slate-900\/80 {
+            background-color: rgba(15, 23, 42, 0.94) !important;
+        }
+        body.day-mode #arquitectura .bg-slate-900\/70 h4,
+        body.day-mode #arquitectura .bg-slate-900\/80 h4 { text-shadow: none !important; }
+        body.day-mode #arquitectura .bg-slate-900\/70 p,
+        body.day-mode #arquitectura .bg-slate-900\/80 p,
+        body.day-mode #arquitectura .bg-slate-900\/70 .text-gray-300,
+        body.day-mode #arquitectura .bg-slate-900\/80 .text-gray-300,
+        body.day-mode #arquitectura .bg-slate-900\/80 .text-gray-400 { color: rgba(203, 213, 225, 0.94) !important; }
+        body.day-mode #arquitectura .bg-slate-900\/80 .text-eco-lightblue { color: #0098c6 !important; }
+        body.day-mode #arquitectura .bg-slate-900\/70 .text-eco-lightgreen,
+        body.day-mode #arquitectura .bg-slate-900\/80 .text-eco-lightgreen { color: #9ab63b !important; }
+        body.day-mode #arquitectura .bg-slate-900\/80 .bg-slate-800 { background-color: rgba(30,41,59,0.95) !important; color: #cbd5e1 !important; }
+        body.day-mode #arquitectura .bg-slate-900\/80 .bg-slate-800.border-slate-700 { border-color: rgba(255,255,255,0.12) !important; }
+        body.day-mode #arquitectura .bg-eco-lightgreen\/15 { background-color: rgba(154,182,59,0.22) !important; }
+        body.day-mode #arquitectura .bg-eco-lightblue\/15 { background-color: rgba(0,152,198,0.22) !important; }
+        /* Badge "CLOUD · MQTT" arriba del Maestro */
+        body.day-mode #arquitectura .bg-slate-900\/80 { color: #ffffff !important; }
+
+        /* 4. HIL TEASER — banda gradient eco-dark → eco-blue */
+        body.day-mode #hil-teaser .bg-gradient-to-r.from-eco-dark.to-eco-blue {
+            background-image: linear-gradient(to right, #0f1729, #00478F) !important;
+        }
+        body.day-mode #hil-teaser h3,
+        body.day-mode #hil-teaser h4 { color: #ffffff !important; text-shadow: none !important; }
+        body.day-mode #hil-teaser p,
+        body.day-mode #hil-teaser .text-blue-100\/90,
+        body.day-mode #hil-teaser .text-blue-100\/70 { color: rgba(219, 234, 254, 0.92) !important; }
+        body.day-mode #hil-teaser strong { color: #ffffff !important; }
+        body.day-mode #hil-teaser i { color: inherit; }
+        body.day-mode #hil-teaser .bg-white\/5 { background-color: rgba(255,255,255,0.08) !important; }
+        body.day-mode #hil-teaser .bg-white\/10 { background-color: rgba(255,255,255,0.16) !important; }
+        body.day-mode #hil-teaser .border-white\/10 { border-color: rgba(255,255,255,0.20) !important; }
+        body.day-mode #hil-teaser .text-blue-300 { color: #93c5fd !important; }
+        body.day-mode #hil-teaser .text-eco-lightgreen { color: #9ab63b !important; }
+        body.day-mode #hil-teaser .bg-eco-lightgreen\/20 { background-color: rgba(154,182,59,0.25) !important; }
+        body.day-mode #hil-teaser .bg-blue-500\/20 { background-color: rgba(59,130,246,0.22) !important; }
+        body.day-mode #hil-teaser .bg-eco-green\/20 { background-color: rgba(79,119,37,0.25) !important; }
+
+        /* Transición suave global */
+        body { transition: background-color 0.35s ease; }
+        section, footer, nav, .bg-eco-dark { transition: background-color 0.35s ease, border-color 0.35s ease; }
     </style>
 </head>
 
@@ -346,8 +686,8 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <div id="logo-btn" class="flex-shrink-0 flex items-center cursor-pointer">
-                    <img src="ecomonitor-color.png"
-                        alt="Ecomonitor" class="h-9 md:h-11 w-auto object-contain">
+                    <img src="ecomonitor-logo.svg"
+                        alt="Ecomonitor" class="h-10 md:h-12 w-auto object-contain">
                 </div>
 
                 <div class="hidden md:flex space-x-8 items-center">
@@ -364,12 +704,20 @@
                         class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">Instalación</a>
                     <a href="#precios"
                         class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">Planes</a>
+                    <button id="theme-toggle" class="theme-toggle" aria-label="Cambiar modo día/noche" title="Cambiar modo día/noche">
+                        <i data-lucide="moon" class="w-4 h-4 theme-icon-moon"></i>
+                        <i data-lucide="sun" class="w-4 h-4 theme-icon-sun"></i>
+                    </button>
                     <button
                         class="open-login-btn bg-white text-eco-blue px-5 py-3 rounded-full text-sm font-semibold hover:bg-gray-100 transition-all shadow-md shadow-black/20 min-h-[44px] flex items-center">Acceso
                         a Portal</button>
                 </div>
 
-                <div class="md:hidden flex items-center">
+                <div class="md:hidden flex items-center gap-2">
+                    <button id="theme-toggle-mobile" class="theme-toggle" aria-label="Cambiar modo día/noche">
+                        <i data-lucide="moon" class="w-4 h-4 theme-icon-moon"></i>
+                        <i data-lucide="sun" class="w-4 h-4 theme-icon-sun"></i>
+                    </button>
                     <button id="mobile-menu-btn" class="text-white hover:text-white/80 focus:outline-none">
                         <i data-lucide="menu" class="w-6 h-6"></i>
                     </button>
@@ -417,13 +765,11 @@
                     <h1
                         class="font-extrabold text-white mb-8 drop-shadow-md"
                         style="font-size: clamp(1.875rem, 3vw + 0.75rem, 3.25rem); line-height: 1.1; letter-spacing: -0.025em; text-wrap: balance;">
-                        Del mantenimiento correctivo al
-                        <span class="text-eco-lightgreen">predictivo</span> · monitoreo
-                        <span class="text-eco-lightblue">24/7</span>
+                        Monitoreo <span class="text-eco-lightgreen">predictivo</span> y gestión <span class="text-eco-lightblue">eficiente</span> de tus equipos HVAC
                     </h1>
                     <p
-                        class="text-lg text-gray-300 font-medium mb-10 leading-relaxed bg-white/5 backdrop-blur-sm p-5 rounded-2xl border border-white/10 shadow-lg">
-                        Monitoreando el estado de tus salas críticas y de tus equipos HVAC 24/7.
+                        class="text-base md:text-lg text-gray-300 font-medium mb-10 leading-relaxed bg-white/5 backdrop-blur-sm p-5 rounded-2xl border border-white/10 shadow-lg">
+                        Controlamos las condiciones que la industria no puede dejar al azar. Temperatura, humedad, calidad del aire, presión diferencial. <span class="text-white">En plantas que no pueden parar, esas variables no son confort: son seguridad operativa.</span>
                     </p>
                     <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                         <a href="#solucion"
@@ -451,63 +797,13 @@
                         <div class="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
                         <div class="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-gray-950 z-20 shadow-inner"></div>
 
-                        <div class="relative bg-[#0a1020] aspect-[16/9] flex flex-col font-mono select-none">
-                            <div class="flex items-center justify-between px-3 py-2 bg-[#0a1f2a] border-b border-slate-800">
-                                <div class="flex items-center gap-1.5">
-                                    <span class="w-2 h-2 rounded-full bg-eco-lightgreen animate-pulse" style="box-shadow:0 0 6px #9ab63b"></span>
-                                    <span class="font-bold text-sm md:text-base"><span class="text-eco-lightgreen">ECO</span><span class="text-eco-lightblue">MONITOR</span></span>
-                                </div>
-                                <div class="text-[8px] md:text-[10px] text-slate-400 hidden sm:block">SALA PRINCIPAL · YPF S.A.</div>
-                                <div class="text-[10px] md:text-xs text-cyan-400 font-bold">14:23:36</div>
-                            </div>
+                        <div class="relative bg-black">
+                            <img src="hero-hmi-light.jpg" alt="HMI EcoMonitor — Sala Principal Ecocontrol"
+                                class="hero-hmi hero-hmi-night w-full h-auto select-none" draggable="false">
+                            <img src="hero-hmi-dark.jpg" alt="HMI EcoMonitor — Sala Principal Ecocontrol"
+                                class="hero-hmi hero-hmi-day w-full h-auto select-none" draggable="false">
 
-                            <div class="px-3 py-1.5 bg-eco-green/10 border-b border-eco-green/20 flex items-center gap-2">
-                                <span class="w-1.5 h-1.5 rounded-full bg-eco-lightgreen"></span>
-                                <span class="text-[9px] md:text-[10px] font-bold text-eco-lightgreen tracking-widest">SALA OPERANDO CON NORMALIDAD</span>
-                            </div>
-
-                            <div class="grid grid-cols-3 gap-2 p-2 md:p-3">
-                                <div class="bg-[#142036] border border-slate-800 rounded p-2">
-                                    <div class="text-[7px] md:text-[9px] text-slate-400 tracking-wider mb-1">TEMPERATURA</div>
-                                    <div class="text-lg md:text-2xl font-bold text-white">21.4<span class="text-[10px] text-slate-500 ml-0.5">°C</span></div>
-                                    <div class="text-[7px] text-slate-500 mt-1">SP 27.0°</div>
-                                </div>
-                                <div class="bg-[#142036] border border-slate-800 rounded p-2">
-                                    <div class="text-[7px] md:text-[9px] text-slate-400 tracking-wider mb-1">HUMEDAD</div>
-                                    <div class="text-lg md:text-2xl font-bold text-eco-lightblue">47<span class="text-[10px] text-slate-500 ml-0.5">%</span></div>
-                                    <div class="text-[7px] text-slate-500 mt-1">SP 50%</div>
-                                </div>
-                                <div class="bg-[#142036] border border-slate-800 rounded p-2">
-                                    <div class="text-[7px] md:text-[9px] text-slate-400 tracking-wider mb-1">PRESURIZACIÓN</div>
-                                    <div class="text-lg md:text-2xl font-bold text-eco-lightgreen">+25<span class="text-[10px] text-slate-500 ml-0.5">Pa</span></div>
-                                    <div class="text-[7px] text-slate-500 mt-1">SP 50 Pa</div>
-                                </div>
-                            </div>
-
-                            <div class="flex-1 px-3 pb-3">
-                                <div class="bg-[#0a1f2a] rounded h-full border border-slate-800 p-2 flex flex-col">
-                                    <div class="flex items-center justify-between mb-1">
-                                        <div class="flex items-center gap-3 text-[8px] md:text-[10px]">
-                                            <span class="text-eco-lightgreen font-bold">● SALA · 21.4°</span>
-                                            <span class="text-orange-400 font-bold">● EXTERIOR · 28.0°</span>
-                                        </div>
-                                        <span class="text-[8px] text-slate-500">CLIMA · 1H · EN VIVO</span>
-                                    </div>
-                                    <svg class="w-full flex-1" viewBox="0 0 100 30" preserveAspectRatio="none">
-                                        <line x1="0" y1="8" x2="100" y2="8" stroke="#334155" stroke-width="0.15" stroke-dasharray="0.5 0.8"/>
-                                        <line x1="0" y1="15" x2="100" y2="15" stroke="#334155" stroke-width="0.15" stroke-dasharray="0.5 0.8"/>
-                                        <line x1="0" y1="22" x2="100" y2="22" stroke="#334155" stroke-width="0.15" stroke-dasharray="0.5 0.8"/>
-                                        <polyline fill="none" stroke="#fb923c" stroke-width="0.5"
-                                            points="0,18 8,17 16,16 24,15 32,15 40,14 48,13 56,12 64,11 72,10 80,9 88,9 96,8 100,8"/>
-                                        <polyline fill="none" stroke="#9ab63b" stroke-width="0.5"
-                                            points="0,22 8,21.5 16,22 24,21.8 32,22 40,21.5 48,22 56,21.7 64,21.9 72,22 80,21.8 88,22 96,21.9 100,22"/>
-                                    </svg>
-                                </div>
-                            </div>
-
-                            <div class="pointer-events-none absolute inset-0 z-10" style="background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 49.5%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0) 50.5%, rgba(255,255,255,0) 100%); background-size: 100% 3px;"></div>
-
-                            <div class="pointer-events-none absolute top-1 right-2 px-2 py-0.5 rounded text-[8px] md:text-[9px] font-mono text-eco-lightgreen bg-black/40 backdrop-blur-sm border border-eco-lightgreen/30 z-20 flex items-center gap-1.5">
+                            <div class="pointer-events-none absolute top-2 right-3 px-2 py-0.5 rounded text-[9px] md:text-[10px] font-mono text-eco-lightgreen bg-black/50 backdrop-blur-sm border border-eco-lightgreen/30 z-20 flex items-center gap-1.5">
                                 <span class="w-1.5 h-1.5 rounded-full bg-eco-lightgreen animate-pulse" style="box-shadow: 0 0 6px #9ab63b"></span>
                                 LIVE
                             </div>
@@ -515,6 +811,51 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+    </section>
+
+    <section id="fortalezas" class="py-12 lg:py-16 bg-eco-dark relative overflow-hidden border-y border-white/5">
+        <div class="absolute inset-0 opacity-[0.04] pointer-events-none"
+            style="background-image: radial-gradient(#60a5fa 1px, transparent 1px); background-size: 30px 30px;"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 lg:gap-4 reveal-stagger">
+                <div class="flex flex-col items-center text-center group">
+                    <div class="w-14 h-14 mb-3 flex items-center justify-center rounded-full bg-eco-lightgreen/10 border border-eco-lightgreen/20 group-hover:bg-eco-lightgreen/20 transition-all">
+                        <i data-lucide="wrench" class="w-7 h-7 text-eco-lightgreen"></i>
+                    </div>
+                    <h4 class="text-[11px] md:text-xs font-bold text-white uppercase tracking-wide leading-tight">Reducción de costos<br>de mantenimiento</h4>
+                </div>
+                <div class="flex flex-col items-center text-center group">
+                    <div class="w-14 h-14 mb-3 flex items-center justify-center rounded-full bg-eco-lightgreen/10 border border-eco-lightgreen/20 group-hover:bg-eco-lightgreen/20 transition-all">
+                        <i data-lucide="network" class="w-7 h-7 text-eco-lightgreen"></i>
+                    </div>
+                    <h4 class="text-[11px] md:text-xs font-bold text-white uppercase tracking-wide leading-tight">Arquitectura robusta<br>y modo huérfano</h4>
+                </div>
+                <div class="flex flex-col items-center text-center group">
+                    <div class="w-14 h-14 mb-3 flex items-center justify-center rounded-full bg-eco-lightgreen/10 border border-eco-lightgreen/20 group-hover:bg-eco-lightgreen/20 transition-all">
+                        <i data-lucide="cpu" class="w-7 h-7 text-eco-lightgreen"></i>
+                    </div>
+                    <h4 class="text-[11px] md:text-xs font-bold text-white uppercase tracking-wide leading-tight">Edge computing<br>para operación remota</h4>
+                </div>
+                <div class="flex flex-col items-center text-center group">
+                    <div class="w-14 h-14 mb-3 flex items-center justify-center rounded-full bg-eco-lightgreen/10 border border-eco-lightgreen/20 group-hover:bg-eco-lightgreen/20 transition-all">
+                        <i data-lucide="settings" class="w-7 h-7 text-eco-lightgreen"></i>
+                    </div>
+                    <h4 class="text-[11px] md:text-xs font-bold text-white uppercase tracking-wide leading-tight">Hardware estandarizado<br>y repuestos</h4>
+                </div>
+                <div class="flex flex-col items-center text-center group">
+                    <div class="w-14 h-14 mb-3 flex items-center justify-center rounded-full bg-eco-lightgreen/10 border border-eco-lightgreen/20 group-hover:bg-eco-lightgreen/20 transition-all">
+                        <i data-lucide="refresh-cw" class="w-7 h-7 text-eco-lightgreen"></i>
+                    </div>
+                    <h4 class="text-[11px] md:text-xs font-bold text-white uppercase tracking-wide leading-tight">Lógica de rotación<br>dinámica</h4>
+                </div>
+                <div class="flex flex-col items-center text-center group">
+                    <div class="w-14 h-14 mb-3 flex items-center justify-center rounded-full bg-eco-lightgreen/10 border border-eco-lightgreen/20 group-hover:bg-eco-lightgreen/20 transition-all">
+                        <i data-lucide="user-minus" class="w-7 h-7 text-eco-lightgreen"></i>
+                    </div>
+                    <h4 class="text-[11px] md:text-xs font-bold text-white uppercase tracking-wide leading-tight">Ahorro en personal<br>especializado</h4>
+                </div>
             </div>
         </div>
     </section>
@@ -659,12 +1000,9 @@
                 </div>
 
                 <div class="relative">
-                    <div id="hmi-glow"
-                        class="absolute inset-0 bg-eco-blue blur-2xl opacity-20 rounded-full transition-colors duration-1000">
-                    </div>
+                    <div class="absolute inset-0 bg-eco-blue blur-2xl opacity-20 rounded-full"></div>
 
-                    <div id="hmi-box"
-                        class="bg-gray-800 border border-gray-700 rounded-2xl overflow-hidden shadow-2xl relative z-10 transition-all duration-1000">
+                    <div class="relative z-10 rounded-2xl bg-gray-800 border border-gray-700 overflow-hidden shadow-2xl ring-1 ring-black/40">
                         <div class="bg-gray-900 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
                             <div class="flex items-center gap-2">
                                 <div class="flex gap-1.5">
@@ -674,84 +1012,18 @@
                                 </div>
                                 <div class="text-xs text-gray-400 ml-4 font-mono">ecomonitor-hmi.local</div>
                             </div>
-                            <i data-lucide="wifi" class="w-4 h-4 text-gray-500"></i>
+                            <span class="text-[10px] font-mono text-eco-lightgreen flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-eco-lightgreen animate-pulse" style="box-shadow:0 0 6px #9ab63b"></span>
+                                LIVE
+                            </span>
                         </div>
-                        <div class="p-6 relative">
-                            <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
-                                <h4 class="text-lg font-bold text-white">SALA ELÉCTRICA VDF 01</h4>
-                                <span id="sim-status-badge"
-                                    class="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded animate-pulse transition-all">ONLINE</span>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-4 mb-6">
-                                <div class="bg-gray-700/50 p-4 rounded-xl border border-gray-600/50">
-                                    <p class="text-xs text-gray-400 uppercase tracking-wide">Temp. Interior</p>
-                                    <div class="flex items-end gap-2 mt-1">
-                                        <span id="sim-temp"
-                                            class="text-3xl font-bold text-white transition-colors duration-300">23.5°</span>
-                                        <span class="text-sm text-gray-400 mb-1">/ SP 24.0°</span>
-                                    </div>
-                                </div>
-                                <div class="bg-gray-700/50 p-4 rounded-xl border border-gray-600/50">
-                                    <p class="text-xs text-gray-400 uppercase tracking-wide">Presión Sala</p>
-                                    <div class="flex items-end gap-2 mt-1">
-                                        <span id="sim-pres"
-                                            class="text-3xl font-bold text-eco-lightgreen transition-colors duration-300">+25.4</span>
-                                        <span class="text-sm text-gray-400 mb-1">Pa</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-gray-700/50 p-4 rounded-xl border border-gray-600/50">
-                                <div class="flex justify-between items-center mb-2">
-                                    <p class="text-xs text-gray-400 uppercase tracking-wide" id="sim-global-text">Estado
-                                        Global de Planta</p>
-                                    <span id="sim-global-icon"
-                                        class="text-xs text-green-400 flex items-center gap-1 transition-colors"><i
-                                            data-lucide="check-circle" class="w-3 h-3"></i> F&G OK</span>
-                                </div>
-                                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
-                                    <div id="sim-bar"
-                                        class="h-full bg-eco-lightgreen w-full transition-all duration-1000"></div>
-                                </div>
-                                <div class="flex justify-between mt-2 text-xs text-gray-400">
-                                    <span>Uptime: 99.9%</span>
-                                    <span>Temp Exterior: 38.2°C</span>
-                                </div>
-                            </div>
-
-                            <div id="alert-widget"
-                                class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 w-11/12 bg-white rounded-xl shadow-2xl p-4 translate-y-10 opacity-0 pointer-events-none transition-all duration-500 z-20 border border-red-100">
-                                <div class="flex gap-3">
-                                    <div
-                                        class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 flex-shrink-0">
-                                        <i data-lucide="bell-ring" class="w-5 h-5"></i>
-                                    </div>
-                                    <div>
-                                        <h5 class="text-gray-900 font-bold text-sm">Alerta Predictiva Generada</h5>
-                                        <p class="text-gray-600 text-xs mt-1 leading-tight">VDF 01: Caída de presión y
-                                            aumento de temp. <strong>Diagnóstico: Filtro saturado.</strong></p>
-                                        <div
-                                            class="mt-2 flex items-center gap-2 bg-gray-50 px-2 py-1 rounded border border-gray-200">
-                                            <i data-lucide="shopping-cart" class="w-3 h-3 text-eco-blue"></i>
-                                            <span class="text-[10px] text-gray-600 font-medium">Auto-orden generada:
-                                                SKU-F9 (Filtro)</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="relative bg-black">
+                            <img src="hmi-light.jpg" alt="Análisis Profundo HVAC 1 — pantalla HMI EcoMonitor"
+                                class="hmi-screen hmi-screen-night w-full h-auto select-none" draggable="false">
+                            <img src="hmi-dark.jpg" alt="Análisis Profundo HVAC 1 — pantalla HMI EcoMonitor"
+                                class="hmi-screen hmi-screen-day w-full h-auto select-none" draggable="false">
                         </div>
                     </div>
-
-                    <div class="mt-8 flex justify-center relative z-0">
-                        <button id="sim-btn"
-                            class="bg-gray-800 hover:bg-gray-700 text-white border border-gray-600 px-6 py-3 rounded-full text-sm font-semibold transition-all shadow-lg flex items-center gap-2 group">
-                            <i data-lucide="play"
-                                class="w-4 h-4 text-eco-lightgreen group-hover:scale-110 transition-transform"></i>
-                            Simular Estrés Térmico
-                        </button>
-                    </div>
-
                 </div>
             </div>
         </div>
@@ -1117,8 +1389,8 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center mb-16 reveal">
                 <h3 class="text-3xl md:text-5xl font-bold text-white mb-4" style="letter-spacing: -0.03em; text-wrap: balance;">Arquitectura maestro-esclavo vía Modbus</h3>
-                <p class="text-gray-300 max-w-2xl mx-auto">Hardware industrial basado en procesadores Dual-Core de
-                    240MHz (ESP32-EDGE). Totalmente distribuido para garantizar máxima resiliencia.</p>
+                <p class="text-gray-300 max-w-2xl mx-auto">Hardware industrial basado en procesadores Dual-Core embebidos.
+                    Totalmente distribuido para garantizar máxima resiliencia.</p>
             </div>
 
             <div class="grid md:grid-cols-2 gap-12 items-center">
@@ -1171,7 +1443,7 @@
                                 <span class="bg-eco-lightgreen/15 text-eco-lightgreen text-[10px] px-2 py-1 rounded font-bold border border-eco-lightgreen/40 font-mono">ID: 1</span>
                             </div>
                             <p class="text-sm text-gray-300">Instalado en equipo HVAC. Maneja gases, etapas de frío y
-                                fallas críticas del compresor (vía ADS1219 y Entradas Aisladas HMHA2801).</p>
+                                fallas críticas del compresor con entradas aisladas de alta resolución.</p>
                         </div>
 
                         <div
@@ -1182,8 +1454,8 @@
                                 </h4>
                                 <span class="bg-eco-lightgreen/15 text-eco-lightgreen text-[10px] px-2 py-1 rounded font-bold border border-eco-lightgreen/40 font-mono">ID: 2</span>
                             </div>
-                            <p class="text-sm text-gray-300">Asignado al Presurizador. Control de velocidad VFD (PID)
-                                vía DAC MCP4725 de 12 bits y sensor de presión SDP810.</p>
+                            <p class="text-sm text-gray-300">Asignado al Presurizador. Control PID de velocidad VFD
+                                y lectura continua de presión diferencial.</p>
                         </div>
                     </div>
                 </div>
@@ -1195,7 +1467,7 @@
                             <i data-lucide="network" class="w-6 h-6"></i>
                         </div>
                         <h4 class="text-xl font-bold text-white mb-2">Conexión en guirnalda robusta</h4>
-                        <p class="text-gray-300">Basado en RS-485 (Transceptor ISL81387) y protocolo Modbus RTU, permite
+                        <p class="text-gray-300">Basado en RS-485 y protocolo Modbus RTU, permite
                             interconectar los equipos HVAC mediante cable trenzado. Hardware con protección ESD a <span class="font-mono text-eco-lightgreen">±15 kV</span>
                             para tolerar ruido industrial.</p>
                     </div>
@@ -1208,7 +1480,7 @@
                         <h4 class="text-xl font-bold text-white mb-2">Puesta en marcha vía PEM App</h4>
                         <p class="text-gray-300">Mediante la <strong class="text-white">PEM App</strong> embebida vía Wi-Fi, se asigna
                             identidad Modbus (ej: Aire Acondicionado o Presurizador) a cada nodo en minutos sin escribir
-                            una línea de código, grabando los parámetros en su memoria <span class="font-mono text-eco-lightblue">AT24CM02</span>.</p>
+                            una línea de código, grabando los parámetros en memoria no volátil.</p>
                     </div>
 
                     <div class="reveal">
@@ -1217,7 +1489,7 @@
                             <i data-lucide="heart-pulse" class="w-6 h-6"></i>
                         </div>
                         <h4 class="text-xl font-bold text-white mb-2">Latido heartbeat y supervivencia</h4>
-                        <p class="text-gray-300">El Maestro envía un latido constante cada <span class="font-mono text-eco-lightgreen">2 s</span> (Registro <span class="font-mono text-eco-lightblue">40014</span>). Si se
+                        <p class="text-gray-300">El Maestro envía un latido constante cada <span class="font-mono text-eco-lightgreen">2 s</span>. Si se
                             corta el cable Modbus, el esclavo lo detecta, asume el estado "Huérfano" y continúa operando
                             de manera autónoma con sus sensores locales.</p>
                     </div>
@@ -1733,8 +2005,31 @@
     </div>
 
     <script>
+        // === Theme toggle (día/noche). Persistencia en localStorage. Aplica antes del paint. ===
+        (function () {
+            try {
+                const saved = localStorage.getItem('ecomonitor-theme');
+                if (saved === 'day') document.body.classList.add('day-mode');
+            } catch (e) { /* localStorage puede fallar en iframes con cookies bloqueadas */ }
+        })();
+
         document.addEventListener('DOMContentLoaded', function () {
             lucide.createIcons();
+
+            // Theme toggle wiring
+            const applyTheme = (mode) => {
+                if (mode === 'day') document.body.classList.add('day-mode');
+                else document.body.classList.remove('day-mode');
+                try { localStorage.setItem('ecomonitor-theme', mode); } catch (e) {}
+            };
+            const toggleTheme = () => {
+                const isDay = document.body.classList.contains('day-mode');
+                applyTheme(isDay ? 'night' : 'day');
+            };
+            const t1 = document.getElementById('theme-toggle');
+            const t2 = document.getElementById('theme-toggle-mobile');
+            if (t1) t1.addEventListener('click', toggleTheme);
+            if (t2) t2.addEventListener('click', toggleTheme);
 
             // Scroll-reveal: fade-in-up cuando entran en viewport
             const revealObserver = new IntersectionObserver((entries) => {
@@ -1868,90 +2163,6 @@
             document.getElementById('tab-btn-polvo').addEventListener('click', () => switchTab('polvo'));
             document.getElementById('tab-btn-autopsia').addEventListener('click', () => switchTab('autopsia'));
 
-            // 8. Simulation Logic
-            let simInterval;
-            document.getElementById('sim-btn').addEventListener('click', function () {
-                const btn = this;
-                btn.disabled = true;
-                btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin text-eco-blue"></i> Analizando datos...';
-                lucide.createIcons();
-
-                let temp = 23.5;
-                let pres = 25.4;
-
-                const tempEl = document.getElementById('sim-temp');
-                const presEl = document.getElementById('sim-pres');
-                const statusBadge = document.getElementById('sim-status-badge');
-                const hmiBox = document.getElementById('hmi-box');
-                const hmiGlow = document.getElementById('hmi-glow');
-                const simBar = document.getElementById('sim-bar');
-                const alertWidget = document.getElementById('alert-widget');
-                const globalIcon = document.getElementById('sim-global-icon');
-
-                // Reset UI
-                alertWidget.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
-                alertWidget.classList.remove('translate-y-0', 'opacity-100');
-                tempEl.classList.replace('text-red-400', 'text-white');
-                presEl.classList.replace('text-orange-400', 'text-eco-lightgreen');
-                statusBadge.className = 'px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded animate-pulse transition-all';
-                statusBadge.innerText = 'ONLINE';
-                hmiBox.classList.remove('border-red-500/50', 'shadow-[0_0_40px_rgba(239,68,68,0.2)]');
-                hmiGlow.classList.replace('bg-red-600', 'bg-eco-blue');
-                simBar.classList.replace('bg-red-500', 'bg-eco-lightgreen');
-                simBar.style.width = '100%';
-                globalIcon.innerHTML = '<i data-lucide="check-circle" class="w-3 h-3"></i> F&G OK';
-                globalIcon.className = 'text-xs text-green-400 flex items-center gap-1 transition-colors';
-                lucide.createIcons();
-
-                if (simInterval) clearInterval(simInterval);
-
-                simInterval = setInterval(() => {
-                    temp += 0.8;
-                    pres -= 1.2;
-
-                    tempEl.innerText = temp.toFixed(1) + '°';
-                    presEl.innerText = (pres > 0 ? '+' : '') + pres.toFixed(1);
-
-                    // Warning State
-                    if (temp > 26.0 && temp < 29.0) {
-                        simBar.style.width = '60%';
-                        simBar.classList.replace('bg-eco-lightgreen', 'bg-yellow-500');
-                    }
-
-                    // Critical State
-                    if (temp >= 29.0) {
-                        clearInterval(simInterval);
-
-                        // UI changes to Red/Alert
-                        tempEl.classList.replace('text-white', 'text-red-400');
-                        presEl.classList.replace('text-eco-lightgreen', 'text-orange-400');
-
-                        statusBadge.innerText = 'ALERTA TÉRMICA';
-                        statusBadge.className = 'px-2 py-1 bg-red-500 text-white text-xs font-bold rounded animate-bounce';
-
-                        hmiBox.classList.add('border-red-500/50', 'shadow-[0_0_40px_rgba(239,68,68,0.2)]');
-                        hmiGlow.classList.replace('bg-eco-blue', 'bg-red-600');
-
-                        simBar.classList.replace('bg-yellow-500', 'bg-red-500');
-                        simBar.style.width = '25%';
-
-                        globalIcon.innerHTML = '<i data-lucide="alert-triangle" class="w-3 h-3"></i> PELIGRO VDF';
-                        globalIcon.className = 'text-xs text-red-400 flex items-center gap-1 transition-colors animate-pulse';
-                        lucide.createIcons();
-
-                        // Show Smart Supply Chain Popup
-                        setTimeout(() => {
-                            alertWidget.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
-                            alertWidget.classList.add('translate-y-0', 'opacity-100');
-
-                            // Reset button
-                            btn.innerHTML = '<i data-lucide="rotate-ccw" class="w-4 h-4 text-gray-400"></i> Reiniciar Simulación';
-                            btn.disabled = false;
-                            lucide.createIcons();
-                        }, 500);
-                    }
-                }, 300);
-            });
         });
     </script>
 
@@ -3127,12 +3338,39 @@
                 const leftCount = Math.ceil(totalEq / 2);
                 const rightCount = totalEq - leftCount;
                 const zSpread = roomD * 0.72;
+                // En la pared IZQUIERDA hay un MAESTRO centrado en z=0 ocupando ±0.45 (mD=0.9).
+                // Reservamos un corredor libre alrededor del master para que ningún equipo,
+                // su esclavo o sus rejillas interiores quede frente a él.
+                const masterClearance = 1.05; // distancia mínima del centro del master en z
                 // Asignar side + z a cada equipo
                 allEquipment.forEach((eq, gi) => {
                     eq.side = gi < leftCount ? 'left' : 'right';
                     const posInRow = eq.side === 'left' ? gi : gi - leftCount;
                     const cntRow   = eq.side === 'left' ? leftCount : rightCount;
-                    eq.z = cntRow <= 1 ? 0 : -zSpread/2 + posInRow * (zSpread / (cntRow - 1));
+                    if (eq.side === 'right') {
+                        // Pared derecha: distribución uniforme
+                        eq.z = cntRow <= 1 ? 0 : -zSpread/2 + posInRow * (zSpread / (cntRow - 1));
+                    } else {
+                        // Pared izquierda: distribuir evitando el corredor del master
+                        const segLen = Math.max(0, zSpread/2 - masterClearance);
+                        if (cntRow === 1) {
+                            // Un único equipo izq: lo ubicamos delante del master (hacia +z)
+                            eq.z = masterClearance + segLen * 0.5;
+                        } else {
+                            const backCnt = Math.floor(cntRow / 2);
+                            const frontCnt = cntRow - backCnt;
+                            if (posInRow < backCnt) {
+                                // Mitad trasera: rango [-zSpread/2, -masterClearance]
+                                const t = backCnt === 1 ? 0.5 : posInRow / (backCnt - 1);
+                                eq.z = -zSpread/2 + t * segLen;
+                            } else {
+                                // Mitad delantera: rango [+masterClearance, +zSpread/2]
+                                const idx = posInRow - backCnt;
+                                const t = frontCnt === 1 ? 0.5 : idx / (frontCnt - 1);
+                                eq.z = masterClearance + t * segLen;
+                            }
+                        }
+                    }
                 });
                 const n = hvacUnits.length;
                 const hvacInfo = []; // {x, y, z, side, equipPos, idx}
@@ -3488,7 +3726,21 @@
                     // Elegimos el lado (+z o -z) que tenga más espacio hasta los bordes del shelter
                     const spaceForward  = (roomD/2 - 0.3) - info.z;   // espacio hacia +z
                     const spaceBackward = info.z - (-roomD/2 + 0.3);  // espacio hacia -z
-                    const escZ = spaceForward > spaceBackward ? info.z + 0.65 : info.z - 0.65;
+                    let escZ = spaceForward > spaceBackward ? info.z + 0.65 : info.z - 0.65;
+                    // Evitar colisión con el MASTER (pared izquierda, centrado en z=0, ancho mD=0.9 → ±0.45)
+                    // Si el esclavo cae en la zona del master, empujarlo lo suficiente para no superponerse.
+                    if (info.side === 'left') {
+                        const masterHalfZ = 0.45;
+                        const minClearance = masterHalfZ + 0.2 /*escW/2*/ + 0.12 /*margin*/; // = 0.77
+                        if (Math.abs(escZ) < minClearance) {
+                            const dir = escZ >= 0 ? 1 : -1;
+                            escZ = dir * minClearance;
+                            // Si el push lo saca de la sala, intentar el otro lado
+                            if (Math.abs(escZ) > roomD/2 - 0.25) {
+                                escZ = -dir * minClearance;
+                            }
+                        }
+                    }
                     const pos = new THREE.Vector3(interiorX, info.y, escZ);
 
                     const g = new THREE.Group();
