@@ -815,27 +815,25 @@
                         alt="Ecomonitor" class="h-10 md:h-12 w-auto object-contain">
                 </div>
 
-                <div class="hidden md:flex space-x-8 items-center">
+                <div class="hidden md:flex space-x-6 lg:space-x-7 items-center">
                     <a href="#problematica"
-                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">La
-                        Problemática</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1 whitespace-nowrap">Problemática</a>
                     <a href="#solucion"
-                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">La Solución</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1 whitespace-nowrap">Solución</a>
                     <a href="#arquitectura"
-                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">Arquitectura</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1 whitespace-nowrap">Arquitectura</a>
                     <a href="#como-funciona"
-                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">Cómo funciona</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1 whitespace-nowrap">Funcionamiento</a>
                     <a href="#instalacion"
-                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">Instalación</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1 whitespace-nowrap">Instalación</a>
                     <a href="#precios"
-                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1">Planes</a>
+                        class="text-sm font-semibold text-white hover:text-eco-lightgreen transition-colors drop-shadow-sm py-3 px-1 -my-1 whitespace-nowrap">Planes</a>
                     <button id="theme-toggle" class="theme-toggle" aria-label="Cambiar modo día/noche" title="Cambiar modo día/noche">
                         <i data-lucide="moon" class="w-4 h-4 theme-icon-moon"></i>
                         <i data-lucide="sun" class="w-4 h-4 theme-icon-sun"></i>
                     </button>
                     <button
-                        class="open-login-btn bg-white text-eco-blue px-5 py-3 rounded-full text-sm font-semibold hover:bg-gray-100 transition-all shadow-md shadow-black/20 min-h-[44px] flex items-center">Acceso
-                        a Portal</button>
+                        class="open-login-btn bg-white text-eco-blue px-5 py-3 rounded-full text-sm font-semibold hover:bg-gray-100 transition-all shadow-md shadow-black/20 min-h-[44px] flex items-center whitespace-nowrap">Portal</button>
                 </div>
 
                 <div class="md:hidden flex items-center gap-2">
@@ -851,14 +849,13 @@
         </div>
         <div id="mobile-menu"
             class="hidden md:hidden bg-white border-t border-gray-100 px-4 py-6 space-y-4 shadow-lg absolute w-full left-0 top-full">
-            <a href="#problematica" class="block text-base font-medium text-gray-600">La Problemática</a>
-            <a href="#solucion" class="block text-base font-medium text-gray-600">La Solución</a>
+            <a href="#problematica" class="block text-base font-medium text-gray-600">Problemática</a>
+            <a href="#solucion" class="block text-base font-medium text-gray-600">Solución</a>
             <a href="#arquitectura" class="block text-base font-medium text-gray-600">Arquitectura</a>
-            <a href="#como-funciona" class="block text-base font-medium text-gray-600">Cómo funciona</a>
+            <a href="#como-funciona" class="block text-base font-medium text-gray-600">Funcionamiento</a>
             <a href="#instalacion" class="block text-base font-medium text-gray-600">Instalación</a>
             <a href="#precios" class="block text-base font-medium text-gray-600">Planes</a>
-            <button class="open-login-btn block text-base font-medium text-eco-blue w-full text-left">Acceso a
-                Portal</button>
+            <button class="open-login-btn block text-base font-medium text-eco-blue w-full text-left">Portal</button>
         </div>
     </nav>
 
@@ -2144,12 +2141,16 @@
     </div>
 
     <script>
-        // === Theme toggle (día/noche). Persistencia en localStorage. Aplica antes del paint. ===
+        // === Theme toggle (día/noche). Default = día. El usuario puede cambiar a noche y se persiste en localStorage. ===
         (function () {
             try {
                 const saved = localStorage.getItem('ecomonitor-theme');
-                if (saved === 'day') document.body.classList.add('day-mode');
-            } catch (e) { /* localStorage puede fallar en iframes con cookies bloqueadas */ }
+                // Default = day. Solo no aplicamos día si el usuario eligió noche explícitamente
+                if (saved !== 'night') document.body.classList.add('day-mode');
+            } catch (e) {
+                // localStorage falló (iframes con cookies bloqueadas): default a día igual
+                document.body.classList.add('day-mode');
+            }
         })();
 
         document.addEventListener('DOMContentLoaded', function () {
@@ -4218,7 +4219,13 @@
                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">HVAC suplentes</label>
                                     <select value={hvacBackup} onChange={(e) => setHvacBackup(parseInt(e.target.value))} className="sim-select w-full">
                                         {Array.from({ length: Math.floor(hvacTotal / 2) + 1 }, (_, i) => i).map(n => (
-                                            <option key={n} value={n}>{n === 0 ? '0 (todos titulares)' : `N-${n} (${n} en reserva)`}</option>
+                                            <option key={n} value={n}>{
+                                                n === 0
+                                                    ? '0 (todos titulares)'
+                                                    : n === Math.floor(hvacTotal / 2)
+                                                        ? `N-${n} (100% redundancia)`
+                                                        : `N-${n} (${n} en reserva)`
+                                            }</option>
                                         ))}
                                     </select>
                                 </div>
