@@ -2636,6 +2636,7 @@
                         ambient.color.setHex(0xfff2e0); ambient.intensity = 0.65;
                         dir.color.setHex(0xffefd5);     dir.intensity = 1.10;
                         warm.color.setHex(0xc4b89c);    warm.intensity = 0.22;
+                        hemi.color.setHex(0xffe8c8); hemi.groundColor.setHex(0x8a7a5e); hemi.intensity = 0.55;
                     } else {
                         // Noche oscura
                         scene.fog.near = 18;
@@ -2643,6 +2644,7 @@
                         ambient.color.setHex(0x2a3658); ambient.intensity = 0.35;
                         dir.color.setHex(0x96abd0);     dir.intensity = 0.45;
                         warm.color.setHex(0x2e3450);    warm.intensity = 0.16;
+                        hemi.color.setHex(0x6a7ba0); hemi.groundColor.setHex(0x1a1a24); hemi.intensity = 0.22;
                     }
                 };
                 // Estado del tema de la escena: 'auto' sigue al body.classList, 'day'/'night' lo sobrescribe
@@ -2780,11 +2782,50 @@
                     scene.add(rock);
                 }
 
+                // === MATAS DE COIRÓN — tussock patagónico, tan/verde-amarillento ===
+                // Cono achatado con vértices desplazados hacia afuera → "penacho" en vez de cono liso.
+                const tuftColors = ['#8f8552', '#a09660', '#7a7148', '#96895a', '#b0a370', '#867844'].map(c => new THREE.Color(c));
+                for (let i = 0; i < 90; i++) {
+                    const angle = seedRand(i * 5 + 400) * Math.PI * 2;
+                    const dist = 8 + seedRand(i * 5 + 401) * 60;
+                    const x = Math.cos(angle) * dist;
+                    const z = Math.sin(angle) * dist;
+                    // Evitar zona del slab (radio ~7.5 desde origen)
+                    if (Math.abs(x) < 8 && Math.abs(z) < 6) continue;
+                    const h = 0.18 + seedRand(i * 5 + 402) * 0.22;   // altura 0.18–0.40 m
+                    const r = 0.14 + seedRand(i * 5 + 403) * 0.10;   // radio 0.14–0.24 m
+                    const tuftGeo = new THREE.ConeGeometry(r, h, 7, 1, true);
+                    // Deformar cada vértice hacia afuera para look de mata desprolija
+                    const tPosT = tuftGeo.attributes.position;
+                    for (let v = 0; v < tPosT.count; v++) {
+                        const dx = (seedRand(i * 20 + v * 3) - 0.5) * 0.06;
+                        const dy = (seedRand(i * 20 + v * 3 + 1) - 0.5) * 0.03;
+                        const dz = (seedRand(i * 20 + v * 3 + 2) - 0.5) * 0.06;
+                        tPosT.setXYZ(v, tPosT.getX(v) + dx, tPosT.getY(v) + dy, tPosT.getZ(v) + dz);
+                    }
+                    tuftGeo.computeVertexNormals();
+                    const tuft = new THREE.Mesh(
+                        tuftGeo,
+                        new THREE.MeshLambertMaterial({
+                            color: tuftColors[Math.floor(seedRand(i * 29) * tuftColors.length)],
+                            side: THREE.DoubleSide
+                        })
+                    );
+                    tuft.position.set(x, terrainHeightAt(x, z) + h * 0.45, z);
+                    tuft.rotation.y = seedRand(i * 31) * Math.PI * 2;
+                    tuft.rotation.z = (seedRand(i * 37) - 0.5) * 0.15;  // leve inclinación (viento)
+                    tuft.castShadow = true;
+                    tuft.receiveShadow = true;
+                    scene.add(tuft);
+                }
+
                 // (Montañas removidas por simplicidad — el horizonte ahora lo absorbe la fog del cielo)
 
                 // === SLAB de hormigón (más grande, soporta pilotis) ===
                 const slabGeo = new THREE.BoxGeometry(roomW + slabPad * 2, 0.2, roomD + slabPad * 2);
-                const slab = new THREE.Mesh(slabGeo, new THREE.MeshLambertMaterial({ color: '#a8a39a' }));
+                const slab = new THREE.Mesh(slabGeo, new THREE.MeshStandardMaterial({
+                    color: '#a8a39a', metalness: 0.05, roughness: 0.88
+                }));
                 slab.position.set(0, 0.1, 0); slab.receiveShadow = true; scene.add(slab);
                 const slabEdges = new THREE.LineSegments(
                     new THREE.EdgesGeometry(slabGeo),
@@ -2819,7 +2860,7 @@
                 });
 
                 // === VIGAS estructurales debajo del shelter (entre pilotis, soportan el piso) ===
-                const beamMat = new THREE.MeshLambertMaterial({ color: '#2e2e36' });
+                const beamMat = new THREE.MeshStandardMaterial({ color: '#2e2e36', metalness: 0.55, roughness: 0.55 });
                 // Vigas largas (a lo largo de X) — 2 unidades
                 [-roomD/2 + 0.4, roomD/2 - 0.4].forEach(z => {
                     const beam = new THREE.Mesh(
@@ -2936,7 +2977,7 @@
                 // === PLATAFORMA + ESCALERA + BARANDAS AMARILLAS (en la puerta, lado largo) ===
                 // Plataforma de grating al frente de la puerta (puerta sigue siendo a -roomW/4, roomD/2)
                 const platformGeo = new THREE.BoxGeometry(2.5, 0.08, 1.6);
-                const platformMat = new THREE.MeshLambertMaterial({ color: '#4a4a52' });
+                const platformMat = new THREE.MeshStandardMaterial({ color: '#4a4a52', metalness: 0.4, roughness: 0.52 });
                 const platform = new THREE.Mesh(platformGeo, platformMat);
                 platform.position.set(-roomW/4, 2.21 - 0.04, roomD/2 + 0.8);
                 platform.castShadow = true;
@@ -2986,7 +3027,7 @@
                 });
 
                 // Barandas amarillas (tubos)
-                const handrailMat = new THREE.MeshLambertMaterial({ color: '#f5c542' });
+                const handrailMat = new THREE.MeshStandardMaterial({ color: '#f5c542', metalness: 0.45, roughness: 0.45 });
                 const buildRailing = (points) => {
                     // points = array de Vector3, conecta cada par consecutivo con cilindros
                     for (let i = 0; i < points.length - 1; i++) {
@@ -3080,7 +3121,7 @@
                 // === Floor interior ===
                 const floor = new THREE.Mesh(
                     new THREE.PlaneGeometry(roomW, roomD),
-                    new THREE.MeshLambertMaterial({ color: TH_COLOR.room })
+                    new THREE.MeshStandardMaterial({ color: TH_COLOR.room, metalness: 0.02, roughness: 0.9 })
                 );
                 floor.rotation.x = -Math.PI / 2;
                 floor.position.y = 2.21;
@@ -4559,6 +4600,38 @@
                             // 3. Log crítico
                             setTimeout(() => addEvent(fault.severity, uid, fault.msg), 0);
                         });
+                    }
+
+                    // === AUTO-ROTACIÓN — cuando accHoursSim - lastAutoRot >= PERIOD_HOURS[rotationPeriod] ===
+                    const rotationHours = PERIOD_HOURS[rotationPeriod];
+                    if (p.accHoursSim - p.lastAutoRot >= rotationHours) {
+                        p.lastAutoRot = p.accHoursSim;
+                        setTimeout(() => {
+                            advanceTime();
+                            addEvent('info', 'ROT', `Rotación automática (${PERIOD_LABELS[rotationPeriod]} de operación cumplida)`);
+                        }, 0);
+                    }
+
+                    // === AUTO-APOYO PREDICTIVO — cuando la sala se calienta sostenidamente sin fallas ===
+                    // Dispara una suplente si:
+                    //   - temp sala >= warn (28°C) durante >= 20 s sim
+                    //   - hay SUPLENTE disponible
+                    //   - no hay APOYO ya activo
+                    //   - no hay falla activa (esas usan el failover por trip)
+                    const anyStandby = hvacUnits.some(u => u.state === 'SUPLENTE');
+                    const anyApoyo   = hvacUnits.some(u => u.state === 'APOYO');
+                    const overheating = p.salaTemp >= PHYS.alarms.temp_warn_C;
+                    if (overheating && anyStandby && !anyApoyo && !isOverloadActive) {
+                        p.autoApoyoTimer = (p.autoApoyoTimer || 0) + dt_sim_s;
+                        if (p.autoApoyoTimer >= 20) {
+                            p.autoApoyoTimer = 0;
+                            setTimeout(() => {
+                                triggerOverload();
+                                addEvent('warn', 'AUTO', 'Auto-apoyo activado: temperatura sala > umbral de atención');
+                            }, 0);
+                        }
+                    } else if (!overheating) {
+                        p.autoApoyoTimer = 0;
                     }
 
                     // === Push a UI a ~2 Hz (no cada tick para no trabar el render) ===
