@@ -2574,18 +2574,33 @@
                 const H = 560;
 
                 const scene = new THREE.Scene();
-                // === Paletas día (atardecer cálido) / noche (oscuro con fog) ===
-                // Cada paleta = solo background + fog (simple, sin estrellas ni shader)
-                const SKY_DAY = {
-                    bg:  new THREE.Color('#c4c2b0'),   // atardecer Patagonia (warm sand/dusk)
-                    fog: new THREE.Color('#d8c5a0')    // niebla cálida
+                // === Cielo con gradiente vertical (CanvasTexture) — día y noche pre-generados ===
+                const makeSkyTex = (stops) => {
+                    const c = document.createElement('canvas');
+                    c.width = 4; c.height = 512;
+                    const g = c.getContext('2d').createLinearGradient(0, 0, 0, 512);
+                    stops.forEach(([t, col]) => g.addColorStop(t, col));
+                    const cx = c.getContext('2d');
+                    cx.fillStyle = g; cx.fillRect(0, 0, 4, 512);
+                    const t = new THREE.CanvasTexture(c);
+                    if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
+                    return t;
                 };
-                const SKY_NIGHT = {
-                    bg:  new THREE.Color('#0c1228'),   // navy muy oscuro (cielo nocturno)
-                    fog: new THREE.Color('#1a2240')    // niebla nocturna azul-purpura
-                };
-                // Background simple: solid color (sin shader, sin tiling, sin lunas raras)
-                scene.background = SKY_NIGHT.bg.clone();
+                const skyDayTex = makeSkyTex([
+                    [0.00, '#7a95b3'],  // cenit celeste
+                    [0.40, '#a8b4bc'],  // media altura
+                    [0.72, '#d0c2a5'],  // horizonte tostado
+                    [1.00, '#b8a382']   // banda de tierra
+                ]);
+                const skyNightTex = makeSkyTex([
+                    [0.00, '#050813'],  // cenit muy oscuro
+                    [0.35, '#0e1530'],
+                    [0.75, '#26304f'],  // resplandor bajo (luna implícita)
+                    [1.00, '#0f1428']
+                ]);
+                const SKY_DAY   = { bg: skyDayTex,   fog: new THREE.Color('#d0c2a5') };
+                const SKY_NIGHT = { bg: skyNightTex, fog: new THREE.Color('#1a2240') };
+                scene.background = skyNightTex;
                 // Niebla densa que absorbe el horizonte y simula la atmósfera
                 scene.fog = new THREE.Fog(SKY_NIGHT.fog.clone(), 22, 75);
 
@@ -2624,27 +2639,26 @@
                 const warm = new THREE.DirectionalLight(0xc4b89c, 0.22);  // luz rebotada del terreno
                 warm.position.set(-6, 3, -4); scene.add(warm);
 
-                // === Aplicar tema día/noche: solo background + fog + luces ===
+                // === Aplicar tema día/noche: fondo + fog + luces (5 canales) ===
                 const applySceneTheme = (isDay) => {
-                    const palette = isDay ? SKY_DAY : SKY_NIGHT;
-                    scene.background = palette.bg.clone();
-                    scene.fog.color.copy(palette.fog);
+                    scene.background = isDay ? skyDayTex : skyNightTex;
+                    scene.fog.color.copy(isDay ? SKY_DAY.fog : SKY_NIGHT.fog);
                     if (isDay) {
-                        // Atardecer Patagonia cálido
-                        scene.fog.near = 22;
-                        scene.fog.far  = 75;
-                        ambient.color.setHex(0xfff2e0); ambient.intensity = 0.65;
-                        dir.color.setHex(0xffefd5);     dir.intensity = 1.10;
-                        warm.color.setHex(0xc4b89c);    warm.intensity = 0.22;
-                        hemi.color.setHex(0xffe8c8); hemi.groundColor.setHex(0x8a7a5e); hemi.intensity = 0.55;
+                        // Día patagónico — sol cenital cálido, sombras nítidas
+                        scene.fog.near = 24;
+                        scene.fog.far  = 80;
+                        ambient.color.setHex(0xfff3e2); ambient.intensity = 0.72;
+                        dir.color.setHex(0xfff0d8);     dir.intensity     = 1.25;
+                        warm.color.setHex(0xd0c0a2);    warm.intensity    = 0.28;
+                        hemi.color.setHex(0xbcd0e2); hemi.groundColor.setHex(0xa89478); hemi.intensity = 0.68;
                     } else {
-                        // Noche oscura
-                        scene.fog.near = 18;
-                        scene.fog.far  = 65;
-                        ambient.color.setHex(0x2a3658); ambient.intensity = 0.35;
-                        dir.color.setHex(0x96abd0);     dir.intensity = 0.45;
-                        warm.color.setHex(0x2e3450);    warm.intensity = 0.16;
-                        hemi.color.setHex(0x6a7ba0); hemi.groundColor.setHex(0x1a1a24); hemi.intensity = 0.22;
+                        // Noche — protagonismo de LEDs/HMI, luces frías y bajas
+                        scene.fog.near = 16;
+                        scene.fog.far  = 58;
+                        ambient.color.setHex(0x1f2a48); ambient.intensity = 0.28;
+                        dir.color.setHex(0x8ea2c8);     dir.intensity     = 0.35;
+                        warm.color.setHex(0x232840);    warm.intensity    = 0.12;
+                        hemi.color.setHex(0x4a5e88); hemi.groundColor.setHex(0x0e1220); hemi.intensity = 0.18;
                     }
                 };
                 // Estado del tema de la escena: 'auto' sigue al body.classList, 'day'/'night' lo sobrescribe
@@ -2821,10 +2835,52 @@
 
                 // (Montañas removidas por simplicidad — el horizonte ahora lo absorbe la fog del cielo)
 
+                // === Helper: textura procedural de hormigón (splotches + juntas), determinística vía seedRand ===
+                const makeConcreteTexture = ({
+                    size = 512, baseColor = '#a8a39a', splotchDarkness = 0.13,
+                    jointSpacing = 128, jointColor = 'rgba(52,48,42,0.42)',
+                    salt = 1
+                }) => {
+                    const c = document.createElement('canvas');
+                    c.width = size; c.height = size;
+                    const ctx = c.getContext('2d');
+                    ctx.fillStyle = baseColor; ctx.fillRect(0, 0, size, size);
+                    // Splotches (variación de color, textura de árido)
+                    for (let i = 0; i < 260; i++) {
+                        const x = seedRand(i * 7 + salt * 101) * size;
+                        const y = seedRand(i * 11 + salt * 103) * size;
+                        const r = 2 + seedRand(i * 13 + salt * 107) * 14;
+                        const dark = seedRand(i * 17 + salt * 109) > 0.5;
+                        const a = seedRand(i * 19 + salt * 113) * splotchDarkness;
+                        ctx.fillStyle = dark ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a * 0.6})`;
+                        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+                    }
+                    // Juntas (grid de líneas)
+                    if (jointSpacing > 0) {
+                        ctx.strokeStyle = jointColor;
+                        ctx.lineWidth = 2;
+                        for (let x = jointSpacing; x < size; x += jointSpacing) {
+                            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, size); ctx.stroke();
+                        }
+                        for (let y = jointSpacing; y < size; y += jointSpacing) {
+                            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke();
+                        }
+                    }
+                    const tex = new THREE.CanvasTexture(c);
+                    if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+                    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                    return tex;
+                };
+
                 // === SLAB de hormigón (más grande, soporta pilotis) ===
                 const slabGeo = new THREE.BoxGeometry(roomW + slabPad * 2, 0.2, roomD + slabPad * 2);
+                const slabTex = makeConcreteTexture({
+                    baseColor: '#a8a39a', splotchDarkness: 0.16, jointSpacing: 96,
+                    jointColor: 'rgba(52,48,42,0.5)', salt: 1
+                });
+                slabTex.repeat.set(3, 2);  // 3 tiles a lo largo, 2 a lo ancho
                 const slab = new THREE.Mesh(slabGeo, new THREE.MeshStandardMaterial({
-                    color: '#a8a39a', metalness: 0.05, roughness: 0.88
+                    map: slabTex, metalness: 0.05, roughness: 0.88
                 }));
                 slab.position.set(0, 0.1, 0); slab.receiveShadow = true; scene.add(slab);
                 const slabEdges = new THREE.LineSegments(
@@ -3118,19 +3174,40 @@
                     }
                 });
 
-                // === Floor interior ===
+                // === Floor interior — piso técnico epóxico con juntas ===
+                const floorTex = makeConcreteTexture({
+                    baseColor: '#dcdad3', splotchDarkness: 0.09, jointSpacing: 128,
+                    jointColor: 'rgba(80,75,68,0.28)', salt: 2
+                });
+                floorTex.repeat.set(4, 3);
                 const floor = new THREE.Mesh(
                     new THREE.PlaneGeometry(roomW, roomD),
-                    new THREE.MeshStandardMaterial({ color: TH_COLOR.room, metalness: 0.02, roughness: 0.9 })
+                    new THREE.MeshStandardMaterial({ map: floorTex, metalness: 0.05, roughness: 0.82 })
                 );
                 floor.rotation.x = -Math.PI / 2;
                 floor.position.y = 2.21;
+                floor.receiveShadow = true;
                 scene.add(floor);
 
-                // Floor grid
-                const grid = new THREE.GridHelper(Math.max(roomW, roomD), 12, TH_COLOR.lineSoft, TH_COLOR.grid);
-                grid.material.transparent = true; grid.material.opacity = 0.4;
-                grid.position.y = 0.22; scene.add(grid);
+                // === ZÓCALO — perimetral donde el piso se une con las paredes ===
+                const zocaloMat = new THREE.MeshStandardMaterial({ color: '#3a3a42', metalness: 0.3, roughness: 0.6 });
+                const zocaloH = 0.10, zocaloT = 0.035;  // alto 10cm, espesor 3.5cm
+                const zocaloY = 2.21 + zocaloH / 2 + 0.005;
+                // 4 tramos, uno por pared
+                [
+                    { w: roomW, d: zocaloT, x: 0,             z: -roomD/2 + zocaloT/2 },  // fondo
+                    { w: roomW, d: zocaloT, x: 0,             z:  roomD/2 - zocaloT/2 },  // frente
+                    { w: zocaloT, d: roomD, x: -roomW/2 + zocaloT/2, z: 0 },              // izq
+                    { w: zocaloT, d: roomD, x:  roomW/2 - zocaloT/2, z: 0 }               // der
+                ].forEach(z => {
+                    const zoc = new THREE.Mesh(
+                        new THREE.BoxGeometry(z.w, zocaloH, z.d),
+                        zocaloMat
+                    );
+                    zoc.position.set(z.x, zocaloY, z.z);
+                    zoc.receiveShadow = true;
+                    scene.add(zoc);
+                });
 
                 // === 4 PAREDES + TECHO (opacidad togglable) ===
                 const wallMeshes = [];
@@ -3260,17 +3337,19 @@
                     });
                 });
 
-                // === VFDs (6 cabinets en grilla 3x2 distribuidos en el piso) ===
+                // === VFDs (6 cabinets contra la pared del FONDO — pasillo central libre) ===
+                // En una sala eléctrica los equipos que disipan calor van pegados a la pared, nunca en el medio.
                 const heatMeshes = [];
                 const heatWaves = [];
                 const eqW = 1.3, eqH = 2.6, eqD = 0.9;
+                const vfdBackZ = -roomD/2 + eqD/2 + 0.15;  // pegados a la pared del fondo
                 const vfdPositions = [
-                    { x: -4.0, z: -1.4 },
-                    { x:  0.0, z: -1.4 },
-                    { x:  4.0, z: -1.4 },
-                    { x: -4.0, z:  1.4 },
-                    { x:  0.0, z:  1.4 },
-                    { x:  4.0, z:  1.4 }
+                    { x: -4.5, z: vfdBackZ },
+                    { x: -2.7, z: vfdBackZ },
+                    { x: -0.9, z: vfdBackZ },
+                    { x:  0.9, z: vfdBackZ },
+                    { x:  2.7, z: vfdBackZ },
+                    { x:  4.5, z: vfdBackZ }
                 ];
                 vfdPositions.forEach((pos, i) => {
                     const x = pos.x, z = pos.z;
@@ -3799,92 +3878,183 @@
                     );
                     stateBand.position.set(bodyX, y + unitH/2 - 0.12, z);
                     g.add(stateBand);
-                    // === VENTILADOR CONDENSADOR (AM-010: 710mm diámetro, en la mitad INFERIOR de la cara frontal) ===
                     const fanFaceX = bodyX + outSign * (unitW/2 + 0.005);
-                    const fanY = y - unitH * 0.28;  // en el tercio inferior (donde va en el AM-010 real)
-                    const fanRadius = 0.355;  // 710mm diámetro real
-                    // Cavidad recessed
-                    const recess = new THREE.Mesh(
-                        new THREE.CircleGeometry(fanRadius, 32),
-                        new THREE.MeshLambertMaterial({ color: '#15151c' })
+                    const fanRadius = 0.355;  // Ø710mm real
+                    // === VENTILADOR AXIAL EN LA TAPA SUPERIOR (AM-010 Iny. Sup.: mira al cielo) ===
+                    const fanTopY = y + unitH/2 + 0.005;
+                    // Cavidad oscura empotrada en la tapa (donde gira el fan)
+                    const topRecess = new THREE.Mesh(
+                        new THREE.CircleGeometry(fanRadius * 1.06, 40),
+                        new THREE.MeshStandardMaterial({ color: '#0a0a12', metalness: 0.15, roughness: 0.9 })
                     );
-                    recess.position.set(fanFaceX - outSign * 0.02, fanY, z);
-                    recess.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
-                    g.add(recess);
-                    // Anillo exterior de la grilla (torus)
-                    const grilleRing = new THREE.Mesh(
-                        new THREE.TorusGeometry(fanRadius + 0.015, 0.025, 8, 32),
-                        new THREE.MeshLambertMaterial({ color: '#2a2a32' })
-                    );
-                    grilleRing.position.set(fanFaceX, fanY, z);
-                    grilleRing.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
-                    g.add(grilleRing);
-                    // Barras horizontales de la grilla (protección)
-                    for (let bar = -3; bar <= 3; bar++) {
-                        const grilleBar = new THREE.Mesh(
-                            new THREE.BoxGeometry(0.01, 0.012, 0.7),
-                            new THREE.MeshLambertMaterial({ color: '#2a2a32' })
-                        );
-                        grilleBar.position.set(fanFaceX + outSign * 0.001, fanY + bar * 0.105, z);
-                        g.add(grilleBar);
-                    }
-                    // FAN GROUP: hub central + 3 aspas planas (sin pitch — no atraviesan la mochila)
+                    topRecess.rotation.x = -Math.PI/2;
+                    topRecess.position.set(bodyX, fanTopY + 0.008, z);
+                    g.add(topRecess);
+                    // Fan: hub + 5 aspas en plano XZ (rota sobre eje Y)
                     const fan = new THREE.Group();
-                    fan.add(new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.055, 0.055, 0.06, 14),
-                        new THREE.MeshLambertMaterial({ color: '#1f1f26' })
-                    ));
-                    for (let bi = 0; bi < 3; bi++) {
-                        const angle = (bi / 3) * Math.PI * 2;
-                        const blade = new THREE.Mesh(
-                            new THREE.BoxGeometry(0.32, 0.04, 0.11),
-                            new THREE.MeshLambertMaterial({ color: '#9c9ca6' })
-                        );
-                        blade.position.set(Math.cos(angle) * 0.18, 0, Math.sin(angle) * 0.18);
+                    const hubMat = new THREE.MeshStandardMaterial({ color: '#1f1f26', metalness: 0.7, roughness: 0.4 });
+                    fan.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.09, 16), hubMat));
+                    const bladeMat = new THREE.MeshStandardMaterial({ color: '#9c9ca6', metalness: 0.55, roughness: 0.5 });
+                    for (let bi = 0; bi < 5; bi++) {
+                        const angle = (bi / 5) * Math.PI * 2;
+                        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.022, 0.09), bladeMat);
+                        blade.position.set(Math.cos(angle) * 0.20, 0, Math.sin(angle) * 0.20);
                         blade.rotation.y = angle;
+                        blade.rotation.x = 0.22;  // pitch leve (aspa inclinada como un axial real)
                         fan.add(blade);
                     }
-                    fan.rotation.z = outSign === -1 ? Math.PI/2 : -Math.PI/2;
-                    fan.position.set(fanFaceX - outSign * 0.12, fanY, z);
+                    fan.position.set(bodyX, fanTopY + 0.055, z);
                     g.add(fan);
-                    // === PANELES DE ACCESO (parte superior de la cara frontal — AM-010 tiene 2) ===
-                    // Panel 1 (superior): 350mm × 1050mm — acceso a compresor
-                    // Panel 2 (medio):    285mm × 1050mm — acceso a ventilador evaporador
-                    const panelWidth = unitD * 0.75;  // ~1.05m en real
-                    const panels = [
-                        { yOff: unitH * 0.32,  h: 0.35 },   // panel superior
-                        { yOff: unitH * 0.08,  h: 0.285 }   // panel medio
-                    ];
-                    for (const p of panels) {
-                        const panelGeo = new THREE.BoxGeometry(0.005, p.h, panelWidth);
-                        const panelMesh = new THREE.Mesh(
-                            panelGeo,
-                            new THREE.MeshLambertMaterial({ color: '#e6e2d5' })  // ligeramente más gris que el body
+                    // Grilla radial protectora ARRIBA del fan: anillo exterior + 3 anillos concéntricos + 8 rayos
+                    const gridMat = new THREE.MeshStandardMaterial({ color: '#2a2a32', metalness: 0.75, roughness: 0.35 });
+                    const grilleY = fanTopY + 0.11;
+                    const outerRing = new THREE.Mesh(new THREE.TorusGeometry(fanRadius, 0.022, 8, 40), gridMat);
+                    outerRing.rotation.x = Math.PI/2;
+                    outerRing.position.set(bodyX, grilleY, z);
+                    g.add(outerRing);
+                    for (let r = 1; r <= 3; r++) {
+                        const ring = new THREE.Mesh(new THREE.TorusGeometry(fanRadius * (r / 4), 0.010, 6, 28), gridMat);
+                        ring.rotation.x = Math.PI/2;
+                        ring.position.set(bodyX, grilleY, z);
+                        g.add(ring);
+                    }
+                    for (let s = 0; s < 8; s++) {
+                        const angle = (s / 8) * Math.PI * 2;
+                        const spoke = new THREE.Mesh(new THREE.BoxGeometry(fanRadius * 2 - 0.02, 0.010, 0.014), gridMat);
+                        spoke.position.set(bodyX, grilleY, z);
+                        spoke.rotation.y = angle;
+                        g.add(spoke);
+                    }
+                    // === LOUVERS DENSOS EN LA CARA FRONTAL (serpentina condensadora — lo icónico del AM-010) ===
+                    // Backing plate oscura para dar profundidad detrás de los louvers
+                    const louverAreaH = unitH * 0.48;
+                    const louverAreaCenter = y - unitH * 0.10;
+                    const louverAreaW = unitD * 0.86;
+                    const backing = new THREE.Mesh(
+                        new THREE.PlaneGeometry(louverAreaW + 0.03, louverAreaH + 0.05),
+                        new THREE.MeshStandardMaterial({ color: '#151519', metalness: 0.1, roughness: 0.95 })
+                    );
+                    backing.position.set(fanFaceX + outSign * 0.001, louverAreaCenter, z);
+                    backing.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
+                    g.add(backing);
+                    // Louvers horizontales densos (32 aletas)
+                    const louverCount = 32;
+                    const louverMat = new THREE.MeshStandardMaterial({ color: '#7d7d84', metalness: 0.68, roughness: 0.5 });
+                    for (let l = 0; l < louverCount; l++) {
+                        const ly = louverAreaCenter - louverAreaH/2 + 0.02 + (l / (louverCount - 1)) * (louverAreaH - 0.04);
+                        const louver = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.022, 0.016, louverAreaW),
+                            louverMat
                         );
-                        panelMesh.position.set(fanFaceX + outSign * 0.001, y + p.yOff, z);
+                        louver.position.set(fanFaceX + outSign * 0.006, ly, z);
+                        g.add(louver);
+                    }
+                    // Marco fino alrededor del área de louvers
+                    const louverFrame = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(new THREE.PlaneGeometry(louverAreaW + 0.03, louverAreaH + 0.05)),
+                        new THREE.LineBasicMaterial({ color: '#3a3a42' })
+                    );
+                    louverFrame.position.copy(backing.position);
+                    louverFrame.rotation.copy(backing.rotation);
+                    g.add(louverFrame);
+
+                    // === PANELES DE ACCESO (parte superior de la cara frontal — compresor + evaporador) ===
+                    const panels = [
+                        { yOff: unitH * 0.35,  h: 0.42, w: unitD * 0.55 },   // superior: compresor
+                        { yOff: unitH * 0.19,  h: 0.24, w: unitD * 0.55 }    // medio: ventilador evaporador
+                    ];
+                    const panelMat = new THREE.MeshStandardMaterial({ color: '#e6e2d5', metalness: 0.45, roughness: 0.5 });
+                    const screwMat = new THREE.MeshStandardMaterial({ color: '#3a3a42', metalness: 0.75, roughness: 0.35 });
+                    for (const p of panels) {
+                        const panelGeo = new THREE.BoxGeometry(0.008, p.h, p.w);
+                        const panelMesh = new THREE.Mesh(panelGeo, panelMat);
+                        panelMesh.position.set(fanFaceX + outSign * 0.004, y + p.yOff, z);
                         g.add(panelMesh);
-                        // Marco del panel (líneas)
                         const panelEdges = new THREE.LineSegments(
                             new THREE.EdgesGeometry(panelGeo),
-                            new THREE.LineBasicMaterial({ color: '#5a5a62', transparent: true, opacity: 0.7 })
+                            new THREE.LineBasicMaterial({ color: '#5a5a62', transparent: true, opacity: 0.75 })
                         );
                         panelEdges.position.copy(panelMesh.position);
                         g.add(panelEdges);
-                    }
-                    // === REJILLAS LATERALES DE ADMISIÓN (Batería eléctrica visible en el AM-010 real) ===
-                    // Slats verticales sobre las caras laterales que dan al condensador
-                    for (const sideZ of [-unitD/2 - 0.001, unitD/2 + 0.001]) {
-                        for (let k = 0; k < 12; k++) {
-                            const slat = new THREE.LineSegments(
-                                new THREE.BufferGeometry().setFromPoints([
-                                    new THREE.Vector3(bodyX - unitW/2 * 0.5, fanY - 0.5 + k * 0.08, z + sideZ),
-                                    new THREE.Vector3(bodyX + unitW/2 * 0.5, fanY - 0.5 + k * 0.08, z + sideZ)
-                                ]),
-                                new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.4 })
+                        // 4 tornillos en las esquinas
+                        [[p.h/2 - 0.035, p.w/2 - 0.035], [p.h/2 - 0.035, -p.w/2 + 0.035],
+                         [-p.h/2 + 0.035, p.w/2 - 0.035], [-p.h/2 + 0.035, -p.w/2 + 0.035]].forEach(([sy, sz]) => {
+                            const screw = new THREE.Mesh(
+                                new THREE.CylinderGeometry(0.014, 0.014, 0.010, 8),
+                                screwMat
                             );
+                            screw.position.set(fanFaceX + outSign * 0.010, y + p.yOff + sy, z + sz);
+                            screw.rotation.z = outSign === -1 ? -Math.PI/2 : Math.PI/2;
+                            g.add(screw);
+                        });
+                        // Manija horizontal al costado derecho del panel
+                        const handle = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.008, 0.05, 0.14),
+                            screwMat
+                        );
+                        handle.position.set(fanFaceX + outSign * 0.014, y + p.yOff, z + p.w/2 - 0.14);
+                        g.add(handle);
+                    }
+
+                    // === WESTRIC BRANDING (placa en la base de la cara frontal) ===
+                    const brandCanvas = document.createElement('canvas');
+                    brandCanvas.width = 320; brandCanvas.height = 80;
+                    const bctx = brandCanvas.getContext('2d');
+                    bctx.fillStyle = '#f2ede0';
+                    bctx.fillRect(0, 0, 320, 80);
+                    bctx.strokeStyle = '#a89e88';
+                    bctx.lineWidth = 3;
+                    bctx.strokeRect(2, 2, 316, 76);
+                    bctx.fillStyle = '#00478F';
+                    bctx.font = 'bold 42px "Geist Mono", ui-monospace, monospace';
+                    bctx.textAlign = 'center';
+                    bctx.textBaseline = 'middle';
+                    bctx.fillText('WESTRIC', 160, 32);
+                    bctx.fillStyle = '#4f7725';
+                    bctx.font = '13px "Geist Mono", ui-monospace, monospace';
+                    bctx.fillText('AM-010 · INY. SUPERIOR', 160, 62);
+                    const brandTex = new THREE.CanvasTexture(brandCanvas);
+                    if (THREE.SRGBColorSpace) brandTex.colorSpace = THREE.SRGBColorSpace;
+                    const brandPlate = new THREE.Mesh(
+                        new THREE.PlaneGeometry(unitD * 0.45, 0.12),
+                        new THREE.MeshBasicMaterial({ map: brandTex })
+                    );
+                    brandPlate.position.set(fanFaceX + outSign * 0.006, y + unitH * 0.44, z);
+                    brandPlate.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
+                    g.add(brandPlate);
+
+                    // === REJILLAS LATERALES DE INTAKE — condenser coil (aletas verticales densas) ===
+                    for (const sideZ of [-unitD/2 - 0.001, unitD/2 + 0.001]) {
+                        // Marco backing
+                        const sideBacking = new THREE.Mesh(
+                            new THREE.PlaneGeometry(unitW * 0.75, unitH * 0.55),
+                            new THREE.MeshStandardMaterial({ color: '#1a1a20', metalness: 0.1, roughness: 0.9 })
+                        );
+                        sideBacking.position.set(bodyX, y - unitH * 0.10, z + sideZ);
+                        sideBacking.rotation.y = 0;  // cara XY, normal en Z
+                        if (sideZ < 0) sideBacking.rotation.y = Math.PI;
+                        g.add(sideBacking);
+                        // 18 aletas horizontales (finas y densas)
+                        for (let k = 0; k < 18; k++) {
+                            const slat = new THREE.Mesh(
+                                new THREE.BoxGeometry(unitW * 0.72, 0.010, 0.014),
+                                new THREE.MeshStandardMaterial({ color: '#8a8a90', metalness: 0.6, roughness: 0.5 })
+                            );
+                            slat.position.set(bodyX, y - unitH * 0.35 + k * (unitH * 0.55 / 17), z + sideZ + Math.sign(sideZ) * 0.006);
                             g.add(slat);
                         }
                     }
+
+                    // === PESTAÑAS DE FIJACIÓN LATERALES (tabs entre HVAC y pared) ===
+                    const tabMat = new THREE.MeshStandardMaterial({ color: '#c8c4b8', metalness: 0.6, roughness: 0.4 });
+                    [-unitD/3, unitD/3].forEach(dz => {
+                        const tab = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.10, 0.14, 0.16),
+                            tabMat
+                        );
+                        tab.position.set(bodyX - outSign * (unitW/2 + 0.02), y + unitH/2 - 0.35, z + dz);
+                        g.add(tab);
+                    });
 
                     // SOPORTE TRIANGULAR de acero (debajo del HVAC, contra la pared)
                     const bracketMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
