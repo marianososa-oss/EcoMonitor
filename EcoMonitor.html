@@ -2486,7 +2486,8 @@
                 // Niebla densa que absorbe el horizonte y simula la atmósfera
                 scene.fog = new THREE.Fog(SKY_NIGHT.fog.clone(), 22, 75);
 
-                const fs = 17;
+                // Frustum reducido para que el shelter ocupe ~85% del alto del canvas (antes 17 = mucho aire).
+                const fs = 10;
                 let aspect = W / H;
                 const camera = new THREE.OrthographicCamera(
                     -fs * aspect / 2, fs * aspect / 2, fs / 2, -fs / 2, 0.1, 200
@@ -3513,7 +3514,7 @@
                     orbit.actualRadius  += (orbit.targetRadius  - orbit.actualRadius)  * 0.12;
                     orbit.actualZoom    += (orbit.targetZoom    - orbit.actualZoom)    * 0.15;
                     const lookTarget = sceneObj.current.targetView === 'iso'
-                        ? new THREE.Vector3(0, 3.5, 0)
+                        ? new THREE.Vector3(0, 4.0, 0)  // apuntar al centro del shelter (era 3.5)
                         : new THREE.Vector3(0, 0, 0);
                     camLook.lerp(lookTarget, 0.07);
                     camera.position.set(
@@ -4511,34 +4512,7 @@
                         </div>
                     </div>
 
-                    {/* KPI strip provisional (fase 3 lo reemplaza con panel completo) */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-5 py-3 bg-slate-900/60 border-b border-slate-800">
-                        {(() => {
-                            const t = telemetry;
-                            const tempCol = t.salaTemp >= PHYS.alarms.temp_crit_C ? '#ef4444' :
-                                           t.salaTemp >= PHYS.alarms.temp_warn_C ? '#f59e0b' :
-                                           '#9ab63b';
-                            const presCol = t.salaPresDiff <= PHYS.alarms.pres_crit_Pa ? '#ef4444' :
-                                           t.salaPresDiff <= PHYS.alarms.pres_warn_Pa ? '#f59e0b' :
-                                           '#9ab63b';
-                            const cells = [
-                                { label: 'TEMP SALA',   val: t.salaTemp.toFixed(1),   unit: '°C',  col: tempCol,   sub: `SP ${PHYS.setpoint_C}°C ±${PHYS.histeresis_C}` },
-                                { label: 'PRESIÓN Δ',   val: t.salaPresDiff.toFixed(0), unit: 'Pa', col: presCol,  sub: `SP ${PHYS.pres_target_Pa} Pa` },
-                                { label: 'CONSUMO',     val: t.consumo_kW.toFixed(1),  unit: 'kW',  col: '#0098c6', sub: `COP ${t.COP.toFixed(2)}` },
-                                { label: 'CAPACIDAD',   val: t.Q_cool_kW.toFixed(1),   unit: 'kW',  col: '#9ab63b', sub: `${(t.headroom_kW || 0).toFixed(0)} kW margen` }
-                            ];
-                            return cells.map((c, i) => (
-                                <div key={i} className="bg-slate-950/70 border border-slate-800 rounded-lg p-3">
-                                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{c.label}</div>
-                                    <div className="flex items-baseline gap-1 mt-0.5">
-                                        <span className="text-2xl font-mono font-bold" style={{ color: c.col }}>{c.val}</span>
-                                        <span className="text-xs text-slate-500">{c.unit}</span>
-                                    </div>
-                                    <div className="text-[9px] text-slate-500 mt-1 font-mono">{c.sub}</div>
-                                </div>
-                            ));
-                        })()}
-                    </div>
+                    {/* KPI strip provisional removida: los KPIs viven ahora exclusivamente en el panel EcoMonitor (columna derecha) */}
 
                     {/* Condiciones exteriores (T_ext + carga térmica) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-5 py-3 bg-slate-900/30 border-b border-slate-800">
@@ -4665,8 +4639,8 @@
                             />
                         </div>
 
-                        {/* Panel lateral EcoMonitor */}
-                        <div className="relative bg-slate-900/50 flex flex-col">
+                        {/* Panel lateral EcoMonitor — max-h fija al alto del canvas (560px) con scroll interno para no dejar hueco */}
+                        <div className="relative bg-slate-900/50 flex flex-col lg:max-h-[560px] lg:overflow-y-auto sim-no-scroll">
                             {(() => {
                                 const t = telemetry;
                                 // Semáforo global
@@ -4692,15 +4666,15 @@
                                         </svg>
                                     );
                                 };
-                                // KPI card helper
-                                const KPI = ({ label, value, unit, color, sub }) => (
-                                    <div className="bg-slate-950/60 border border-slate-800 rounded p-2">
-                                        <div className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{label}</div>
+                                // KPI card helper — versión grande (destacada) y compacta
+                                const KPI = ({ label, value, unit, color, sub, large }) => (
+                                    <div className={`bg-slate-950/60 border border-slate-800 rounded ${large ? 'p-2.5' : 'p-2'}`}>
+                                        <div className={`font-bold text-slate-500 uppercase tracking-widest ${large ? 'text-[9px]' : 'text-[8px]'}`}>{label}</div>
                                         <div className="flex items-baseline gap-1 mt-0.5">
-                                            <span className="text-base font-mono font-bold" style={{ color }}>{value}</span>
-                                            <span className="text-[9px] text-slate-500">{unit}</span>
+                                            <span className={`font-mono font-bold ${large ? 'text-xl' : 'text-base'}`} style={{ color }}>{value}</span>
+                                            <span className={`text-slate-500 ${large ? 'text-[10px]' : 'text-[9px]'}`}>{unit}</span>
                                         </div>
-                                        {sub && <div className="text-[8px] text-slate-500 mt-0.5 font-mono truncate">{sub}</div>}
+                                        {sub && <div className={`text-slate-500 mt-0.5 ${large ? 'text-[9px]' : 'text-[8px]'} truncate`}>{sub}</div>}
                                     </div>
                                 );
                                 const tempCol = t.salaTemp >= PHYS.alarms.temp_crit_C ? '#ef4444' : t.salaTemp >= PHYS.alarms.temp_warn_C ? '#f59e0b' : '#9ab63b';
@@ -4724,59 +4698,78 @@
                                             </div>
                                         </div>
 
-                                        {/* KPIs grid */}
+                                        {/* KPIs — 4 destacados en la sala principal */}
                                         <div className="p-3 border-b border-slate-800">
                                             <div className="text-[9px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] mb-2">Sala Principal</div>
-                                            <div className="grid grid-cols-2 gap-1.5">
-                                                <KPI label="Temp"     value={t.salaTemp.toFixed(1)}   unit="°C" color={tempCol} sub={`SP ${PHYS.setpoint_C}°C ±${PHYS.histeresis_C}`}/>
-                                                <KPI label="Humedad"  value={t.salaHumidity.toFixed(0)} unit="%HR" color={humCol}  sub={`${PHYS.alarms.hum_low_pct}–${PHYS.alarms.hum_high_pct}%`}/>
-                                                <KPI label="Presión Δ" value={t.salaPresDiff.toFixed(0)} unit="Pa"  color={presCol} sub={`SP +${PHYS.pres_target_Pa} Pa`}/>
-                                                <KPI label="Carga"    value={Q_LOAD.toFixed(0)}       unit="kW" color="#0098c6" sub="VDF + gan."/>
-                                                <KPI label="Capacid." value={t.Q_cool_kW.toFixed(1)}   unit="kW" color="#9ab63b" sub={`${t.cap_TR_total ? t.cap_TR_total.toFixed(1) : '0'} TR`}/>
-                                                <KPI label="Margen"   value={(t.headroom_kW || 0).toFixed(0)} unit="kW" color={t.headroom_kW > 0 ? '#9ab63b' : '#ef4444'} sub={t.headroom_kW > 0 ? 'headroom OK' : 'INSUFIC.'}/>
-                                                <KPI label="Consumo"  value={t.consumo_kW.toFixed(1)}  unit="kW" color="#fbbf24" sub={`${(t.consumo_kW*1000/220).toFixed(0)}A ~est.`}/>
-                                                <KPI label="COP"      value={t.COP.toFixed(2)}         unit=""   color="#9ab63b" sub="kW frío / kW eléc."/>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <KPI large label="Temperatura" value={t.salaTemp.toFixed(1)}                    unit="°C" color={tempCol}    sub={`objetivo ${PHYS.setpoint_C}°C ±${PHYS.histeresis_C}`}/>
+                                                <KPI large label="Presión Δ"   value={Math.round(t.salaPresDiff)}                unit="Pa" color={presCol}    sub={`objetivo +${PHYS.pres_target_Pa} Pa`}/>
+                                                <KPI large label="Margen"      value={Math.round(t.headroom_kW || 0)}            unit="kW" color={t.headroom_kW > 0 ? '#9ab63b' : '#ef4444'} sub={t.headroom_kW > 0 ? 'enfriamiento OK' : 'insuficiente'}/>
+                                                <KPI large label="Consumo"     value={t.consumo_kW.toFixed(1)}                   unit="kW" color="#fbbf24"    sub={`eficiencia ${t.COP.toFixed(2)} COP`}/>
+                                            </div>
+                                            {/* Secundarios: strip compacto */}
+                                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-mono text-slate-400 pt-2 border-t border-slate-800">
+                                                <span title="Humedad relativa de la sala">Humedad <span style={{ color: humCol }} className="font-bold">{Math.round(t.salaHumidity)}%</span></span>
+                                                <span className="text-slate-600">·</span>
+                                                <span title="Carga térmica de los VDF">Carga <span className="text-white font-bold">{Math.round(Q_LOAD)} kW</span></span>
+                                                <span className="text-slate-600">·</span>
+                                                <span title="Capacidad total de enfriamiento entregada por los HVAC activos">Capacidad <span className="text-white font-bold">{Math.round(t.Q_cool_kW)} kW</span> <span className="text-slate-600">({Math.round(t.cap_TR_total || 0)} TR)</span></span>
                                             </div>
                                         </div>
 
                                         {/* Equipos */}
                                         <div className="p-3 border-b border-slate-800">
                                             <div className="text-[9px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] mb-2">Equipos</div>
-                                            <div className="space-y-1">
-                                                {t.hvacTel.map((u, i) => (
-                                                    <div key={u.id} className="bg-slate-950/60 border border-slate-800 rounded p-1.5">
+                                            <div className="space-y-1.5">
+                                                {t.hvacTel.map((u) => (
+                                                    <div key={u.id} className="bg-slate-950/60 border border-slate-800 rounded p-2">
                                                         <div className="flex items-center gap-2">
                                                             <span className="w-1.5 h-1.5 rounded-full" style={{ background: eqColor(u.state), boxShadow: `0 0 4px ${eqColor(u.state)}` }}></span>
                                                             <span className="text-[10px] font-mono font-bold text-white flex-1">{u.id}</span>
                                                             <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: eqColor(u.state) }}>{u.state}</span>
                                                         </div>
                                                         {u.active ? (
-                                                            <div className="grid grid-cols-4 gap-1 mt-1 text-[9px] font-mono text-slate-400">
-                                                                <span><span className="text-slate-500">A</span> {u.corriente_A}</span>
-                                                                <span><span className="text-slate-500">↑</span> {u.pAlta_psi}</span>
-                                                                <span><span className="text-slate-500">↓</span> {u.pBaja_psi}</span>
-                                                                <span className="text-eco-lightgreen">{u.TR}TR</span>
-                                                            </div>
+                                                            <>
+                                                                <div className="mt-1.5 flex items-center gap-3 text-[10px] font-mono flex-wrap">
+                                                                    <span title="Corriente del compresor" className="text-slate-300">
+                                                                        <span className="text-slate-500">Corriente</span> <span className="text-white font-bold">{u.corriente_A.toFixed(1)}</span> A
+                                                                    </span>
+                                                                    <span title="Capacidad entregada — nominal AM-010 es 10 TR" className="text-eco-lightgreen">
+                                                                        <span className="text-slate-500">Cap.</span> <span className="font-bold">{Math.round(u.TR)}</span> TR
+                                                                    </span>
+                                                                </div>
+                                                                <div className="mt-0.5 text-[9px] font-mono text-slate-500" title="Presiones del circuito frigorífico R-410A">
+                                                                    presión alta {u.pAlta_psi} psi · baja {u.pBaja_psi} psi
+                                                                </div>
+                                                            </>
                                                         ) : (
-                                                            <div className="text-[9px] font-mono text-slate-600 mt-1">{u.hours}h · en reserva</div>
+                                                            <div className="text-[9px] font-mono text-slate-600 mt-1">{u.hours} h · en reserva</div>
                                                         )}
                                                     </div>
                                                 ))}
                                                 {t.presTel.map((u) => (
-                                                    <div key={u.id} className="bg-slate-950/60 border border-slate-800 rounded p-1.5">
+                                                    <div key={u.id} className="bg-slate-950/60 border border-slate-800 rounded p-2">
                                                         <div className="flex items-center gap-2">
                                                             <span className="w-1.5 h-1.5 rounded-full" style={{ background: eqColor(u.state), boxShadow: `0 0 4px ${eqColor(u.state)}` }}></span>
                                                             <span className="text-[10px] font-mono font-bold text-white flex-1">{u.id}</span>
                                                             <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: eqColor(u.state) }}>{u.state}</span>
                                                         </div>
                                                         {u.active ? (
-                                                            <div className="grid grid-cols-3 gap-1 mt-1 text-[9px] font-mono text-slate-400">
-                                                                <span><span className="text-slate-500">Q</span> {u.caudal_m3h}m³/h</span>
-                                                                <span><span className="text-slate-500">W</span> {u.consumo_W}</span>
-                                                                <span className="text-eco-lightgreen">filt {u.saturacion_pct}%</span>
-                                                            </div>
+                                                            <>
+                                                                <div className="mt-1.5 flex items-center gap-3 text-[10px] font-mono flex-wrap">
+                                                                    <span title="Caudal de aire entregado por el presurizador CASIBA" className="text-slate-300">
+                                                                        <span className="text-slate-500">Caudal</span> <span className="text-white font-bold">{Math.round(u.caudal_m3h)}</span> m³/h
+                                                                    </span>
+                                                                    <span title="Consumo eléctrico" className="text-eco-lightgreen">
+                                                                        <span className="text-slate-500">Consumo</span> <span className="font-bold">{u.consumo_W}</span> W
+                                                                    </span>
+                                                                </div>
+                                                                <div className="mt-0.5 text-[9px] font-mono text-slate-500" title="Nivel de saturación del filtro triple + HEPA (medido por SDP810)">
+                                                                    filtro {u.saturacion_pct}% saturado
+                                                                </div>
+                                                            </>
                                                         ) : (
-                                                            <div className="text-[9px] font-mono text-slate-600 mt-1">{u.hours}h · en reserva</div>
+                                                            <div className="text-[9px] font-mono text-slate-600 mt-1">{u.hours} h · en reserva</div>
                                                         )}
                                                     </div>
                                                 ))}
