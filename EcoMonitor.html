@@ -4159,30 +4159,38 @@
                 const escW = 0.4, escH = 0.6, escD = 0.18;
                 const esclavoData = [];
 
-                const buildEsclavo = (info, seq) => {
+                const buildEsclavo = (info, seq, type) => {
                     // info trae wallX, outSign, interiorX, z, y (centro vertical del equipo)
                     const interiorX = info.interiorX;
                     const outSign = info.outSign;
-                    // El esclavo se monta al COSTADO del equipo, en la misma pared interior
-                    // Elegimos el lado (+z o -z) que tenga más espacio hasta los bordes del shelter
-                    const spaceForward  = (roomD/2 - 0.3) - info.z;   // espacio hacia +z
-                    const spaceBackward = info.z - (-roomD/2 + 0.3);  // espacio hacia -z
-                    let escZ = spaceForward > spaceBackward ? info.z + 0.65 : info.z - 0.65;
-                    // Evitar colisión con el MASTER (pared izquierda, centrado en z=0, ancho mD=0.9 → ±0.45)
-                    // Si el esclavo cae en la zona del master, empujarlo lo suficiente para no superponerse.
-                    if (info.side === 'left') {
-                        const masterHalfZ = 0.45;
-                        const minClearance = masterHalfZ + 0.2 /*escW/2*/ + 0.12 /*margin*/; // = 0.77
-                        if (Math.abs(escZ) < minClearance) {
-                            const dir = escZ >= 0 ? 1 : -1;
-                            escZ = dir * minClearance;
-                            // Si el push lo saca de la sala, intentar el otro lado
-                            if (Math.abs(escZ) > roomD/2 - 0.25) {
-                                escZ = -dir * minClearance;
+                    let escZ, escY;
+                    if (type === 'PRES') {
+                        // Para el CASIBA: la rejilla interior está SOLO ARRIBA (pleno de inyección superior).
+                        // El esclavo puede ir CENTRADO con el presurizador (mismo z), en la pared interior,
+                        // ligeramente debajo del centro para no chocar con la grilla perforada superior.
+                        escZ = info.z;
+                        escY = info.y - 0.35;   // debajo del centro del CASIBA, en el espacio libre
+                    } else {
+                        // HVAC: la pared interior tiene rejilla de inyección arriba + retorno abajo,
+                        // así que el esclavo va OFFSET lateral (misma altura, distinto z).
+                        const spaceForward  = (roomD/2 - 0.3) - info.z;
+                        const spaceBackward = info.z - (-roomD/2 + 0.3);
+                        escZ = spaceForward > spaceBackward ? info.z + 0.65 : info.z - 0.65;
+                        // Evitar colisión con el MASTER (pared izquierda, z=0, ancho ±0.45)
+                        if (info.side === 'left') {
+                            const masterHalfZ = 0.45;
+                            const minClearance = masterHalfZ + 0.2 + 0.12;
+                            if (Math.abs(escZ) < minClearance) {
+                                const dir = escZ >= 0 ? 1 : -1;
+                                escZ = dir * minClearance;
+                                if (Math.abs(escZ) > roomD/2 - 0.25) {
+                                    escZ = -dir * minClearance;
+                                }
                             }
                         }
+                        escY = info.y;
                     }
-                    const pos = new THREE.Vector3(interiorX, info.y, escZ);
+                    const pos = new THREE.Vector3(interiorX, escY, escZ);
 
                     const g = new THREE.Group();
                     const bGeo = new THREE.BoxGeometry(escD, escH, escW);
@@ -4219,8 +4227,8 @@
                     esclavoData.push({ pos, equipPos: info.equipPos.clone(), side: info.side, seq });
                 };
 
-                hvacInfo.forEach((hp, i) => buildEsclavo(hp, i));
-                presInfo.forEach((pp, i) => buildEsclavo(pp, hvacInfo.length + i));
+                hvacInfo.forEach((hp, i) => buildEsclavo(hp, i, 'HVAC'));
+                presInfo.forEach((pp, i) => buildEsclavo(pp, hvacInfo.length + i, 'PRES'));
 
                 // (Conduits exterior removidos — el cable pasa internamente por la pared.
                 //  Solo dejamos un pequeño accesorio visual donde el cable entra a cada esclavo)
