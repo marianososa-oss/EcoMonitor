@@ -3800,60 +3800,47 @@
                                             : state === 'APOYO'   ? 0.09
                                             : 0;  // SUPLENTE y FALLA: ventilador detenido
 
-                // === HVACs + PRES distribuidos optimizando ambas paredes laterales ===
-                // Combinamos todos los equipos en una lista única y los repartimos entre L/R
-                const allEquipment = [
-                    ...hvacUnits.map((u, i) => ({ type: 'HVAC', unit: u, idx: i })),
-                    ...presUnits.map((u, i) => ({ type: 'PRES', unit: u, idx: i }))
-                ];
-                const totalEq = allEquipment.length;
-                const leftCount = Math.ceil(totalEq / 2);
-                const rightCount = totalEq - leftCount;
-                const zSpread = roomD * 0.72;
-                // En la pared IZQUIERDA hay un MAESTRO centrado en z=0 ocupando ±0.45 (mD=0.9).
-                // Reservamos un corredor libre alrededor del master para que ningún equipo,
-                // su esclavo o sus rejillas interiores quede frente a él.
-                const masterClearance = 1.05; // distancia mínima del centro del master en z
-                // Asignar side + z a cada equipo
-                allEquipment.forEach((eq, gi) => {
-                    eq.side = gi < leftCount ? 'left' : 'right';
-                    const posInRow = eq.side === 'left' ? gi : gi - leftCount;
-                    const cntRow   = eq.side === 'left' ? leftCount : rightCount;
-                    if (eq.side === 'right') {
-                        // Pared derecha: distribución uniforme
-                        eq.z = cntRow <= 1 ? 0 : -zSpread/2 + posInRow * (zSpread / (cntRow - 1));
-                    } else {
-                        // Pared izquierda: distribuir evitando el corredor del master
-                        const segLen = Math.max(0, zSpread/2 - masterClearance);
-                        if (cntRow === 1) {
-                            // Un único equipo izq: lo ubicamos delante del master (hacia +z)
-                            eq.z = masterClearance + segLen * 0.5;
-                        } else {
-                            const backCnt = Math.floor(cntRow / 2);
-                            const frontCnt = cntRow - backCnt;
-                            if (posInRow < backCnt) {
-                                // Mitad trasera: rango [-zSpread/2, -masterClearance]
-                                const t = backCnt === 1 ? 0.5 : posInRow / (backCnt - 1);
-                                eq.z = -zSpread/2 + t * segLen;
-                            } else {
-                                // Mitad delantera: rango [+masterClearance, +zSpread/2]
-                                const idx = posInRow - backCnt;
-                                const t = frontCnt === 1 ? 0.5 : idx / (frontCnt - 1);
-                                eq.z = masterClearance + t * segLen;
-                            }
-                        }
-                    }
-                });
+                // === NUEVO LAYOUT ===
+                //   HVAC → caras LARGAS (norte z=-roomD/2, sur z=+roomD/2), distribuidos a lo largo de X.
+                //   PRES → UNA cara CORTA (este x=+roomW/2), distribuidos a lo largo de Z.
+                //   Puerta + Master → cara CORTA opuesta (oeste x=-roomW/2).
+                const distributeAlong = (count, span) => {
+                    if (count === 0) return [];
+                    if (count === 1) return [0];
+                    return Array.from({length: count}, (_, i) => -span/2 + (i / (count - 1)) * span);
+                };
+                const nHvac  = hvacUnits.length;
+                const nNorth = Math.ceil(nHvac / 2);
+                const nSouth = nHvac - nNorth;
+                const hvacSpread = roomW * 0.75;  // 9m usable a lo largo de X
+                const northXs = distributeAlong(nNorth, hvacSpread);
+                const southXs = distributeAlong(nSouth, hvacSpread);
+                const hvacAssignments = hvacUnits.map((u, i) =>
+                    i < nNorth
+                        ? { wall: 'north', along: northXs[i],           idx: i }
+                        : { wall: 'south', along: southXs[i - nNorth],  idx: i }
+                );
+                // PRES: todos en cara corta ESTE (x=+roomW/2)
+                const presSpread = roomD * 0.55;
+                const presZs = distributeAlong(presUnits.length, presSpread);
+                const presAssignments = presUnits.map((u, i) => ({ wall: 'east', along: presZs[i], idx: i }));
                 const n = hvacUnits.length;
-                const hvacInfo = []; // {x, y, z, side, equipPos, idx}
+                const hvacInfo = []; // {wall, alongCoord, canon values..., idx}
 
-                const buildHvac = (idx, side, z) => {
+                const buildHvac = (idx, wall, alongCoord) => {
                     const u = hvacUnits[idx];
                     const color = colorByState(u.state);
                     const spin  = spinByState(u.state);
-                    // Wall outside position (HVAC mochila hanging on exterior side wall)
-                    const wallX = side === 'left' ? -roomW/2 : roomW/2;
-                    const outSign = side === 'left' ? -1 : 1;   // -1 = afuera por la izq, +1 = afuera por la der
+                    // === CANÓNICO EAST PLACEMENT ===
+                    // Construyo el HVAC como si fuera en pared corta este (x=+roomW/2, protrusión +X).
+                    // Al final roto+trasladlo group `g` para moverlo a la pared destino (norte/sur).
+                    const side = 'right';
+                    const wallX = roomW/2;
+                    const outSign = 1;
+                    // canon_z = coord along-wall en canónico (eje Z). Para norte, alongCoord es X del mundo:
+                    //   rot Y=+π/2 mapea canon_z → world X. Signo directo.
+                    // Para sur, rot Y=-π/2 mapea -canon_z → world X. Signo invertido para preservar alongX.
+                    const z = wall === 'south' ? -alongCoord : alongCoord;
                     // HVAC mochila: dimensiones REALES del WESTRIC AM-010 Inyección Superior
                     // Fuente: catálogo Ecocontrol AM-010 (Ancho 1400mm × Alto 2490mm × Profundidad 835mm)
                     const unitW = 0.84;   // profundidad hacia afuera del shelter (real: 835mm)
@@ -4163,32 +4150,41 @@
                     g.add(retArrow);
 
                     g.userData = { fan, spinSpeed: spin };
+                    // === WRAP-AND-ROTATE: mover el group canónico a la pared destino ===
+                    if (wall === 'north') {
+                        g.rotation.y =  Math.PI/2;
+                        g.position.set(0, 0,  (roomW/2 - roomD/2));  // +2 con roomW=12, roomD=8
+                    } else if (wall === 'south') {
+                        g.rotation.y = -Math.PI/2;
+                        g.position.set(0, 0, -(roomW/2 - roomD/2));  // -2
+                    }
+                    // wall === 'east' → canónico, sin transformación
                     hvacGroup.add(g);
                     hvacInfo.push({
-                        x: bodyX, y, z, side, idx,
+                        wall, alongCoord, canon_z: z, side, idx,
                         wallX, outSign, interiorX,
-                        equipPos: new THREE.Vector3(bodyX, y, z)
+                        canon_bodyX: bodyX, y,
+                        canon_equipPos: new THREE.Vector3(bodyX, y, z),
+                        groupRef: g
                     });
                 };
 
-                // Construir HVACs usando la asignación unificada
-                allEquipment.filter(e => e.type === 'HVAC').forEach(eq => {
-                    buildHvac(eq.idx, eq.side, eq.z);
-                });
+                // Construir HVACs en paredes largas (norte/sur) según asignación
+                hvacAssignments.forEach(a => buildHvac(a.idx, a.wall, a.along));
 
                 // === PRESURIZADOR CASIBA 2002-EQM (gabinete alto y angosto, ventilador CENTRÍFUGO interno) ===
                 // Diferente al HVAC: NO tiene aspa axial visible en la cara.
                 // Ancho 0.61 · Fondo 0.75 · Alto 1.72 m — montado en pared elevado sobre ménsulas.
                 const presInfo = [];
-                const presAssignments = allEquipment.filter(e => e.type === 'PRES');
+                // PRES: todos en cara CORTA ESTE (canónico, sin rotación)
                 for (let i = 0; i < presUnits.length; i++) {
                     const u = presUnits[i];
                     const color = colorByState(u.state);
                     const assignment = presAssignments[i];
-                    const side = assignment.side;
-                    const wallX = side === 'left' ? -roomW/2 : roomW/2;
-                    const outSign = side === 'left' ? -1 : 1;
-                    const z = assignment.z;
+                    const side = 'right';   // canónico este
+                    const wallX = roomW/2;
+                    const outSign = 1;
+                    const z = assignment.along;   // posición a lo largo de Z
                     // Dimensiones REALES CASIBA 2002-EQM
                     const unitW = 0.75;   // fondo (protrusión hacia afuera del shelter)
                     const unitH = 1.72;   // alto vertical — angosto y alto
@@ -4353,11 +4349,14 @@
 
                     // No hay fan axial visible en CASIBA (ventilador centrífugo interno). La señal de marcha es el LED + banda.
                     g.userData = { fan: null, spinSpeed: 0 };
+                    // PRES canónico este — sin rotación (wall === 'east')
                     presGroup.add(g);
                     presInfo.push({
-                        x: bodyX, y, z, side, idx: i,
+                        wall: 'east', alongCoord: z, canon_z: z, side, idx: i,
                         wallX, outSign, interiorX,
-                        equipPos: new THREE.Vector3(bodyX, y, z)
+                        canon_bodyX: bodyX, y,
+                        canon_equipPos: new THREE.Vector3(bodyX, y, z),
+                        groupRef: g
                     });
                 }
 
@@ -4366,14 +4365,12 @@
                 const esclavoData = [];
 
                 const buildEsclavo = (info, seq, type) => {
-                    // info trae wallX, outSign, interiorX, z, y (centro vertical del equipo)
+                    // info: { wall, canon_z, wallX, outSign, interiorX, y, canon_equipPos, groupRef }
+                    // El esclavo va CENTRADO con el equipo (mismo canon_z, mismo y) en CANÓNICO.
+                    // Se agrega al groupRef del equipo → hereda rotación al mover a norte/sur/etc.
                     const interiorX = info.interiorX;
                     const outSign = info.outSign;
-                    // El esclavo va CENTRADO con el equipo (mismo z, mismo y).
-                    // - HVAC: encaja verticalmente entre las rejillas de inyección (y+0.95) y retorno (y-0.95).
-                    //   El esclavo tiene ~0.6m de alto → ocupa y-0.3 a y+0.3, sin chocar con las rejillas.
-                    // - PRES/CASIBA: la grilla interior está sólo arriba (y+0.81). El esclavo en el centro no la toca.
-                    const pos = new THREE.Vector3(interiorX, info.y, info.z);
+                    const pos = new THREE.Vector3(interiorX, info.y, info.canon_z);
 
                     const g = new THREE.Group();
                     const bGeo = new THREE.BoxGeometry(escD, escH, escW);
@@ -4381,7 +4378,7 @@
                     body.position.copy(pos); g.add(body);
                     const eds = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
                     eds.position.copy(pos); g.add(eds);
-                    // Línea de gozne (hinge vertical en un lado, indica que es tablero con tapa)
+                    // Línea de gozne
                     const hingeY1 = pos.y - escH/2 + 0.04, hingeY2 = pos.y + escH/2 - 0.04;
                     const hinge = new THREE.LineSegments(
                         new THREE.BufferGeometry().setFromPoints([
@@ -4391,14 +4388,14 @@
                         new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.6 })
                     );
                     g.add(hinge);
-                    // LED indicador (verde) en frente
+                    // LED
                     const led = new THREE.Mesh(
                         new THREE.SphereGeometry(0.03, 8, 6),
                         new THREE.MeshBasicMaterial({ color: TH_COLOR.titular })
                     );
                     led.position.set(pos.x + (-outSign) * (escD/2 + 0.008), pos.y + escH/3, pos.z + escW/3);
                     g.add(led);
-                    // Etiqueta de ID (placa chica)
+                    // Placa ID
                     const idPlate = new THREE.Mesh(
                         new THREE.PlaneGeometry(escW * 0.6, 0.08),
                         new THREE.MeshBasicMaterial({ color: '#1f1f26' })
@@ -4406,8 +4403,14 @@
                     idPlate.position.set(pos.x + (-outSign) * (escD/2 + 0.006), pos.y + escH/3 - 0.12, pos.z);
                     idPlate.rotation.y = outSign === -1 ? Math.PI/2 : -Math.PI/2;
                     g.add(idPlate);
-                    esclavoGroup.add(g);
-                    esclavoData.push({ pos, equipPos: info.equipPos.clone(), side: info.side, seq });
+                    // ADD al groupRef del equipo → hereda rotación
+                    info.groupRef.add(g);
+                    esclavoData.push({
+                        pos_canonical: pos,
+                        equipPos_canonical: info.canon_equipPos.clone(),
+                        wall: info.wall, seq,
+                        parentGroup: info.groupRef
+                    });
                 };
 
                 hvacInfo.forEach((hp, i) => buildEsclavo(hp, i, 'HVAC'));
@@ -4416,39 +4419,54 @@
                 // (Conduits exterior removidos — el cable pasa internamente por la pared.
                 //  Solo dejamos un pequeño accesorio visual donde el cable entra a cada esclavo)
 
-                // === CABLE MODBUS daisy chain GRUESO con TubeGeometry ===
+                // === CABLE MODBUS daisy chain — DOS cables (rojo + azul) en paralelo ===
+                // Convierte canónico → mundo aplicando la rotación+translación del wall.
+                const canonicalToWorld = (wall, cx, cy, cz) => {
+                    if (wall === 'north') {
+                        return new THREE.Vector3(cz, cy, -cx + (roomW/2 - roomD/2));
+                    } else if (wall === 'south') {
+                        return new THREE.Vector3(-cz, cy, cx - (roomW/2 - roomD/2));
+                    }
+                    return new THREE.Vector3(cx, cy, cz);
+                };
                 if (esclavoData.length > 0) {
                     const cableY = roomH * 0.92 + 2.21;
-                    // Sequence: master → todos los esclavos en orden (left first, then right, then back)
-                    const leftEs  = esclavoData.filter(e => e.side === 'left');
-                    const rightEs = esclavoData.filter(e => e.side === 'right');
-                    const orderedEs = [...leftEs, ...rightEs.slice().reverse()];
+                    // Orden: norte → este → sur (recorrido perimetral)
+                    const northEs = esclavoData.filter(e => e.wall === 'north');
+                    const eastEs  = esclavoData.filter(e => e.wall === 'east');
+                    const southEs = esclavoData.filter(e => e.wall === 'south');
+                    const orderedEs = [...northEs, ...eastEs, ...southEs];
 
                     const pts = [masterOutputPos.clone()];
                     // Sube del master al techo
                     pts.push(new THREE.Vector3(masterOutputPos.x, cableY, masterOutputPos.z));
-                    // Visita cada esclavo: baja al esclavo, retorna al techo
+                    // Visita cada esclavo (posición en MUNDO)
                     orderedEs.forEach(e => {
-                        pts.push(new THREE.Vector3(e.pos.x, cableY, e.pos.z));
-                        pts.push(new THREE.Vector3(e.pos.x, e.pos.y + escH/2 + 0.05, e.pos.z));
-                        pts.push(new THREE.Vector3(e.pos.x, cableY, e.pos.z));
+                        const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
+                        pts.push(new THREE.Vector3(wp.x, cableY, wp.z));
+                        pts.push(new THREE.Vector3(wp.x, wp.y + escH/2 + 0.05, wp.z));
+                        pts.push(new THREE.Vector3(wp.x, cableY, wp.z));
                     });
 
-                    // Curve suave a través de los puntos (CatmullRom para evitar codos agudos)
                     if (pts.length >= 2) {
                         const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
-                        // TUBO GRUESO — cable visible desde lejos
-                        const tubeGeo = new THREE.TubeGeometry(curve, Math.max(64, pts.length * 8), 0.05, 8, false);
-                        const tubeMat = new THREE.MeshLambertMaterial({ color: TH_COLOR.cable });
-                        const tube = new THREE.Mesh(tubeGeo, tubeMat);
-                        tube.castShadow = true;
-                        cableGroup.add(tube);
-                        // Glow externo (semi-transparente más grueso)
-                        const glowGeo = new THREE.TubeGeometry(curve, Math.max(64, pts.length * 8), 0.10, 8, false);
-                        const glowMat = new THREE.MeshBasicMaterial({
-                            color: TH_COLOR.cable, transparent: true, opacity: 0.18, depthWrite: false
-                        });
-                        cableGroup.add(new THREE.Mesh(glowGeo, glowMat));
+                        const segments = Math.max(64, pts.length * 8);
+                        // Cable AZUL — un poco más alto
+                        const blueCurve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(p.x, p.y + 0.025, p.z)), false, 'catmullrom', 0.0);
+                        const blueTube = new THREE.Mesh(
+                            new THREE.TubeGeometry(blueCurve, segments, 0.028, 8, false),
+                            new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.5 })
+                        );
+                        blueTube.castShadow = true;
+                        cableGroup.add(blueTube);
+                        // Cable ROJO — un poco más bajo (paralelo)
+                        const redCurve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(p.x, p.y - 0.025, p.z)), false, 'catmullrom', 0.0);
+                        const redTube = new THREE.Mesh(
+                            new THREE.TubeGeometry(redCurve, segments, 0.028, 8, false),
+                            new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.2, roughness: 0.5 })
+                        );
+                        redTube.castShadow = true;
+                        cableGroup.add(redTube);
                     }
                 }
 
