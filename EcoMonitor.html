@@ -2336,6 +2336,90 @@
             return <i data-lucide={name} className={className} style={{ ...style, width: size, height: size }}></i>;
         };
 
+        // ==================================================================================
+        // === MOTOR FÍSICO / TÉRMICO — Fase 1+2 =============================================
+        //   Constantes ajustables + capacidad AM-010 interpolada por T_ext y altitud (Neuquén)
+        //   + performance del presurizador CASIBA 2002-EQM.
+        // ==================================================================================
+        const PHYS = {
+            Q_LOAD_KW_DEFAULT: 100,        // carga térmica (VDFs + ganancias). Ajustable 60–140
+            setpoint_C: 23,
+            histeresis_C: 2,
+            hum_target_pct: 45,
+            pres_target_Pa: 50,            // presión diferencial objetivo (pliego típico)
+            C_sala_kJK: 850,               // capacitancia térmica sala (tuned ~5-10 min τ)
+            tExt_default_C: 28,
+            altitud_m: 300,                // Neuquén
+
+            HVAC: {
+                // AM-010 nominal (spec catálogo WESTRIC)
+                cap_nominal_kW: 32,
+                cap_sensible_kW: 29.4,
+                consumo_kW_marcha: 8.95,
+                corriente_A_nominal: 15.2,
+                carga_R410A_kg: 7,
+                TR_kW: 3.517,              // 1 TR = 3.517 kW
+                // Tabla de rendimiento: por altitud, puntos (tExt, CT_kW, CS_kW) — spec p.11
+                curves: [
+                    { alt: 0,    pts: [[26, 34.2, 31.8], [35, 32.0, 29.4], [41, 29.7, 27.7]] },
+                    { alt: 1000, pts: [[26, 34.0, 31.4], [35, 31.2, 29.1], [41, 29.5, 27.2]] }
+                ],
+                // Presostatos R-410A (kg/cm² → psi) — spec p.11
+                cortePresostatoAlta_psi: [420, 610],
+                cortePresostatoBaja_psi: [50, 90],
+                pBaja_normal_psi: [115, 160],
+                pAlta_offset_per_degC: 12    // pAlta ≈ (tExt + 15) * offset, empírico
+            },
+
+            PRES: {
+                // CASIBA 2002-EQM (presurizador industrial)
+                caudal_nominal_m3h: 2500,
+                consumo_W_marcha: 400,
+                aporte_Pa_nominal: 50,
+                volt: 220,
+                saturacion_inicial_pct: 15   // filtros arrancan levemente sucios
+            },
+
+            alarms: {
+                temp_warn_C: 28, temp_crit_C: 33,
+                pres_warn_Pa: 30, pres_crit_Pa: 15,
+                hum_low_pct: 30, hum_high_pct: 60,
+                current_high_A: 18
+            }
+        };
+
+        // Interpolación bilineal (tExt, altitud) → { CT, CS, TR } de la unidad AM-010
+        const am010Cap = (tExt, altitud = PHYS.altitud_m) => {
+            const interpByTemp = (pts) => {
+                if (tExt <= pts[0][0]) return { CT: pts[0][1], CS: pts[0][2] };
+                if (tExt >= pts[pts.length-1][0]) return { CT: pts[pts.length-1][1], CS: pts[pts.length-1][2] };
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const [t0, ct0, cs0] = pts[i];
+                    const [t1, ct1, cs1] = pts[i+1];
+                    if (tExt >= t0 && tExt <= t1) {
+                        const f = (tExt - t0) / (t1 - t0);
+                        return { CT: ct0 + f*(ct1-ct0), CS: cs0 + f*(cs1-cs0) };
+                    }
+                }
+                return { CT: 32, CS: 29.4 };
+            };
+            const r0 = interpByTemp(PHYS.HVAC.curves[0].pts);   // altitud 0
+            const r1 = interpByTemp(PHYS.HVAC.curves[1].pts);   // altitud 1000
+            const g = Math.max(0, Math.min(1, altitud / 1000));
+            const CT = r0.CT + g * (r1.CT - r0.CT);
+            const CS = r0.CS + g * (r1.CS - r0.CS);
+            return { CT, CS, TR: CT / PHYS.HVAC.TR_kW };
+        };
+
+        // Presión de alta del R-410A en función de T_ext (aproximación funcional para condensador axial EC)
+        const pAltaEst_psi = (tExt) => Math.max(180, Math.min(610, (tExt + 15) * PHYS.HVAC.pAlta_offset_per_degC));
+
+        // Ruido pseudorandom estable por unidad (para variabilidad realista sin saltos)
+        const noise = (seed, amp = 1) => {
+            const s = Math.sin(seed * 12.9898 + Date.now() * 0.0001) * 43758.5453;
+            return (s - Math.floor(s) - 0.5) * 2 * amp;
+        };
+
         // Inline state colors — bypass any Tailwind JIT issue
         const STATE_STYLE = {
             TITULAR:  { border: '1.5px solid rgba(154,182,59,0.7)',  background: 'rgba(79,119,37,0.18)',   color: '#9ab63b', boxShadow: '0 0 20px rgba(154,182,59,0.40)' },
@@ -3148,7 +3232,7 @@
                 };
                 drawCard(18,  64, 152, 92, 'TEMPERATURA',    '21.4', '°C',  '#ffffff');
                 drawCard(180, 64, 152, 92, 'HUMEDAD',        '47',   '%',   '#0098c6');
-                drawCard(342, 64, 152, 92, 'PRESURIZACIÓN', '+25',  'Pa',  '#9ab63b');
+                drawCard(342, 64, 152, 92, 'PRESURIZACIÓN', '+50',  'Pa',  '#9ab63b');
                 // Gráfico
                 sctx.fillStyle = '#0a1f2a';
                 sctx.fillRect(18, 170, 476, 110);
@@ -4049,6 +4133,37 @@
             const [isOverloadActive, setIsOverloadActive] = useState(false);
             const [history, setHistory]           = useState([]);
 
+            // === MOTOR TIEMPO REAL — Fase 1+2 ===
+            const [isRunning, setIsRunning]       = useState(true);   // play/pausa del reloj físico
+            const [simSpeed, setSimSpeed]         = useState(30);     // x1 | x30 | x300 (1s real = simSpeed segundos simulados)
+            const [tExt, setTExt]                 = useState(PHYS.tExt_default_C);
+            const [Q_LOAD, setQ_LOAD]             = useState(PHYS.Q_LOAD_KW_DEFAULT);
+
+            // Estado físico de alta frecuencia (no dispara re-render — se persiste en el ref)
+            const physRef = useRef({
+                salaTemp:      PHYS.setpoint_C,          // arranca en setpoint
+                salaHumidity:  PHYS.hum_target_pct,
+                salaPresDiff:  PHYS.pres_target_Pa,
+                accHoursSim:   0,                        // horas simuladas acumuladas por el motor tiempo real
+                lastUiPush:    0,                        // ms — última vez que actualicé la UI
+                lastAutoRot:   0                         // horas — última rotación automática
+            });
+
+            // Telemetría visible en UI (se refresca ~2 Hz, no cada tick)
+            const [telemetry, setTelemetry] = useState({
+                salaTemp:      PHYS.setpoint_C,
+                salaHumidity:  PHYS.hum_target_pct,
+                salaPresDiff:  PHYS.pres_target_Pa,
+                Q_cool_kW:     0,
+                consumo_kW:    0,
+                COP:           0,
+                cap_TR_unit:   9.1,   // ~32 kW nominal / 3.517
+                headroom_kW:   0,
+                hvacTel:       [],
+                presTel:       [],
+                accHoursSim:   0
+            });
+
             useEffect(() => {
                 const activeNeeded = Math.max(0, hvacTotal - hvacBackup);
                 const newHvacs = Array.from({ length: hvacTotal }, (_, i) => ({
@@ -4067,7 +4182,131 @@
                     hvacs: newHvacs.map(u => ({ id: u.id, state: u.state })),
                     pres:  newPres.map(u => ({ id: u.id, state: u.state }))
                 }]);
+                // Reset del estado físico también
+                physRef.current.salaTemp = PHYS.setpoint_C;
+                physRef.current.salaHumidity = PHYS.hum_target_pct;
+                physRef.current.salaPresDiff = presTotal > 0 ? PHYS.pres_target_Pa : 0;
+                physRef.current.accHoursSim = 0;
+                physRef.current.lastAutoRot = 0;
             }, [hvacTotal, hvacBackup, presTotal]);
+
+            // === MOTOR FÍSICO TIEMPO REAL — Fase 1+2 ===
+            // Corre a 200ms (5 Hz). Actualiza UI cada ~500ms (2 Hz) para no trabar el render.
+            useEffect(() => {
+                if (!isRunning) return;
+                const TICK_MS = 200;
+                const interval = setInterval(() => {
+                    const p = physRef.current;
+                    const dt_sim_s = (TICK_MS / 1000) * simSpeed;  // segundos simulados por tick
+                    const dt_sim_h = dt_sim_s / 3600;
+
+                    p.accHoursSim += dt_sim_h;
+
+                    // === Capacidad de enfriamiento por unidad AM-010 (derateada por T_ext + altitud) ===
+                    const cap = am010Cap(tExt, PHYS.altitud_m);
+                    const pAlta_base = pAltaEst_psi(tExt);
+
+                    // === Telemetría por HVAC ===
+                    let Q_cool_total_kW = 0;
+                    let consumo_total_kW = 0;
+                    const hvacTel = hvacUnits.map((u, i) => {
+                        const active = u.state === 'TITULAR' || u.state === 'APOYO';
+                        // Modulación por termostato: si sala < setpoint, unidad cicla al 20%
+                        const tempError = p.salaTemp - (PHYS.setpoint_C - PHYS.histeresis_C);
+                        const load_frac = active ? Math.max(0.20, Math.min(1, tempError / (2 * PHYS.histeresis_C))) : 0;
+                        const CS_eff = cap.CS * load_frac;
+                        const CT_eff = cap.CT * load_frac;
+                        const corriente_A = active ? PHYS.HVAC.corriente_A_nominal * load_frac + noise(i * 3.1, 0.3) : 0;
+                        const pBaja_psi = active ? 130 + noise(i * 5.7, 12) : 0;
+                        const pAlta_psi = active ? pAlta_base * (0.85 + 0.15 * load_frac) + noise(i * 7.1, 6) : 0;
+                        const consumo_kW = active ? PHYS.HVAC.consumo_kW_marcha * load_frac + noise(i * 11.3, 0.1) : 0;
+
+                        Q_cool_total_kW += CS_eff;
+                        consumo_total_kW += consumo_kW;
+
+                        return {
+                            id: u.id,
+                            state: u.state,
+                            active,
+                            load_pct: Math.round(load_frac * 100),
+                            CS_kW: +CS_eff.toFixed(2),
+                            CT_kW: +CT_eff.toFixed(2),
+                            TR:    +(CT_eff / PHYS.HVAC.TR_kW).toFixed(1),
+                            corriente_A: +corriente_A.toFixed(1),
+                            pAlta_psi: +Math.max(0, pAlta_psi).toFixed(0),
+                            pBaja_psi: +Math.max(0, pBaja_psi).toFixed(0),
+                            consumo_kW: +consumo_kW.toFixed(2),
+                            hours: u.hours
+                        };
+                    });
+
+                    // === Temperatura de sala: balance térmico simple (capacitancia concentrada) ===
+                    const Q_net_kW = Q_LOAD - Q_cool_total_kW;
+                    // dT = (Q_net * dt_sim_s) / C_kJK ; unidades: kW * s / (kJ/K) = K
+                    const dT = (Q_net_kW * dt_sim_s) / PHYS.C_sala_kJK;
+                    p.salaTemp = Math.max(-5, Math.min(50, p.salaTemp + dT));
+
+                    // === Humedad: drift lento hacia target ===
+                    p.salaHumidity += (PHYS.hum_target_pct - p.salaHumidity) * Math.min(0.5, 0.002 * simSpeed);
+                    p.salaHumidity += noise(31.7, 0.05);
+
+                    // === Presión diferencial: depende de presurizadores activos ===
+                    const presActivos = presUnits.filter(u => u.state === 'TITULAR').length;
+                    const target_pres = presActivos > 0 ? PHYS.pres_target_Pa * Math.min(1, presActivos) : 0;
+                    p.salaPresDiff += (target_pres - p.salaPresDiff) * Math.min(0.5, 0.01 * simSpeed);
+                    p.salaPresDiff += noise(41.3, 0.3);
+
+                    // === Telemetría por presurizador CASIBA ===
+                    const presTel = presUnits.map((u, i) => {
+                        const active = u.state === 'TITULAR';
+                        const sat = PHYS.PRES.saturacion_inicial_pct + noise(i * 13.7, 1);
+                        const caudal = active ? PHYS.PRES.caudal_nominal_m3h * (1 - sat / 100) + noise(i * 17.9, 30) : 0;
+                        return {
+                            id: u.id,
+                            state: u.state,
+                            active,
+                            saturacion_pct: Math.round(Math.max(0, sat)),
+                            caudal_m3h: +Math.max(0, caudal).toFixed(0),
+                            consumo_W: active ? PHYS.PRES.consumo_W_marcha : 0,
+                            aporte_Pa: active ? PHYS.PRES.aporte_Pa_nominal : 0,
+                            hours: u.hours
+                        };
+                    });
+
+                    // === Push a UI a ~2 Hz (no cada tick para no trabar el render) ===
+                    const now = Date.now();
+                    if (now - p.lastUiPush > 500) {
+                        const activeCount = hvacTel.filter(t => t.active).length;
+                        const cap_total_kW = activeCount * cap.CS;
+                        setTelemetry({
+                            salaTemp:     p.salaTemp,
+                            salaHumidity: p.salaHumidity,
+                            salaPresDiff: p.salaPresDiff,
+                            Q_cool_kW:    Q_cool_total_kW,
+                            consumo_kW:   consumo_total_kW,
+                            COP:          consumo_total_kW > 0.1 ? Q_cool_total_kW / consumo_total_kW : 0,
+                            cap_TR_unit:  cap.TR,
+                            cap_TR_total: cap_total_kW / PHYS.HVAC.TR_kW,
+                            headroom_kW:  cap_total_kW - Q_LOAD,
+                            hvacTel,
+                            presTel,
+                            accHoursSim:  p.accHoursSim
+                        });
+                        p.lastUiPush = now;
+                    }
+                }, TICK_MS);
+                return () => clearInterval(interval);
+            }, [isRunning, simSpeed, tExt, Q_LOAD, hvacUnits, presUnits]);
+
+            // Expone la telemetría en window.__ecomonitor para poder inspeccionar desde la consola
+            useEffect(() => {
+                if (typeof window !== 'undefined') {
+                    window.__ecomonitor = {
+                        get: () => ({ ...telemetry, config: { tExt, Q_LOAD, simSpeed, isRunning } }),
+                        debug: () => console.table(telemetry.hvacTel)
+                    };
+                }
+            }, [telemetry, tExt, Q_LOAD, simSpeed, isRunning]);
 
             const handleTotalChange = (e) => {
                 const val = parseInt(e.target.value);
@@ -4180,10 +4419,23 @@
                                 <div className="text-[11px] text-slate-400 font-mono">ROOM_01 · MASTER + N×HVAC + M×PRES</div>
                             </div>
                         </div>
-                        <div className="mt-4 md:mt-0 flex items-center gap-3">
-                            <div className="bg-slate-950 border border-slate-800 px-4 py-2 rounded-lg">
+                        <div className="mt-4 md:mt-0 flex items-center gap-2 flex-wrap">
+                            {/* Play/Pause reloj físico */}
+                            <button
+                                onClick={() => setIsRunning(!isRunning)}
+                                className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 border ${isRunning ? 'bg-eco-lightgreen/20 border-eco-lightgreen/50 text-eco-lightgreen' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                                title={isRunning ? 'Pausar reloj físico' : 'Reanudar reloj físico'}>
+                                <Icon name={isRunning ? 'pause' : 'play'} size={12} /> {isRunning ? 'Live' : 'Pausa'}
+                            </button>
+                            {/* Selector de velocidad de simulación */}
+                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-1 flex" title="Velocidad del reloj físico">
+                                {[1, 30, 300].map(v => (
+                                    <button key={v} onClick={() => setSimSpeed(v)} className={`px-2 py-1 rounded text-[10px] font-bold font-mono transition-colors ${simSpeed === v ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>x{v}</button>
+                                ))}
+                            </div>
+                            <div className="bg-slate-950 border border-slate-800 px-3 py-2 rounded-lg">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mr-2">Uptime</span>
-                                <span className="text-lg font-mono font-bold text-white">{String(simulationTime).padStart(4, '0')}<span className="text-xs text-eco-lightgreen ml-1">h</span></span>
+                                <span className="text-lg font-mono font-bold text-white">{String(simulationTime + Math.floor(telemetry.accHoursSim)).padStart(4, '0')}<span className="text-xs text-eco-lightgreen ml-1">h</span></span>
                             </div>
                             <div className="bg-slate-950 border border-slate-800 rounded-lg p-1 flex">
                                 <button onClick={() => setView('iso')} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${view === 'iso' ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>3D</button>
@@ -4198,6 +4450,59 @@
                                 <button onClick={() => setSceneTheme('day')}   className={`px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${sceneTheme === 'day'   ? 'bg-amber-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Día</button>
                                 <button onClick={() => setSceneTheme('night')} className={`px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${sceneTheme === 'night' ? 'bg-indigo-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Noche</button>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* KPI strip provisional (fase 3 lo reemplaza con panel completo) */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-5 py-3 bg-slate-900/60 border-b border-slate-800">
+                        {(() => {
+                            const t = telemetry;
+                            const tempCol = t.salaTemp >= PHYS.alarms.temp_crit_C ? '#ef4444' :
+                                           t.salaTemp >= PHYS.alarms.temp_warn_C ? '#f59e0b' :
+                                           '#9ab63b';
+                            const presCol = t.salaPresDiff <= PHYS.alarms.pres_crit_Pa ? '#ef4444' :
+                                           t.salaPresDiff <= PHYS.alarms.pres_warn_Pa ? '#f59e0b' :
+                                           '#9ab63b';
+                            const cells = [
+                                { label: 'TEMP SALA',   val: t.salaTemp.toFixed(1),   unit: '°C',  col: tempCol,   sub: `SP ${PHYS.setpoint_C}°C ±${PHYS.histeresis_C}` },
+                                { label: 'PRESIÓN Δ',   val: t.salaPresDiff.toFixed(0), unit: 'Pa', col: presCol,  sub: `SP ${PHYS.pres_target_Pa} Pa` },
+                                { label: 'CONSUMO',     val: t.consumo_kW.toFixed(1),  unit: 'kW',  col: '#0098c6', sub: `COP ${t.COP.toFixed(2)}` },
+                                { label: 'CAPACIDAD',   val: t.Q_cool_kW.toFixed(1),   unit: 'kW',  col: '#9ab63b', sub: `${(t.headroom_kW || 0).toFixed(0)} kW margen` }
+                            ];
+                            return cells.map((c, i) => (
+                                <div key={i} className="bg-slate-950/70 border border-slate-800 rounded-lg p-3">
+                                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{c.label}</div>
+                                    <div className="flex items-baseline gap-1 mt-0.5">
+                                        <span className="text-2xl font-mono font-bold" style={{ color: c.col }}>{c.val}</span>
+                                        <span className="text-xs text-slate-500">{c.unit}</span>
+                                    </div>
+                                    <div className="text-[9px] text-slate-500 mt-1 font-mono">{c.sub}</div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+
+                    {/* Condiciones exteriores (T_ext + carga térmica) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-5 py-3 bg-slate-900/30 border-b border-slate-800">
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Icon name="thermometer-sun" size={12} className="text-amber-400" /> Temp. exterior
+                                </label>
+                                <span className="text-[11px] font-mono text-white">{tExt.toFixed(0)}°C</span>
+                            </div>
+                            <input type="range" min="-5" max="42" step="1" value={tExt} onChange={(e) => setTExt(parseInt(e.target.value))} className="sim-input-range w-full"/>
+                            <div className="flex justify-between text-[9px] font-mono text-slate-600 mt-0.5"><span>-5°C invierno</span><span>42°C pico</span></div>
+                        </div>
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Icon name="zap" size={12} className="text-eco-lightgreen" /> Carga térmica VDF
+                                </label>
+                                <span className="text-[11px] font-mono text-white">{Q_LOAD.toFixed(0)} kW</span>
+                            </div>
+                            <input type="range" min="60" max="140" step="5" value={Q_LOAD} onChange={(e) => setQ_LOAD(parseInt(e.target.value))} className="sim-input-range w-full"/>
+                            <div className="flex justify-between text-[9px] font-mono text-slate-600 mt-0.5"><span>60 kW mínimo</span><span>140 kW crítico</span></div>
                         </div>
                     </div>
 
