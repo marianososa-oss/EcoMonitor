@@ -2342,12 +2342,15 @@
         //   + performance del presurizador CASIBA 2002-EQM.
         // ==================================================================================
         const PHYS = {
-            Q_LOAD_KW_DEFAULT: 100,        // carga térmica (VDFs + ganancias). Ajustable 60–140
+            Q_LOAD_KW_DEFAULT: 80,         // carga térmica default (VDFs + ganancias). Ajustable 60–140.
+                                            // Con 3 unidades activas (86 kW nominal) queda margen sano; a >90 kW empieza auto-apoyo.
             setpoint_C: 23,
             histeresis_C: 2,
             hum_target_pct: 45,
             pres_target_Pa: 50,            // presión diferencial objetivo (pliego típico)
-            C_sala_kJK: 850,               // capacitancia térmica sala (tuned ~5-10 min τ)
+            // Capacitancia térmica de la sala: 100 m³ de aire + paredes concreto + racks + slab
+            // Air: ~120 kJ/K; Walls (5 ton × 880 J/kgK): 4400 kJ/K; Racks + equipment: ~500 kJ/K
+            C_sala_kJK: 5000,              // ~14 min de constante de tiempo con 6 kW netos
             tExt_default_C: 28,
             altitud_m: 300,                // Neuquén
 
@@ -4211,9 +4214,11 @@
                     let consumo_total_kW = 0;
                     const hvacTel = hvacUnits.map((u, i) => {
                         const active = u.state === 'TITULAR' || u.state === 'APOYO';
-                        // Modulación por termostato: si sala < setpoint, unidad cicla al 20%
+                        // Modulación PID-like: 0% (sala fría) a 100% (sala caliente), lineal en la banda de histéresis
+                        //   temp <= setpoint - hyst → 0 (apagada)
+                        //   temp >= setpoint + hyst → 1 (full)
                         const tempError = p.salaTemp - (PHYS.setpoint_C - PHYS.histeresis_C);
-                        const load_frac = active ? Math.max(0.20, Math.min(1, tempError / (2 * PHYS.histeresis_C))) : 0;
+                        const load_frac = active ? Math.max(0, Math.min(1, tempError / (2 * PHYS.histeresis_C))) : 0;
                         const CS_eff = cap.CS * load_frac;
                         const CT_eff = cap.CT * load_frac;
                         const corriente_A = active ? PHYS.HVAC.corriente_A_nominal * load_frac + noise(i * 3.1, 0.3) : 0;
