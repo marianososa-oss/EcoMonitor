@@ -3147,13 +3147,7 @@
                 );
                 antTop.position.set(-roomW/2 + 1, roomH + 2.21 + 1.45, -roomD/2 + 0.6);
                 scene.add(antTop);
-                // Vent lateral (en pared derecha exterior)
-                const ventGeo = new THREE.BoxGeometry(0.08, 0.7, 1.0);
-                const ventMesh = new THREE.Mesh(ventGeo, new THREE.MeshLambertMaterial({ color: '#d6d0c0' }));
-                ventMesh.position.set(roomW/2 + 0.05, roomH/2 + 0.5 + 2.21, -roomD/4);
-                scene.add(ventMesh);
-                const ventEdges = new THREE.LineSegments(new THREE.EdgesGeometry(ventGeo), lineMat);
-                ventEdges.position.copy(ventMesh.position); scene.add(ventEdges);
+                // (Vent lateral decorativo removido — no cumplía función y confundía visualmente)
                 // === PUERTA DOBLE DE EMERGENCIA (abre a los 2 lados) ===
                 const doorTotalW = 1.4, doorH = 2.2;
                 const doorY = 1.1 + 2.21;
