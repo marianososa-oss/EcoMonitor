@@ -2423,6 +2423,109 @@
             return (s - Math.floor(s) - 0.5) * 2 * amp;
         };
 
+        // ==================================================================================
+        // === FASE 4 — FALLAS + FAILOVER =====================================================
+        // Cada falla altera la telemetría de forma coherente. Si tiene `tripAfterS` acumulado,
+        // dispara la seguridad → estado FALLA + auto-apoyo con una suplente.
+        // ==================================================================================
+        const FAULT_EFFECTS = {
+            gas_leak: {
+                target:       'HVAC',
+                label:        'Fuga de gas (R-410A)',
+                icon:         'droplets',
+                severity:     'crit',
+                msg:          'Presión de baja fuera de rango — presostato de baja disparado.',
+                capacityMul:  0.55,
+                corrienteMul: 0.75,
+                pBajaAdd:     -50,     // pBaja cae desde ~130 a ~80 psi
+                pAltaMul:     0.92,
+                tripAfterS:   45
+            },
+            dirty_condenser: {
+                target:       'HVAC',
+                label:        'Condensadora sucia',
+                icon:         'wind',
+                severity:     'crit',
+                msg:          'Presión de alta excedida — presostato de alta disparado.',
+                capacityMul:  0.70,
+                corrienteMul: 1.20,
+                pAltaAdd:     +90,     // pAlta se dispara hacia ~500+ psi
+                tripAfterS:   60
+            },
+            dirty_filter_hvac: {
+                target:       'HVAC',
+                label:        'Filtro HVAC saturado',
+                icon:         'filter',
+                severity:     'warn',
+                msg:          'Filtro HVAC saturado — caudal reducido, capacidad cae.',
+                capacityMul:  0.75,
+                pBajaMul:     0.88
+            },
+            phase_loss: {
+                target:       'HVAC',
+                label:        'Falta de fase',
+                icon:         'zap-off',
+                severity:     'crit',
+                msg:          'Falta de fase — relé térmico disparado, la unidad no arranca.',
+                capacityMul:  0,
+                corrienteMul: 1.4,
+                tripAfterS:   8
+            },
+            fan_motor_burnt: {
+                target:       'HVAC',
+                label:        'Motor ventilador quemado',
+                icon:         'fan',
+                severity:     'crit',
+                msg:          'Ventilador evaporador detenido — congelamiento, corte por baja.',
+                capacityMul:  0,
+                pBajaMul:     0.7,
+                tripAfterS:   15
+            },
+            cvtr_faulty: {
+                target:       'HVAC',
+                label:        'Módulo CVTR inestable',
+                icon:         'activity',
+                severity:     'warn',
+                msg:          'Módulo CVTR PWM inestable — presión de alta oscilante.',
+                pAltaOscillate: 60      // amplitud psi de oscilación
+            },
+            // PRES
+            dirty_filter_pres: {
+                target:       'PRES',
+                label:        'Filtros PRES saturados (HEPA)',
+                icon:         'filter',
+                severity:     'warn',
+                msg:          'Triple filtro + HEPA saturado — caudal cae, presión Δ compromete.',
+                caudalMul:    0.35,
+                aporteMul:    0.30,
+                saturacionAdd: 70
+            }
+        };
+
+        // Eventos globales (no unidad-específicos)
+        const GLOBAL_EVENTS = {
+            door_open: {
+                label:        'Puerta abierta',
+                icon:         'door-open',
+                severity:     'warn',
+                msg:          'Puerta abierta — presurización comprometida.',
+                presTargetOverride: 5    // presión diferencial cae hacia 5 Pa
+            },
+            drain_blocked: {
+                label:        'Condensado obstruido',
+                icon:         'droplet',
+                severity:     'info',
+                msg:          'Drenaje obstruido — nivel de agua en bandeja fuera de rango.'
+            },
+            heat_wave: {
+                label:        'Ola de calor',
+                icon:         'flame',
+                severity:     'info',
+                msg:          'Ola de calor — T. exterior +12 °C sobre lo configurado.',
+                tExtBoost:    12
+            }
+        };
+
         // Inline state colors — bypass any Tailwind JIT issue
         const STATE_STYLE = {
             TITULAR:  { border: '1.5px solid rgba(154,182,59,0.7)',  background: 'rgba(79,119,37,0.18)',   color: '#9ab63b', boxShadow: '0 0 20px rgba(154,182,59,0.40)' },
@@ -2503,6 +2606,9 @@
 
                 const ambient = new THREE.AmbientLight(0xfff2e0, 0.55);
                 scene.add(ambient);
+                // HemisphereLight cielo/tierra — realza el metal galvanizado de los gabinetes
+                const hemi = new THREE.HemisphereLight(0xffe8c8, 0x40404a, 0.35);
+                scene.add(hemi);
                 const dir = new THREE.DirectionalLight(0xffefd5, 1.0);  // luz principal (sol o luna)
                 dir.position.set(12, 22, 8);
                 dir.castShadow = true;
@@ -3573,10 +3679,11 @@
 
                 const colorByState = (state) => state === 'TITULAR' ? TH_COLOR.titular
                                               : state === 'APOYO'   ? TH_COLOR.apoyo
+                                              : state === 'FALLA'   ? '#ef4444'
                                               : TH_COLOR.suplente;
                 const spinByState = (state) => state === 'TITULAR' ? 0.05
                                             : state === 'APOYO'   ? 0.09
-                                            : 0;
+                                            : 0;  // SUPLENTE y FALLA: ventilador detenido
 
                 // === HVACs + PRES distribuidos optimizando ambas paredes laterales ===
                 // Combinamos todos los equipos en una lista única y los repartimos entre L/R
@@ -3641,17 +3748,19 @@
                     const bodyX = wallX + outSign * (unitW / 2 + 0.04);  // cuerpo afuera de la pared
 
                     const g = new THREE.Group();
-                    // Cuerpo blanco crema del HVAC mochila
+                    // Cuerpo AM-010: chapa galvanizada prepintada — PBR (Standard)
                     const bGeo = new THREE.BoxGeometry(unitW, unitH, unitD);
-                    const body = new THREE.Mesh(bGeo, new THREE.MeshLambertMaterial({ color: '#f1eee5' }));
+                    const body = new THREE.Mesh(bGeo, new THREE.MeshStandardMaterial({
+                        color: '#f1eee5', metalness: 0.55, roughness: 0.48
+                    }));
                     body.position.set(bodyX, y, z);
                     g.add(body);
                     const eds = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
                     eds.position.copy(body.position); g.add(eds);
-                    // Banda de color (indicador de estado) en la parte superior
+                    // Banda de color (indicador de estado — TITULAR verde / APOYO ámbar / FALLA rojo / SUPLENTE gris)
                     const stateBand = new THREE.Mesh(
                         new THREE.BoxGeometry(unitW + 0.01, 0.18, unitD + 0.01),
-                        new THREE.MeshLambertMaterial({ color })
+                        new THREE.MeshStandardMaterial({ color, metalness: 0.3, roughness: 0.4, emissive: color, emissiveIntensity: u.state === 'FALLA' ? 0.4 : 0.15 })
                     );
                     stateBand.position.set(bodyX, y + unitH/2 - 0.12, z);
                     g.add(stateBand);
@@ -3861,110 +3970,183 @@
                     buildHvac(eq.idx, eq.side, eq.z);
                 });
 
-                // === Presurizadores como MOCHILAS CHICAS en pared lateral (junto a HVACs) ===
+                // === PRESURIZADOR CASIBA 2002-EQM (gabinete alto y angosto, ventilador CENTRÍFUGO interno) ===
+                // Diferente al HVAC: NO tiene aspa axial visible en la cara.
+                // Ancho 0.61 · Fondo 0.75 · Alto 1.72 m — montado en pared elevado sobre ménsulas.
                 const presInfo = [];
-                // Mapeo de PRES idx → asignación unificada
                 const presAssignments = allEquipment.filter(e => e.type === 'PRES');
                 for (let i = 0; i < presUnits.length; i++) {
                     const u = presUnits[i];
                     const color = colorByState(u.state);
-                    const spin  = spinByState(u.state) * 0.8;
-                    // Usar la asignación unificada (slot junto a los HVACs)
                     const assignment = presAssignments[i];
                     const side = assignment.side;
                     const wallX = side === 'left' ? -roomW/2 : roomW/2;
                     const outSign = side === 'left' ? -1 : 1;
                     const z = assignment.z;
-                    // Mochila más chica
-                    const unitW = 0.6;   // protrusión exterior
-                    const unitH = 1.3;   // altura (más chico que HVAC)
-                    const unitD = 0.65;  // profundidad
-                    const y = 2.21 + roomH * 0.55;  // misma altura que HVACs
+                    // Dimensiones REALES CASIBA 2002-EQM
+                    const unitW = 0.75;   // fondo (protrusión hacia afuera del shelter)
+                    const unitH = 1.72;   // alto vertical — angosto y alto
+                    const unitD = 0.61;   // ancho (a lo largo del shelter)
+                    const y = 2.21 + roomH * 0.60;  // ligeramente más alto que HVACs (para inyectar arriba)
                     const bodyX = wallX + outSign * (unitW / 2 + 0.04);
 
                     const g = new THREE.Group();
-                    // Cuerpo blanco más chico
+
+                    // === Cuerpo galvanizado (frente y traseros/laterales cortos) ===
+                    const bodyMat = new THREE.MeshStandardMaterial({
+                        color: '#e8e6dd', metalness: 0.65, roughness: 0.45
+                    });
                     const bGeo = new THREE.BoxGeometry(unitW, unitH, unitD);
-                    const body = new THREE.Mesh(bGeo, new THREE.MeshLambertMaterial({ color: '#f1eee5' }));
-                    body.position.set(bodyX, y, z); g.add(body);
+                    const body = new THREE.Mesh(bGeo, bodyMat);
+                    body.position.set(bodyX, y, z);
+                    g.add(body);
                     const eds = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
                     eds.position.copy(body.position); g.add(eds);
-                    // Banda de estado
+
+                    // === Banda de estado en la parte superior ===
                     const stateBand = new THREE.Mesh(
-                        new THREE.BoxGeometry(unitW + 0.01, 0.12, unitD + 0.01),
-                        new THREE.MeshLambertMaterial({ color })
+                        new THREE.BoxGeometry(unitW + 0.01, 0.10, unitD + 0.01),
+                        new THREE.MeshStandardMaterial({ color, metalness: 0.3, roughness: 0.4, emissive: color, emissiveIntensity: u.state === 'FALLA' ? 0.4 : 0.15 })
                     );
-                    stateBand.position.set(bodyX, y + unitH/2 - 0.08, z);
+                    stateBand.position.set(bodyX, y + unitH/2 - 0.06, z);
                     g.add(stateBand);
-                    // Fan más chico (igual estructura que HVAC pero escalado)
-                    const fanFaceX = bodyX + outSign * (unitW/2 + 0.005);
-                    const fanY = y - 0.15;
-                    // Recess
-                    const recess = new THREE.Mesh(
-                        new THREE.CircleGeometry(0.22, 24),
-                        new THREE.MeshLambertMaterial({ color: '#15151c' })
-                    );
-                    recess.position.set(fanFaceX - outSign * 0.02, fanY, z);
-                    recess.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
-                    g.add(recess);
-                    // Ring
-                    const ring = new THREE.Mesh(
-                        new THREE.TorusGeometry(0.24, 0.018, 8, 24),
-                        new THREE.MeshLambertMaterial({ color: '#2a2a32' })
-                    );
-                    ring.position.set(fanFaceX, fanY, z);
-                    ring.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
-                    g.add(ring);
-                    // Fan: hub + 3 aspas planas chicas (mismo principio que HVAC)
-                    const fan = new THREE.Group();
-                    fan.add(new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.035, 0.035, 0.04, 12),
-                        new THREE.MeshLambertMaterial({ color: '#1f1f26' })
-                    ));
-                    for (let bi = 0; bi < 3; bi++) {
-                        const angle = (bi / 3) * Math.PI * 2;
-                        const blade = new THREE.Mesh(
-                            new THREE.BoxGeometry(0.20, 0.03, 0.07),
-                            new THREE.MeshLambertMaterial({ color: '#9c9ca6' })
+
+                    // === Puertas de acceso LATERALES (tono azul-charcoal más oscuro sobre el cuerpo) ===
+                    const doorMat = new THREE.MeshStandardMaterial({
+                        color: '#4a5670', metalness: 0.6, roughness: 0.5
+                    });
+                    // Dos puertas — una en cada cara lateral (ancho unitD sobre eje Z)
+                    [-unitD/2 - 0.002, unitD/2 + 0.002].forEach(zSide => {
+                        const door = new THREE.Mesh(
+                            new THREE.BoxGeometry(unitW * 0.85, unitH * 0.55, 0.003),
+                            doorMat
                         );
-                        blade.position.set(Math.cos(angle) * 0.11, 0, Math.sin(angle) * 0.11);
-                        blade.rotation.y = angle;
-                        fan.add(blade);
+                        door.position.set(bodyX, y - unitH * 0.05, z + zSide);
+                        g.add(door);
+                        // Manija de la puerta
+                        const handle = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.03, 0.15, 0.02),
+                            new THREE.MeshStandardMaterial({ color: '#2a2a32', metalness: 0.8, roughness: 0.3 })
+                        );
+                        handle.position.set(bodyX + unitW * 0.35, y - unitH * 0.05, z + zSide + (zSide > 0 ? 0.015 : -0.015));
+                        g.add(handle);
+                    });
+
+                    // === Grilla PERFORADA de toma de aire en la BASE (aire exterior entra por acá) ===
+                    const intakeFaceX = bodyX + outSign * (unitW/2 + 0.005);
+                    const intakeGrille = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.008, unitH * 0.25, unitD * 0.75),
+                        new THREE.MeshStandardMaterial({ color: '#2a2a32', metalness: 0.4, roughness: 0.6 })
+                    );
+                    intakeGrille.position.set(intakeFaceX, y - unitH * 0.35, z);
+                    g.add(intakeGrille);
+                    // Patrón perforado — puntos sobre la grilla
+                    const dotRows = 6, dotCols = 5;
+                    for (let dr = 0; dr < dotRows; dr++) {
+                        for (let dc = 0; dc < dotCols; dc++) {
+                            const dot = new THREE.Mesh(
+                                new THREE.CircleGeometry(0.012, 8),
+                                new THREE.MeshBasicMaterial({ color: '#0a0a10' })
+                            );
+                            const rangeY = unitH * 0.20;
+                            const rangeZ = unitD * 0.60;
+                            dot.position.set(
+                                intakeFaceX + outSign * 0.006,
+                                y - unitH * 0.35 - rangeY/2 + (dr + 0.5) * (rangeY / dotRows),
+                                z - rangeZ/2 + (dc + 0.5) * (rangeZ / dotCols)
+                            );
+                            dot.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
+                            g.add(dot);
+                        }
                     }
-                    fan.rotation.z = outSign === -1 ? Math.PI/2 : -Math.PI/2;
-                    // Recessed profundo
-                    fan.position.set(fanFaceX - outSign * 0.10, fanY, z);
-                    g.add(fan);
 
-                    // Bracket más chico (soporte triangular)
-                    const bracketMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
+                    // === PLENO DE INYECCIÓN superior curvado hacia la pared (atraviesa el muro y descarga en interior) ===
+                    // Codo/ducto exterior — sale del top del gabinete y curva hacia el shelter
+                    const ductMat = new THREE.MeshStandardMaterial({ color: '#c5c3ba', metalness: 0.5, roughness: 0.5 });
+                    const ductTop = new THREE.Mesh(
+                        new THREE.BoxGeometry(unitW * 0.5, 0.18, unitD * 0.7),
+                        ductMat
+                    );
+                    ductTop.position.set(bodyX, y + unitH/2 + 0.10, z);
+                    g.add(ductTop);
+                    // Codo hacia la pared
+                    const elbowLen = unitW / 2 + 0.06;
+                    const ductElbow = new THREE.Mesh(
+                        new THREE.BoxGeometry(elbowLen, 0.15, unitD * 0.7),
+                        ductMat
+                    );
+                    ductElbow.position.set(bodyX - outSign * elbowLen/2 + outSign * unitW/2 * 0.2, y + unitH/2 + 0.22, z);
+                    g.add(ductElbow);
+
+                    // === INDICADOR de flujo (LED verde en frente — señala "en marcha") ===
+                    const led = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.025, 8, 6),
+                        new THREE.MeshBasicMaterial({ color: u.state === 'TITULAR' ? '#9ab63b' : u.state === 'FALLA' ? '#ef4444' : '#334155' })
+                    );
+                    led.position.set(intakeFaceX + outSign * 0.005, y + unitH * 0.25, z + unitD * 0.28);
+                    g.add(led);
+                    // Placa de identificación
+                    const idPlate = new THREE.Mesh(
+                        new THREE.PlaneGeometry(0.15, 0.05),
+                        new THREE.MeshBasicMaterial({ color: '#1a1a20' })
+                    );
+                    idPlate.position.set(intakeFaceX + outSign * 0.008, y + unitH * 0.20, z);
+                    idPlate.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
+                    g.add(idPlate);
+
+                    // === Ménsulas / brackets bajo el gabinete (montado en pared, no en piso) ===
+                    const bracketMat = new THREE.MeshStandardMaterial({ color: '#3a3a42', metalness: 0.7, roughness: 0.4 });
                     const bracketBase = y - unitH/2;
+                    // Ménsula debajo del gabinete
                     const bHoriz = new THREE.Mesh(
-                        new THREE.BoxGeometry(unitW * 0.85, 0.06, 0.12),
+                        new THREE.BoxGeometry(unitW * 0.9, 0.06, 0.15),
                         bracketMat
                     );
-                    bHoriz.position.set(bodyX, bracketBase, z); g.add(bHoriz);
+                    bHoriz.position.set(bodyX, bracketBase - 0.03, z);
+                    g.add(bHoriz);
+                    // Soporte contra pared
                     const bWall = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.06, 0.5, 0.12),
+                        new THREE.BoxGeometry(0.06, 0.35, 0.15),
                         bracketMat
                     );
-                    bWall.position.set(wallX, bracketBase - 0.25, z); g.add(bWall);
+                    bWall.position.set(wallX + outSign * 0.03, bracketBase - 0.05, z);
+                    g.add(bWall);
 
-                    // Rejilla pequeña interior alineada con el presurizador
+                    // === GRILLA PERFORADA INTERIOR (inyección al shelter — arriba, distinta de las louveradas del HVAC) ===
                     const interiorX = wallX + (-outSign) * 0.025;
-                    const presRet = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.025, 0.4, 0.55),
-                        new THREE.MeshLambertMaterial({ color: '#d4d4d8' })
+                    const interiorGrilleY = y + unitH/2 - 0.05;  // arriba, alineada con el pleno
+                    const presInj = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.03, 0.35, 0.55),
+                        new THREE.MeshStandardMaterial({ color: '#d4d4d8', metalness: 0.5, roughness: 0.5 })
                     );
-                    presRet.position.set(interiorX, y, z);
-                    g.add(presRet);
-                    const presRetEds = new THREE.LineSegments(
-                        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.025, 0.4, 0.55)),
-                        new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.7 })
+                    presInj.position.set(interiorX, interiorGrilleY, z);
+                    g.add(presInj);
+                    // Patrón perforado hacia la sala (círculos pequeños)
+                    const iRows = 4, iCols = 7;
+                    for (let ir = 0; ir < iRows; ir++) {
+                        for (let ic = 0; ic < iCols; ic++) {
+                            const idot = new THREE.Mesh(
+                                new THREE.CircleGeometry(0.012, 8),
+                                new THREE.MeshBasicMaterial({ color: '#4a4a52' })
+                            );
+                            idot.position.set(
+                                interiorX - outSign * 0.015,
+                                interiorGrilleY - 0.14 + (ir + 0.5) * (0.28 / iRows),
+                                z - 0.22 + (ic + 0.5) * (0.44 / iCols)
+                            );
+                            idot.rotation.y = outSign === -1 ? Math.PI/2 : -Math.PI/2;
+                            g.add(idot);
+                        }
+                    }
+                    // Placa "AISI 304" (identificando el pasamuros)
+                    const wallPassPlate = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.028, 0.4, 0.6)),
+                        new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.5 })
                     );
-                    presRetEds.position.copy(presRet.position); g.add(presRetEds);
+                    wallPassPlate.position.copy(presInj.position); g.add(wallPassPlate);
 
-                    g.userData = { fan, spinSpeed: spin };
+                    // No hay fan axial visible en CASIBA (ventilador centrífugo interno). La señal de marcha es el LED + banda.
+                    g.userData = { fan: null, spinSpeed: 0 };
                     presGroup.add(g);
                     presInfo.push({
                         x: bodyX, y, z, side, idx: i,
@@ -4175,6 +4357,19 @@
             const [tExt, setTExt]                 = useState(PHYS.tExt_default_C);
             const [Q_LOAD, setQ_LOAD]             = useState(PHYS.Q_LOAD_KW_DEFAULT);
 
+            // === FASE 4 — Fallas + eventos globales + log ===
+            const [activeFaults, setActiveFaults]   = useState({});   // { 'HVAC-1': 'gas_leak' }
+            const [globalEvents, setGlobalEvents]   = useState({});   // { door_open: true, heat_wave: false }
+            const [events, setEvents]               = useState([]);   // log historico
+            const eventIdRef = useRef(1);
+            const addEvent = (severity, unit, msg) => {
+                setEvents(prev => [{
+                    id: eventIdRef.current++,
+                    time: Date.now(),
+                    severity, unit, msg
+                }, ...prev].slice(0, 30));
+            };
+
             // Estado físico de alta frecuencia (no dispara re-render — se persiste en el ref)
             const physRef = useRef({
                 salaTemp:      PHYS.setpoint_C,          // arranca en setpoint
@@ -4184,7 +4379,10 @@
                 lastUiPush:    0,                        // ms — última vez que actualicé la UI
                 lastAutoRot:   0,                        // horas — última rotación automática
                 // Trends: buffer circular de últimos ~60 samples (≈30s a 2Hz de push)
-                trends: { tempInt: [], tempExt: [], presDiff: [], consumo: [] }
+                trends: { tempInt: [], tempExt: [], presDiff: [], consumo: [] },
+                // Fase 4: acumulador de tiempo por falla activa para determinar el TRIP
+                faultDurations: {},
+                pendingTrips: []
             });
             const TREND_MAX = 60;
             const pushTrend = (arr, val) => {
@@ -4248,25 +4446,58 @@
                     p.accHoursSim += dt_sim_h;
 
                     // === Capacidad de enfriamiento por unidad AM-010 (derateada por T_ext + altitud) ===
-                    const cap = am010Cap(tExt, PHYS.altitud_m);
-                    const pAlta_base = pAltaEst_psi(tExt);
+                    // Ola de calor: sube T_ext efectiva
+                    const tExtEff = tExt + (globalEvents.heat_wave ? GLOBAL_EVENTS.heat_wave.tExtBoost : 0);
+                    const cap = am010Cap(tExtEff, PHYS.altitud_m);
+                    const pAlta_base = pAltaEst_psi(tExtEff);
 
-                    // === Telemetría por HVAC ===
+                    // === Telemetría por HVAC (con inyección de fallas) ===
                     let Q_cool_total_kW = 0;
                     let consumo_total_kW = 0;
                     const hvacTel = hvacUnits.map((u, i) => {
+                        const inFalla = u.state === 'FALLA';
                         const active = u.state === 'TITULAR' || u.state === 'APOYO';
-                        // Modulación PID-like: 0% (sala fría) a 100% (sala caliente), lineal en la banda de histéresis
-                        //   temp <= setpoint - hyst → 0 (apagada)
-                        //   temp >= setpoint + hyst → 1 (full)
+                        const faultKey = activeFaults[u.id];
+                        const fault = faultKey ? FAULT_EFFECTS[faultKey] : null;
+
+                        // Modulación PID-like
                         const tempError = p.salaTemp - (PHYS.setpoint_C - PHYS.histeresis_C);
                         const load_frac = active ? Math.max(0, Math.min(1, tempError / (2 * PHYS.histeresis_C))) : 0;
-                        const CS_eff = cap.CS * load_frac;
-                        const CT_eff = cap.CT * load_frac;
-                        const corriente_A = active ? PHYS.HVAC.corriente_A_nominal * load_frac + noise(i * 3.1, 0.3) : 0;
-                        const pBaja_psi = active ? 130 + noise(i * 5.7, 12) : 0;
-                        const pAlta_psi = active ? pAlta_base * (0.85 + 0.15 * load_frac) + noise(i * 7.1, 6) : 0;
-                        const consumo_kW = active ? PHYS.HVAC.consumo_kW_marcha * load_frac + noise(i * 11.3, 0.1) : 0;
+
+                        let CS_eff       = cap.CS * load_frac;
+                        let CT_eff       = cap.CT * load_frac;
+                        let corriente_A  = active ? PHYS.HVAC.corriente_A_nominal * load_frac + noise(i * 3.1, 0.3) : 0;
+                        let pBaja_psi    = active ? 130 + noise(i * 5.7, 12) : 0;
+                        let pAlta_psi    = active ? pAlta_base * (0.85 + 0.15 * load_frac) + noise(i * 7.1, 6) : 0;
+                        let consumo_kW   = active ? PHYS.HVAC.consumo_kW_marcha * load_frac + noise(i * 11.3, 0.1) : 0;
+
+                        // Aplicar efectos de falla (si activa y no ya en FALLA final)
+                        if (fault && active) {
+                            if (fault.capacityMul != null) { CS_eff *= fault.capacityMul; CT_eff *= fault.capacityMul; }
+                            if (fault.corrienteMul != null) corriente_A *= fault.corrienteMul;
+                            if (fault.pBajaAdd != null) pBaja_psi += fault.pBajaAdd;
+                            if (fault.pBajaMul != null) pBaja_psi *= fault.pBajaMul;
+                            if (fault.pAltaAdd != null) pAlta_psi += fault.pAltaAdd;
+                            if (fault.pAltaMul != null) pAlta_psi *= fault.pAltaMul;
+                            if (fault.pAltaOscillate) pAlta_psi += Math.sin(Date.now() * 0.002) * fault.pAltaOscillate;
+                            consumo_kW *= (fault.capacityMul != null ? fault.capacityMul : 1);
+
+                            // Acumular duración → trip
+                            if (fault.tripAfterS) {
+                                p.faultDurations[u.id] = (p.faultDurations[u.id] || 0) + dt_sim_s;
+                                if (p.faultDurations[u.id] >= fault.tripAfterS && !p.faultDurations['_tripped_' + u.id]) {
+                                    p.pendingTrips.push({ uid: u.id, faultKey, fault });
+                                    p.faultDurations['_tripped_' + u.id] = true;
+                                }
+                            }
+                        }
+
+                        if (inFalla) {
+                            CS_eff = 0; CT_eff = 0;
+                            corriente_A = 0;
+                            pBaja_psi = 0; pAlta_psi = 0;
+                            consumo_kW = 0;
+                        }
 
                         Q_cool_total_kW += CS_eff;
                         consumo_total_kW += consumo_kW;
@@ -4275,6 +4506,7 @@
                             id: u.id,
                             state: u.state,
                             active,
+                            fault: faultKey || null,
                             load_pct: Math.round(load_frac * 100),
                             CS_kW: +CS_eff.toFixed(2),
                             CT_kW: +CT_eff.toFixed(2),
@@ -4297,28 +4529,58 @@
                     p.salaHumidity += (PHYS.hum_target_pct - p.salaHumidity) * Math.min(0.5, 0.002 * simSpeed);
                     p.salaHumidity += noise(31.7, 0.05);
 
-                    // === Presión diferencial: depende de presurizadores activos ===
-                    const presActivos = presUnits.filter(u => u.state === 'TITULAR').length;
-                    const target_pres = presActivos > 0 ? PHYS.pres_target_Pa * Math.min(1, presActivos) : 0;
+                    // === Presión diferencial: depende de presurizadores activos + puerta abierta (global) ===
+                    const presActivos = presUnits.filter(u => u.state === 'TITULAR' && !activeFaults[u.id]).length;
+                    let target_pres = presActivos > 0 ? PHYS.pres_target_Pa * Math.min(1, presActivos) : 0;
+                    if (globalEvents.door_open) target_pres = Math.min(target_pres, GLOBAL_EVENTS.door_open.presTargetOverride);
                     p.salaPresDiff += (target_pres - p.salaPresDiff) * Math.min(0.5, 0.01 * simSpeed);
                     p.salaPresDiff += noise(41.3, 0.3);
 
-                    // === Telemetría por presurizador CASIBA ===
+                    // === Telemetría por presurizador CASIBA (con fallas de filtro) ===
                     const presTel = presUnits.map((u, i) => {
                         const active = u.state === 'TITULAR';
-                        const sat = PHYS.PRES.saturacion_inicial_pct + noise(i * 13.7, 1);
-                        const caudal = active ? PHYS.PRES.caudal_nominal_m3h * (1 - sat / 100) + noise(i * 17.9, 30) : 0;
+                        const faultKey = activeFaults[u.id];
+                        const fault = faultKey ? FAULT_EFFECTS[faultKey] : null;
+                        let sat = PHYS.PRES.saturacion_inicial_pct + noise(i * 13.7, 1);
+                        let caudalMul = 1, aporteMul = 1;
+                        if (fault && active) {
+                            if (fault.saturacionAdd) sat = Math.min(95, sat + fault.saturacionAdd);
+                            if (fault.caudalMul != null) caudalMul = fault.caudalMul;
+                            if (fault.aporteMul != null) aporteMul = fault.aporteMul;
+                        }
+                        const caudal = active ? PHYS.PRES.caudal_nominal_m3h * (1 - sat / 100) * caudalMul + noise(i * 17.9, 30) : 0;
                         return {
                             id: u.id,
                             state: u.state,
                             active,
+                            fault: faultKey || null,
                             saturacion_pct: Math.round(Math.max(0, sat)),
                             caudal_m3h: +Math.max(0, caudal).toFixed(0),
                             consumo_W: active ? PHYS.PRES.consumo_W_marcha : 0,
-                            aporte_Pa: active ? PHYS.PRES.aporte_Pa_nominal : 0,
+                            aporte_Pa: active ? PHYS.PRES.aporte_Pa_nominal * aporteMul : 0,
                             hours: u.hours
                         };
                     });
+
+                    // === Procesar TRIPs pendientes (fuera del map para poder setHvacUnits sin loops) ===
+                    if (p.pendingTrips.length > 0) {
+                        const trips = p.pendingTrips.slice();
+                        p.pendingTrips = [];
+                        trips.forEach(({ uid, fault }) => {
+                            // 1. Marcar la unidad como FALLA + 2. Auto-apoyo con la mejor suplente
+                            setHvacUnits(current => {
+                                let updated = current.map(u => u.id === uid ? { ...u, state: 'FALLA' } : u);
+                                const suplente = updated.filter(u => u.state === 'SUPLENTE').sort((a, b) => a.hours - b.hours)[0];
+                                if (suplente) {
+                                    updated = updated.map(u => u.id === suplente.id ? { ...u, state: 'APOYO' } : u);
+                                    setTimeout(() => addEvent('info', suplente.id, `Auto-apoyo activado — reemplaza a ${uid}`), 0);
+                                }
+                                return updated;
+                            });
+                            // 3. Log crítico
+                            setTimeout(() => addEvent(fault.severity, uid, fault.msg), 0);
+                        });
+                    }
 
                     // === Push a UI a ~2 Hz (no cada tick para no trabar el render) ===
                     const now = Date.now();
@@ -4355,7 +4617,39 @@
                     }
                 }, TICK_MS);
                 return () => clearInterval(interval);
-            }, [isRunning, simSpeed, tExt, Q_LOAD, hvacUnits, presUnits]);
+            }, [isRunning, simSpeed, tExt, Q_LOAD, hvacUnits, presUnits, activeFaults, globalEvents]);
+
+            // === Funciones de inyección de fallas (usa botones en el UI) ===
+            const injectFault = (faultKey) => {
+                const fault = FAULT_EFFECTS[faultKey];
+                if (!fault) return;
+                // Target: el primer TITULAR del tipo correspondiente
+                const list = fault.target === 'HVAC' ? hvacUnits : presUnits;
+                const target = list.find(u => u.state === 'TITULAR' && !activeFaults[u.id]);
+                if (!target) {
+                    addEvent('info', '—', `No hay ${fault.target} titular disponible para inyectar "${fault.label}"`);
+                    return;
+                }
+                setActiveFaults(prev => ({ ...prev, [target.id]: faultKey }));
+                addEvent(fault.severity, target.id, `⚠ Falla inyectada: ${fault.label}`);
+            };
+            const toggleGlobalEvent = (key) => {
+                const wasOn = !!globalEvents[key];
+                setGlobalEvents(prev => ({ ...prev, [key]: !wasOn }));
+                const ev = GLOBAL_EVENTS[key];
+                addEvent(ev.severity, 'SALA', wasOn ? `${ev.label} — normalizado` : ev.msg);
+            };
+            const normalizeAll = () => {
+                // Limpia todas las fallas activas + eventos globales + resetea TRIPs
+                Object.keys(activeFaults).forEach(uid => addEvent('info', uid, `Normalizado: ${FAULT_EFFECTS[activeFaults[uid]]?.label || 'falla'}`));
+                setActiveFaults({});
+                setGlobalEvents({});
+                physRef.current.faultDurations = {};
+                // Restablecer estado FALLA a SUPLENTE (queda como reserva)
+                setHvacUnits(current => current.map(u => u.state === 'FALLA' ? { ...u, state: 'SUPLENTE' } : u));
+                addEvent('info', 'SALA', 'Normalización general — todas las fallas limpiadas');
+            };
+            const ackEvent = (id) => setEvents(prev => prev.filter(e => e.id !== id));
 
             // Expone la telemetría en window.__ecomonitor para poder inspeccionar desde la consola
             useEffect(() => {
@@ -4618,6 +4912,52 @@
                         </div>
                     </div>
 
+                    {/* === Botonera de INYECCIÓN DE FALLAS + eventos globales === */}
+                    <div className="p-4 border-b border-slate-800 bg-slate-950/40">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="text-[11px] font-bold text-red-400 uppercase tracking-[0.18em] flex items-center gap-2">
+                                <Icon name="siren" size={14} /> Inyección de fallas
+                            </div>
+                            <button onClick={normalizeAll} className="px-3 py-1.5 rounded bg-eco-lightgreen/15 border border-eco-lightgreen/40 text-eco-lightgreen text-[10px] font-bold uppercase tracking-wider hover:bg-eco-lightgreen/25 transition-colors flex items-center gap-1.5">
+                                <Icon name="check-circle-2" size={12} /> Normalizar todo
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
+                            {Object.entries(FAULT_EFFECTS).map(([key, f]) => {
+                                const activeOnAny = Object.values(activeFaults).includes(key);
+                                const sevCol = f.severity === 'crit' ? '#ef4444' : '#f59e0b';
+                                return (
+                                    <button key={key} onClick={() => injectFault(key)}
+                                        className={`text-left p-2 rounded border transition-all ${activeOnAny ? 'bg-red-500/20 border-red-500/50' : 'bg-slate-950/60 border-slate-800 hover:border-slate-600'}`}
+                                        title={f.msg}>
+                                        <div className="flex items-center gap-1.5">
+                                            <Icon name={f.icon} size={12} style={{ color: sevCol }} />
+                                            <span className="text-[9px] font-bold uppercase" style={{ color: sevCol }}>{f.severity === 'crit' ? 'crít' : 'atn'}</span>
+                                            <span className="text-[8px] font-mono text-slate-500 ml-auto">{f.target}</span>
+                                        </div>
+                                        <div className="text-[10px] text-white font-semibold mt-0.5 leading-tight">{f.label}</div>
+                                    </button>
+                                );
+                            })}
+                            {Object.entries(GLOBAL_EVENTS).map(([key, e]) => {
+                                const on = !!globalEvents[key];
+                                const sevCol = e.severity === 'crit' ? '#ef4444' : e.severity === 'warn' ? '#f59e0b' : '#0098c6';
+                                return (
+                                    <button key={key} onClick={() => toggleGlobalEvent(key)}
+                                        className={`text-left p-2 rounded border transition-all ${on ? 'bg-amber-500/20 border-amber-500/50' : 'bg-slate-950/60 border-slate-800 hover:border-slate-600'}`}
+                                        title={e.msg}>
+                                        <div className="flex items-center gap-1.5">
+                                            <Icon name={e.icon} size={12} style={{ color: sevCol }} />
+                                            <span className="text-[9px] font-bold uppercase" style={{ color: sevCol }}>{e.severity}</span>
+                                            <span className="text-[8px] font-mono text-slate-500 ml-auto">GLOBAL</span>
+                                        </div>
+                                        <div className="text-[10px] text-white font-semibold mt-0.5 leading-tight">{e.label}{on ? ' · ON' : ''}</div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {/* === GRID: escena 3D principal + panel lateral EcoMonitor (desktop) / stacked (mobile) === */}
                     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] border-b border-slate-800">
                         {/* Escena 3D */}
@@ -4795,21 +5135,35 @@
                                             </div>
                                         </div>
 
-                                        {/* Log de eventos (placeholder — se pobla en Fase 4 con alarmas) */}
-                                        <div className="p-3 flex-1 min-h-[80px]">
+                                        {/* Log de eventos (Fase 4 — poblado por fallas + eventos globales) */}
+                                        <div className="p-3 flex-1">
                                             <div className="flex items-center justify-between mb-2">
-                                                <div className="text-[9px] font-bold text-eco-lightgreen uppercase tracking-[0.18em]">Eventos</div>
-                                                <span className="text-[8px] font-mono text-slate-600">Fase 4</span>
+                                                <div className="text-[9px] font-bold text-eco-lightgreen uppercase tracking-[0.18em]">Eventos · log</div>
+                                                <span className="text-[8px] font-mono text-slate-600">{events.length} registro{events.length !== 1 ? 's' : ''}</span>
                                             </div>
-                                            {isCrit || isWarn ? (
-                                                <div className="text-[10px] font-mono flex items-start gap-1.5 rounded p-1.5" style={{ background: statusColor + '15', border: `1px solid ${statusColor}40` }}>
-                                                    <span className="mt-0.5" style={{ color: statusColor }}>●</span>
-                                                    <div style={{ color: statusColor }}>
-                                                        {isCrit ? 'Condiciones críticas en sala' : 'Fuera del rango de operación óptimo'}
-                                                    </div>
-                                                </div>
+                                            {events.length === 0 ? (
+                                                <div className="text-[10px] font-mono text-slate-500 italic">Sin eventos. Sistema estable.</div>
                                             ) : (
-                                                <div className="text-[10px] font-mono text-slate-500 italic">Sin eventos activos.</div>
+                                                <div className="space-y-1 max-h-56 overflow-y-auto sim-no-scroll">
+                                                    {events.map(ev => {
+                                                        const sevCol = ev.severity === 'crit' ? '#ef4444' : ev.severity === 'warn' ? '#f59e0b' : '#0098c6';
+                                                        const time = new Date(ev.time);
+                                                        const ts = `${String(time.getHours()).padStart(2,'0')}:${String(time.getMinutes()).padStart(2,'0')}:${String(time.getSeconds()).padStart(2,'0')}`;
+                                                        return (
+                                                            <div key={ev.id} className="rounded p-1.5 text-[10px] flex items-start gap-1.5" style={{ background: sevCol + '12', border: `1px solid ${sevCol}30` }}>
+                                                                <span style={{ color: sevCol }}>●</span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-1.5 font-mono text-slate-500 text-[8px]">
+                                                                        <span>{ts}</span>
+                                                                        <span className="font-bold" style={{ color: sevCol }}>{ev.unit}</span>
+                                                                    </div>
+                                                                    <div style={{ color: '#e2e8f0' }} className="text-[10px]">{ev.msg}</div>
+                                                                </div>
+                                                                <button onClick={() => ackEvent(ev.id)} title="ACK — marcar como visto" className="text-[8px] text-slate-500 hover:text-white px-1">×</button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             )}
                                         </div>
                                     </>
