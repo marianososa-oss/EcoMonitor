@@ -4163,34 +4163,11 @@
                     // info trae wallX, outSign, interiorX, z, y (centro vertical del equipo)
                     const interiorX = info.interiorX;
                     const outSign = info.outSign;
-                    let escZ, escY;
-                    if (type === 'PRES') {
-                        // Para el CASIBA: la rejilla interior está SOLO ARRIBA (pleno de inyección superior).
-                        // El esclavo puede ir CENTRADO con el presurizador (mismo z), en la pared interior,
-                        // ligeramente debajo del centro para no chocar con la grilla perforada superior.
-                        escZ = info.z;
-                        escY = info.y - 0.35;   // debajo del centro del CASIBA, en el espacio libre
-                    } else {
-                        // HVAC: la pared interior tiene rejilla de inyección arriba + retorno abajo,
-                        // así que el esclavo va OFFSET lateral (misma altura, distinto z).
-                        const spaceForward  = (roomD/2 - 0.3) - info.z;
-                        const spaceBackward = info.z - (-roomD/2 + 0.3);
-                        escZ = spaceForward > spaceBackward ? info.z + 0.65 : info.z - 0.65;
-                        // Evitar colisión con el MASTER (pared izquierda, z=0, ancho ±0.45)
-                        if (info.side === 'left') {
-                            const masterHalfZ = 0.45;
-                            const minClearance = masterHalfZ + 0.2 + 0.12;
-                            if (Math.abs(escZ) < minClearance) {
-                                const dir = escZ >= 0 ? 1 : -1;
-                                escZ = dir * minClearance;
-                                if (Math.abs(escZ) > roomD/2 - 0.25) {
-                                    escZ = -dir * minClearance;
-                                }
-                            }
-                        }
-                        escY = info.y;
-                    }
-                    const pos = new THREE.Vector3(interiorX, escY, escZ);
+                    // El esclavo va CENTRADO con el equipo (mismo z, mismo y).
+                    // - HVAC: encaja verticalmente entre las rejillas de inyección (y+0.95) y retorno (y-0.95).
+                    //   El esclavo tiene ~0.6m de alto → ocupa y-0.3 a y+0.3, sin chocar con las rejillas.
+                    // - PRES/CASIBA: la grilla interior está sólo arriba (y+0.81). El esclavo en el centro no la toca.
+                    const pos = new THREE.Vector3(interiorX, info.y, info.z);
 
                     const g = new THREE.Group();
                     const bGeo = new THREE.BoxGeometry(escD, escH, escW);
