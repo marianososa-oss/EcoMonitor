@@ -3030,15 +3030,18 @@
                 elbow2.position.set(-roomW * 0.30, 0.85,  roomD * 0.60);
                 scene.add(elbow2);
 
-                // === PLATAFORMA + ESCALERA + BARANDAS AMARILLAS (en la puerta, lado largo) ===
-                // Plataforma de grating al frente de la puerta (puerta sigue siendo a -roomW/4, roomD/2)
+                // === PUERTA + PLATAFORMA + ESCALERA (wrap-and-rotate a cara corta OESTE) ===
+                // Construido en canónico (cara larga frontal), luego roto -π/2 y translado para
+                // llevar el conjunto a la cara corta oeste (x=-roomW/2) offset z=+2 del master.
+                const doorGroup = new THREE.Group();
+                // Plataforma de grating al frente de la puerta
                 const platformGeo = new THREE.BoxGeometry(2.5, 0.08, 1.6);
                 const platformMat = new THREE.MeshStandardMaterial({ color: '#4a4a52', metalness: 0.4, roughness: 0.52 });
                 const platform = new THREE.Mesh(platformGeo, platformMat);
                 platform.position.set(-roomW/4, 2.21 - 0.04, roomD/2 + 0.8);
                 platform.castShadow = true;
                 platform.receiveShadow = true;
-                scene.add(platform);
+                doorGroup.add(platform);
                 // Patrón de grating sobre la plataforma (líneas)
                 for (let g = -3; g <= 3; g++) {
                     const gline = new THREE.LineSegments(
@@ -3048,7 +3051,7 @@
                         ]),
                         new THREE.LineBasicMaterial({ color: '#2a2a32' })
                     );
-                    scene.add(gline);
+                    doorGroup.add(gline);
                 }
 
                 // Escalera: 6 escalones del piso (y~0.2) a la plataforma (y~2.2)
@@ -3068,7 +3071,7 @@
                     );
                     step.castShadow = true;
                     step.receiveShadow = true;
-                    scene.add(step);
+                    doorGroup.add(step);
                 }
                 // Vigas laterales de la escalera (zoquetes)
                 [-stairW/2, stairW/2].forEach(xOff => {
@@ -3079,7 +3082,7 @@
                     stringer.position.set(-roomW/4 + xOff, 1.0, roomD/2 + 2.3);
                     stringer.rotation.x = Math.atan2(2.0, 1.4); // ángulo de la escalera
                     stringer.castShadow = true;
-                    scene.add(stringer);
+                    doorGroup.add(stringer);
                 });
 
                 // Barandas amarillas (tubos)
@@ -3096,7 +3099,7 @@
                         rail.position.copy(a.clone().add(b).multiplyScalar(0.5));
                         rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3().subVectors(b, a).normalize());
                         rail.castShadow = true;
-                        scene.add(rail);
+                        doorGroup.add(rail);
                     }
                 };
                 // Postes verticales de la baranda (en plataforma y borde superior de escalera)
@@ -3115,7 +3118,7 @@
                     );
                     post.position.set(px, 2.21 + 0.5, pz);
                     post.castShadow = true;
-                    scene.add(post);
+                    doorGroup.add(post);
                 });
                 // Tubos horizontales superior (barandilla superior)
                 buildRailing([
@@ -3160,7 +3163,7 @@
                         );
                         post.position.set(px, p.y + postH / 2, p.z);
                         post.castShadow = true;
-                        scene.add(post);
+                        doorGroup.add(post);
                     });
                     // Conexión superior (tubo a lo largo de la diagonal, top de los postes)
                     const upTop = stairPosts.map(p => new THREE.Vector3(px, p.y + 1.0, p.z));
@@ -3278,14 +3281,14 @@
                     new THREE.MeshLambertMaterial({ color: '#9c958a' })
                 );
                 leftLeaf.position.set(doorCenterX - leafW/2, doorY, doorZ);
-                scene.add(leftLeaf);
+                doorGroup.add(leftLeaf);
                 // Hoja derecha
                 const rightLeaf = new THREE.Mesh(
                     new THREE.PlaneGeometry(leafW, doorH),
                     new THREE.MeshLambertMaterial({ color: '#9c958a' })
                 );
                 rightLeaf.position.set(doorCenterX + leafW/2, doorY, doorZ);
-                scene.add(rightLeaf);
+                doorGroup.add(rightLeaf);
                 // Marco exterior (rectángulo)
                 const doorFrame = new THREE.LineSegments(
                     new THREE.BufferGeometry().setFromPoints([
@@ -3297,7 +3300,7 @@
                     ]),
                     lineMat
                 );
-                scene.add(doorFrame);
+                doorGroup.add(doorFrame);
                 // Línea divisoria central (donde se abren las hojas)
                 const doorSplit = new THREE.LineSegments(
                     new THREE.BufferGeometry().setFromPoints([
@@ -3306,7 +3309,7 @@
                     ]),
                     lineMat
                 );
-                scene.add(doorSplit);
+                doorGroup.add(doorSplit);
                 // Barras horizontales tipo crash-bar (push to open)
                 [-leafW/2, leafW/2].forEach(xOff => {
                     const crashBar = new THREE.Mesh(
@@ -3314,7 +3317,7 @@
                         new THREE.MeshLambertMaterial({ color: '#3a3a42' })
                     );
                     crashBar.position.set(doorCenterX + xOff, doorY, doorZ + 0.04);
-                    scene.add(crashBar);
+                    doorGroup.add(crashBar);
                 });
                 // Cartel "EXIT / EMERGENCY" verde arriba de la puerta
                 const exitSign = new THREE.Mesh(
@@ -3322,7 +3325,7 @@
                     new THREE.MeshBasicMaterial({ color: '#16a34a' })
                 );
                 exitSign.position.set(doorCenterX, 2.21 + doorH + 0.13, doorZ + 0.03);
-                scene.add(exitSign);
+                doorGroup.add(exitSign);
                 // Bisagras (2 por hoja)
                 const hingeMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
                 [-doorTotalW/2 + 0.04, doorTotalW/2 - 0.04].forEach(xPos => {
@@ -3333,9 +3336,18 @@
                         );
                         hinge.position.set(doorCenterX + xPos, 2.21 + yOff, doorZ + 0.025);
                         hinge.rotation.x = Math.PI / 2;
-                        scene.add(hinge);
+                        doorGroup.add(hinge);
                     });
                 });
+                // Aplicar rotación + traslación al doorGroup para llevarlo a la cara corta OESTE
+                // Canónico: puerta en (-roomW/4, y, +roomD/2). Target: (-roomW/2, y, +2) offset del master en z=0.
+                // Rot Y=-π/2 mapea +Z → -X (normal de la puerta apunta hacia -X, que es afuera del oeste).
+                doorGroup.rotation.y = -Math.PI/2;
+                // Delta translation:
+                //   canonical door center (-3, y, +4) after rot Y=-π/2 → (-4, y, -3)
+                //   target (-6, y, +2). Delta = (-6-(-4), 0, 2-(-3)) = (-2, 0, +5)
+                doorGroup.position.set(-2, 0, 5);
+                scene.add(doorGroup);
 
                 // === VFDs (6 cabinets contra la pared del FONDO — pasillo central libre) ===
                 // En una sala eléctrica los equipos que disipan calor van pegados a la pared, nunca en el medio.
@@ -4431,10 +4443,13 @@
                 };
                 if (esclavoData.length > 0) {
                     const cableY = roomH * 0.92 + 2.21;
-                    // Orden: norte → este → sur (recorrido perimetral)
-                    const northEs = esclavoData.filter(e => e.wall === 'north');
-                    const eastEs  = esclavoData.filter(e => e.wall === 'east');
-                    const southEs = esclavoData.filter(e => e.wall === 'south');
+                    // Orden PERIMETRAL sin cruces: norte (izq→der) → este (arriba→abajo) → sur (der→izq).
+                    // Todos los canónicos usan Z como along-wall → sort por canon_z ASC produce
+                    // el recorrido antihorario correcto para las tres paredes (norte, este, sur).
+                    const byCanonZ = (a, b) => a.pos_canonical.z - b.pos_canonical.z;
+                    const northEs = esclavoData.filter(e => e.wall === 'north').sort(byCanonZ);
+                    const eastEs  = esclavoData.filter(e => e.wall === 'east').sort(byCanonZ);
+                    const southEs = esclavoData.filter(e => e.wall === 'south').sort(byCanonZ);
                     const orderedEs = [...northEs, ...eastEs, ...southEs];
 
                     const pts = [masterOutputPos.clone()];
@@ -4537,8 +4552,8 @@
                         <span className="inline-flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', background: TH_COLOR.heat, borderRadius: '50%' }}></span>VFD calor</span>
                     </div>
                     <div className="absolute bottom-3 right-4 z-10 text-[10px] font-mono pointer-events-none flex flex-col gap-1 items-end" style={{ color: TH_COLOR.master }}>
-                        <span><span style={{ display: 'inline-block', width: '20px', height: '2px', background: TH_COLOR.cable, marginRight: '6px', verticalAlign: 'middle' }}></span>RS-485 daisy chain</span>
-                        <span style={{ color: '#94a3b8' }}><span style={{ display: 'inline-block', width: '20px', height: '1px', background: '#94a3b8', marginRight: '6px', verticalAlign: 'middle' }}></span>Comando Esclavo → equipo</span>
+                        <span style={{ color: '#dc2626' }}><span style={{ display: 'inline-block', width: '20px', height: '2px', background: '#dc2626', marginRight: '6px', verticalAlign: 'middle' }}></span>RS-485 A (rojo)</span>
+                        <span style={{ color: '#2563eb' }}><span style={{ display: 'inline-block', width: '20px', height: '2px', background: '#2563eb', marginRight: '6px', verticalAlign: 'middle' }}></span>RS-485 B (azul)</span>
                     </div>
                 </div>
             );
