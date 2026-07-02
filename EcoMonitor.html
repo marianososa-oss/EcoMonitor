@@ -3519,10 +3519,11 @@
                     // Wall outside position (HVAC mochila hanging on exterior side wall)
                     const wallX = side === 'left' ? -roomW/2 : roomW/2;
                     const outSign = side === 'left' ? -1 : 1;   // -1 = afuera por la izq, +1 = afuera por la der
-                    // HVAC mochila: alto vertical, mounted at mid-height of wall, body protrudes out
-                    const unitW = 0.95;   // ancho hacia afuera del shelter
-                    const unitH = 2.0;    // alto vertical (mochila)
-                    const unitD = 1.0;    // profundidad a lo largo del shelter
+                    // HVAC mochila: dimensiones REALES del WESTRIC AM-010 Inyección Superior
+                    // Fuente: catálogo Ecocontrol AM-010 (Ancho 1400mm × Alto 2490mm × Profundidad 835mm)
+                    const unitW = 0.84;   // profundidad hacia afuera del shelter (real: 835mm)
+                    const unitH = 2.50;   // alto vertical de la mochila (real: 2490mm)
+                    const unitD = 1.40;   // ancho a lo largo de la pared del shelter (real: 1400mm)
                     const y = 2.21 + roomH * 0.55;  // altura centro del HVAC (mid wall exterior)
                     const bodyX = wallX + outSign * (unitW / 2 + 0.04);  // cuerpo afuera de la pared
 
@@ -3541,12 +3542,13 @@
                     );
                     stateBand.position.set(bodyX, y + unitH/2 - 0.12, z);
                     g.add(stateBand);
-                    // === VENTILADOR REALISTA (recessed con hub + blades 3D) ===
+                    // === VENTILADOR CONDENSADOR (AM-010: 710mm diámetro, en la mitad INFERIOR de la cara frontal) ===
                     const fanFaceX = bodyX + outSign * (unitW/2 + 0.005);
-                    const fanY = y - 0.3;
-                    // Cavidad recessed (disco oscuro inset en la mochila)
+                    const fanY = y - unitH * 0.28;  // en el tercio inferior (donde va en el AM-010 real)
+                    const fanRadius = 0.355;  // 710mm diámetro real
+                    // Cavidad recessed
                     const recess = new THREE.Mesh(
-                        new THREE.CircleGeometry(0.34, 32),
+                        new THREE.CircleGeometry(fanRadius, 32),
                         new THREE.MeshLambertMaterial({ color: '#15151c' })
                     );
                     recess.position.set(fanFaceX - outSign * 0.02, fanY, z);
@@ -3554,71 +3556,78 @@
                     g.add(recess);
                     // Anillo exterior de la grilla (torus)
                     const grilleRing = new THREE.Mesh(
-                        new THREE.TorusGeometry(0.36, 0.025, 8, 32),
+                        new THREE.TorusGeometry(fanRadius + 0.015, 0.025, 8, 32),
                         new THREE.MeshLambertMaterial({ color: '#2a2a32' })
                     );
                     grilleRing.position.set(fanFaceX, fanY, z);
                     grilleRing.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
                     g.add(grilleRing);
                     // Barras horizontales de la grilla (protección)
-                    for (let bar = -2; bar <= 2; bar++) {
+                    for (let bar = -3; bar <= 3; bar++) {
                         const grilleBar = new THREE.Mesh(
                             new THREE.BoxGeometry(0.01, 0.012, 0.7),
                             new THREE.MeshLambertMaterial({ color: '#2a2a32' })
                         );
-                        grilleBar.position.set(fanFaceX + outSign * 0.001, fanY + bar * 0.12, z);
+                        grilleBar.position.set(fanFaceX + outSign * 0.001, fanY + bar * 0.105, z);
                         g.add(grilleBar);
                     }
                     // FAN GROUP: hub central + 3 aspas planas (sin pitch — no atraviesan la mochila)
                     const fan = new THREE.Group();
-                    // Hub
                     fan.add(new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.05, 0.05, 0.06, 14),
+                        new THREE.CylinderGeometry(0.055, 0.055, 0.06, 14),
                         new THREE.MeshLambertMaterial({ color: '#1f1f26' })
                     ));
-                    // 3 aspas, todas planas en el mismo plano (rotation.x = 0)
                     for (let bi = 0; bi < 3; bi++) {
                         const angle = (bi / 3) * Math.PI * 2;
                         const blade = new THREE.Mesh(
-                            new THREE.BoxGeometry(0.30, 0.04, 0.10),  // largo, grueso, fino
+                            new THREE.BoxGeometry(0.32, 0.04, 0.11),
                             new THREE.MeshLambertMaterial({ color: '#9c9ca6' })
                         );
-                        // Posicionar radialmente desde el hub
-                        blade.position.set(Math.cos(angle) * 0.17, 0, Math.sin(angle) * 0.17);
+                        blade.position.set(Math.cos(angle) * 0.18, 0, Math.sin(angle) * 0.18);
                         blade.rotation.y = angle;
-                        // SIN pitch — todas las aspas planas en el mismo plano
                         fan.add(blade);
                     }
-                    // Orientar el fan para que el eje de rotación sea la normal de la pared
                     fan.rotation.z = outSign === -1 ? Math.PI/2 : -Math.PI/2;
-                    // RECESSED PROFUNDO dentro de la mochila (las aspas no salen del cuerpo)
                     fan.position.set(fanFaceX - outSign * 0.12, fanY, z);
                     g.add(fan);
-                    // Persiana de admisión (recuadro rectangular abajo)
-                    const intake = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.005, 0.5, 0.7),
-                        new THREE.MeshLambertMaterial({ color: '#5e5e66' })
-                    );
-                    intake.position.set(fanFaceX, y + 0.5, z);
-                    g.add(intake);
-                    // Líneas horizontales de la persiana
-                    for (let k = 0; k < 5; k++) {
-                        const louver = new THREE.LineSegments(
-                            new THREE.BufferGeometry().setFromPoints([
-                                new THREE.Vector3(fanFaceX + outSign * 0.005, y + 0.3 + k * 0.1, z - 0.32),
-                                new THREE.Vector3(fanFaceX + outSign * 0.005, y + 0.3 + k * 0.1, z + 0.32)
-                            ]),
-                            new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.55 })
+                    // === PANELES DE ACCESO (parte superior de la cara frontal — AM-010 tiene 2) ===
+                    // Panel 1 (superior): 350mm × 1050mm — acceso a compresor
+                    // Panel 2 (medio):    285mm × 1050mm — acceso a ventilador evaporador
+                    const panelWidth = unitD * 0.75;  // ~1.05m en real
+                    const panels = [
+                        { yOff: unitH * 0.32,  h: 0.35 },   // panel superior
+                        { yOff: unitH * 0.08,  h: 0.285 }   // panel medio
+                    ];
+                    for (const p of panels) {
+                        const panelGeo = new THREE.BoxGeometry(0.005, p.h, panelWidth);
+                        const panelMesh = new THREE.Mesh(
+                            panelGeo,
+                            new THREE.MeshLambertMaterial({ color: '#e6e2d5' })  // ligeramente más gris que el body
                         );
-                        g.add(louver);
+                        panelMesh.position.set(fanFaceX + outSign * 0.001, y + p.yOff, z);
+                        g.add(panelMesh);
+                        // Marco del panel (líneas)
+                        const panelEdges = new THREE.LineSegments(
+                            new THREE.EdgesGeometry(panelGeo),
+                            new THREE.LineBasicMaterial({ color: '#5a5a62', transparent: true, opacity: 0.7 })
+                        );
+                        panelEdges.position.copy(panelMesh.position);
+                        g.add(panelEdges);
                     }
-                    // CAÑO DE ESCAPE (encima del HVAC, sale por arriba)
-                    const exhaust = new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.08, 0.08, 0.4, 10),
-                        new THREE.MeshLambertMaterial({ color: '#a8a8b0' })
-                    );
-                    exhaust.position.set(bodyX, y + unitH/2 + 0.2, z - unitD/2 + 0.18);
-                    g.add(exhaust);
+                    // === REJILLAS LATERALES DE ADMISIÓN (Batería eléctrica visible en el AM-010 real) ===
+                    // Slats verticales sobre las caras laterales que dan al condensador
+                    for (const sideZ of [-unitD/2 - 0.001, unitD/2 + 0.001]) {
+                        for (let k = 0; k < 12; k++) {
+                            const slat = new THREE.LineSegments(
+                                new THREE.BufferGeometry().setFromPoints([
+                                    new THREE.Vector3(bodyX - unitW/2 * 0.5, fanY - 0.5 + k * 0.08, z + sideZ),
+                                    new THREE.Vector3(bodyX + unitW/2 * 0.5, fanY - 0.5 + k * 0.08, z + sideZ)
+                                ]),
+                                new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.4 })
+                            );
+                            g.add(slat);
+                        }
+                    }
 
                     // SOPORTE TRIANGULAR de acero (debajo del HVAC, contra la pared)
                     const bracketMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
