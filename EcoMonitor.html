@@ -2323,7 +2323,7 @@
             heat: '#fb923c',
             heatBright: '#f97316',
             titular: '#9ab63b',
-            suplente: '#94a3b8',
+            suplente: '#38bdf8',   // celeste — reserva visible, distinto de titular/apoyo/falla
             apoyo: '#f59e0b',
             master: '#00478F',
             masterAccent: '#0098c6',
@@ -2529,12 +2529,12 @@
         // Inline state colors — bypass any Tailwind JIT issue
         const STATE_STYLE = {
             TITULAR:  { border: '1.5px solid rgba(154,182,59,0.7)',  background: 'rgba(79,119,37,0.18)',   color: '#9ab63b', boxShadow: '0 0 20px rgba(154,182,59,0.40)' },
-            SUPLENTE: { border: '1px solid #334155',                 background: 'rgba(15,23,42,0.65)',    color: '#94a3b8', boxShadow: 'none' },
+            SUPLENTE: { border: '1.5px solid rgba(56,189,248,0.7)',  background: 'rgba(14,165,233,0.15)',  color: '#38bdf8', boxShadow: '0 0 18px rgba(56,189,248,0.35)' },
             APOYO:    { border: '1.5px solid rgba(251,191,36,0.7)',  background: 'rgba(245,158,11,0.18)',  color: '#fcd34d', boxShadow: '0 0 24px rgba(251,191,36,0.55)' }
         };
         const STATE_BADGE = {
             TITULAR:  { background: 'rgba(154,182,59,0.18)', color: '#9ab63b', border: '1px solid rgba(154,182,59,0.55)' },
-            SUPLENTE: { background: 'rgba(51,65,85,0.55)',   color: '#94a3b8', border: '1px solid #475569' },
+            SUPLENTE: { background: 'rgba(14,165,233,0.18)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.55)' },
             APOYO:    { background: 'rgba(251,191,36,0.18)', color: '#fcd34d', border: '1px solid rgba(251,191,36,0.55)' }
         };
 
@@ -2679,7 +2679,7 @@
                 themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
                 // Room dimensions (más grandes que antes)
-                const roomW = 12, roomD = 8, roomH = 4;
+                const roomW = 12, roomD = 8, roomH = 2.6;  // shelter bajo (2.60m) — equipos internos casi tocan el techo
                 const lineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line });
                 const slabPad = 1; // slab extiende 1u más allá del shelter
 
@@ -3341,15 +3341,16 @@
                 // En una sala eléctrica los equipos que disipan calor van pegados a la pared, nunca en el medio.
                 const heatMeshes = [];
                 const heatWaves = [];
-                const eqW = 1.3, eqH = 2.6, eqD = 0.9;
-                const vfdBackZ = -roomD/2 + eqD/2 + 0.15;  // pegados a la pared del fondo
+                const eqW = 1.3, eqH = 2.0, eqD = 0.9;  // VFDs 2.0m para caber bajo el techo 2.60m
+                const vfdBackZ = -roomD/2 + eqD/2 + 0.10;  // pegados a la pared del fondo
+                // Hilera CONTIGUA (sin separación entre unidades) — paso = eqW
                 const vfdPositions = [
-                    { x: -4.5, z: vfdBackZ },
-                    { x: -2.7, z: vfdBackZ },
-                    { x: -0.9, z: vfdBackZ },
-                    { x:  0.9, z: vfdBackZ },
-                    { x:  2.7, z: vfdBackZ },
-                    { x:  4.5, z: vfdBackZ }
+                    { x: -eqW * 2.5, z: vfdBackZ },
+                    { x: -eqW * 1.5, z: vfdBackZ },
+                    { x: -eqW * 0.5, z: vfdBackZ },
+                    { x:  eqW * 0.5, z: vfdBackZ },
+                    { x:  eqW * 1.5, z: vfdBackZ },
+                    { x:  eqW * 2.5, z: vfdBackZ }
                 ];
                 vfdPositions.forEach((pos, i) => {
                     const x = pos.x, z = pos.z;
@@ -3858,7 +3859,7 @@
                     const unitW = 0.84;   // profundidad hacia afuera del shelter (real: 835mm)
                     const unitH = 2.50;   // alto vertical de la mochila (real: 2490mm)
                     const unitD = 1.40;   // ancho a lo largo de la pared del shelter (real: 1400mm)
-                    const y = 2.21 + roomH * 0.55;  // altura centro del HVAC (mid wall exterior)
+                    const y = 2.21 + roomH * 0.50;  // centrado vertical bajo el techo del shelter (2.60m)
                     const bodyX = wallX + outSign * (unitW / 2 + 0.04);  // cuerpo afuera de la pared
 
                     const g = new THREE.Group();
@@ -4192,7 +4193,7 @@
                     const unitW = 0.75;   // fondo (protrusión hacia afuera del shelter)
                     const unitH = 1.72;   // alto vertical — angosto y alto
                     const unitD = 0.61;   // ancho (a lo largo del shelter)
-                    const y = 2.21 + roomH * 0.60;  // ligeramente más alto que HVACs (para inyectar arriba)
+                    const y = 2.21 + roomH * 0.50;  // centrado vertical bajo el techo bajo del shelter
                     const bodyX = wallX + outSign * (unitW / 2 + 0.04);
 
                     const g = new THREE.Group();
