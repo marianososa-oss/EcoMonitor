@@ -2556,11 +2556,16 @@
         };
 
         // ===== Sala3D : Three.js shelter Neuquén con tableros Maestro+Esclavos =====
-        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible, sceneTheme, hmiValues }) => {
+        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible, sceneTheme, hmiValues, activeFaults, globalEvents }) => {
             const containerRef = useRef(null);
             const canvasRef    = useRef(null);
             const sceneObj     = useRef(null);
             const animRef      = useRef(null);
+            // Refs para que el animate loop lea SIEMPRE el último estado de fallas/eventos sin reconstruir la escena
+            const faultsRef    = useRef({});
+            const eventsRef    = useRef({});
+            useEffect(() => { faultsRef.current = activeFaults || {}; }, [activeFaults]);
+            useEffect(() => { eventsRef.current = globalEvents || {}; }, [globalEvents]);
 
             // Init scene once
             useEffect(() => {
@@ -3252,21 +3257,24 @@
                 const doorY = 1.1 + 2.21;
                 const doorCenterX = -roomW/4;
                 const doorZ = roomD/2 + 0.005;
-                // Hoja izquierda
+                // Hoja izquierda — con PIVOT en el borde EXTERIOR (bisagra) para animar apertura
                 const leafW = doorTotalW / 2;
-                const leftLeaf = new THREE.Mesh(
-                    new THREE.PlaneGeometry(leafW, doorH),
-                    new THREE.MeshLambertMaterial({ color: '#9c958a' })
-                );
-                leftLeaf.position.set(doorCenterX - leafW/2, doorY, doorZ);
-                doorGroup.add(leftLeaf);
-                // Hoja derecha
-                const rightLeaf = new THREE.Mesh(
-                    new THREE.PlaneGeometry(leafW, doorH),
-                    new THREE.MeshLambertMaterial({ color: '#9c958a' })
-                );
-                rightLeaf.position.set(doorCenterX + leafW/2, doorY, doorZ);
-                doorGroup.add(rightLeaf);
+                const leafMat = new THREE.MeshLambertMaterial({ color: '#9c958a', side: THREE.DoubleSide });
+                const leftLeafPivot = new THREE.Group();
+                leftLeafPivot.name = 'leafPivot_L';
+                leftLeafPivot.position.set(doorCenterX - doorTotalW/2, doorY, doorZ);
+                const leftLeaf = new THREE.Mesh(new THREE.PlaneGeometry(leafW, doorH), leafMat);
+                leftLeaf.position.set(leafW/2, 0, 0);  // se extiende hacia +X (borde exterior en 0)
+                leftLeafPivot.add(leftLeaf);
+                doorGroup.add(leftLeafPivot);
+                // Hoja derecha — pivot en el borde EXTERIOR opuesto
+                const rightLeafPivot = new THREE.Group();
+                rightLeafPivot.name = 'leafPivot_R';
+                rightLeafPivot.position.set(doorCenterX + doorTotalW/2, doorY, doorZ);
+                const rightLeaf = new THREE.Mesh(new THREE.PlaneGeometry(leafW, doorH), leafMat);
+                rightLeaf.position.set(-leafW/2, 0, 0);  // se extiende hacia -X
+                rightLeafPivot.add(rightLeaf);
+                doorGroup.add(rightLeafPivot);
                 // Marco exterior (rectángulo)
                 const doorFrame = new THREE.LineSegments(
                     new THREE.BufferGeometry().setFromPoints([
@@ -3602,6 +3610,35 @@
                 labelSprite.position.set(cloudX, cloudY + 1.35, cloudZ);
                 scene.add(labelSprite);
 
+                // === Banner "🌡 OLA DE CALOR" — visible solo cuando globalEvents.heat_wave ===
+                const heatBannerCanvas = document.createElement('canvas');
+                heatBannerCanvas.width = 512; heatBannerCanvas.height = 128;
+                const hbctx = heatBannerCanvas.getContext('2d');
+                hbctx.fillStyle = 'rgba(220,38,38,0.94)';
+                hbctx.strokeStyle = '#fbbf24'; hbctx.lineWidth = 4;
+                const rr = 22;
+                hbctx.beginPath();
+                hbctx.moveTo(rr, 0);
+                hbctx.lineTo(512 - rr, 0); hbctx.quadraticCurveTo(512, 0, 512, rr);
+                hbctx.lineTo(512, 128 - rr); hbctx.quadraticCurveTo(512, 128, 512 - rr, 128);
+                hbctx.lineTo(rr, 128); hbctx.quadraticCurveTo(0, 128, 0, 128 - rr);
+                hbctx.lineTo(0, rr); hbctx.quadraticCurveTo(0, 0, rr, 0);
+                hbctx.fill(); hbctx.stroke();
+                hbctx.fillStyle = '#ffffff';
+                hbctx.font = 'bold 44px sans-serif';
+                hbctx.textAlign = 'center'; hbctx.textBaseline = 'middle';
+                hbctx.fillText('🌡  OLA DE CALOR', 256, 64);
+                const heatBannerTex = new THREE.CanvasTexture(heatBannerCanvas);
+                if (THREE.SRGBColorSpace) heatBannerTex.colorSpace = THREE.SRGBColorSpace;
+                const heatBanner = new THREE.Sprite(new THREE.SpriteMaterial({
+                    map: heatBannerTex, transparent: true, depthTest: false
+                }));
+                heatBanner.scale.set(3.5, 0.88, 1);
+                heatBanner.position.set(0, roomH + 2.21 + 1.6, 0);   // arriba del techo
+                heatBanner.renderOrder = 998;
+                heatBanner.visible = false;
+                scene.add(heatBanner);
+
                 const cloudPos = new THREE.Vector3(cloudX, cloudY, cloudZ);
 
                 // === PAQUETES DE DATOS (cubitos subiendo Master → Cloud en loop) ===
@@ -3628,6 +3665,20 @@
                     roomW, roomD, roomH,
                     targetView: 'iso',
                     setSceneThemeOverride,
+                    ambient, dir, hemi,   // luces para reactuar a heat_wave
+                    // Puertas — pivotes principales y de emergencia para animar door_open
+                    doorPivots: {
+                        main: { L: leftLeafPivot, R: rightLeafPivot },
+                        emergency: {
+                            L: emergencyGroup.getObjectByName('leafPivot_L'),
+                            R: emergencyGroup.getObjectByName('leafPivot_R')
+                        }
+                    },
+                    // faultIcons se leen de hvacInfo/presInfo via .alertSprite en el animate loop
+                    faultIcons: {},
+                    heatBanner,
+                    heatWaveActive: false,   // flag para aplicar/revertir override de luces
+                    applySceneTheme, resolveTheme,   // exponer para revertir en animate
                     // HMI viva: función pura que redibuja el canvas + textura de Three.js
                     updateHMI: (values) => {
                         drawHMI(values);
@@ -3721,20 +3772,79 @@
 
                 const animate = () => {
                     t += 0.016;
-                    // Halo cálido sutil
+                    // === Fase D: leer estado de fallas + eventos globales ===
+                    const faults    = faultsRef.current || {};
+                    const events    = eventsRef.current || {};
+                    const isHeat    = !!events.heat_wave;
+                    const isDoorOpen= !!events.door_open;
+                    const heatMul   = isHeat ? 2.4 : 1;
+
+                    // Halo cálido sutil (más intenso durante heat_wave)
                     heatMeshes.forEach(h => {
-                        const ph = t + h.userData.phase;
+                        const ph = t * heatMul + h.userData.phase;
                         const s = 1 + 0.07 * Math.sin(ph * 1.0);
                         h.scale.set(s, s, s);
-                        h.material.opacity = 0.06 + 0.04 * (0.5 + 0.5 * Math.sin(ph * 1.0));
+                        const baseOp = isHeat ? 0.18 : 0.06;
+                        h.material.opacity = baseOp + 0.05 * (0.5 + 0.5 * Math.sin(ph * 1.0));
                     });
-                    // Ondas de calor subiendo — finas y graduales
+                    // Ondas de calor — más rápidas + más opacas durante heat_wave
                     sceneObj.current.heatWaves?.forEach(w => {
-                        const u = ((t * 0.28 + w.userData.phase) % 1);
+                        const u = ((t * 0.28 * heatMul + w.userData.phase) % 1);
                         w.position.y = eqH + 2.21 + u * 2.0;
                         const sc = 1 + u * 1.8;
                         w.scale.set(sc, sc, sc);
-                        w.material.opacity = (1 - u) * 0.22 * Math.max(0, Math.sin(u * Math.PI));
+                        const peakOp = isHeat ? 0.55 : 0.22;
+                        w.material.opacity = (1 - u) * peakOp * Math.max(0, Math.sin(u * Math.PI));
+                    });
+
+                    // === PUERTAS abriéndose (door_open) — interpolación suave ===
+                    const openAngle = isDoorOpen ? Math.PI/2 * 0.88 : 0;
+                    const dp = sceneObj.current.doorPivots;
+                    if (dp) {
+                        const lerpRot = (piv, target) => {
+                            if (!piv) return;
+                            piv.rotation.y += (target - piv.rotation.y) * 0.08;
+                        };
+                        lerpRot(dp.main?.L,       openAngle);
+                        lerpRot(dp.main?.R,      -openAngle);
+                        lerpRot(dp.emergency?.L,  openAngle);
+                        lerpRot(dp.emergency?.R, -openAngle);
+                    }
+
+                    // === Banner OLA DE CALOR + override de luces ===
+                    if (isHeat && !sceneObj.current.heatWaveActive) {
+                        sceneObj.current.heatWaveActive = true;
+                        if (sceneObj.current.heatBanner) sceneObj.current.heatBanner.visible = true;
+                        // Tinte cálido/rojizo — mezcla con el color actual
+                        sceneObj.current.ambient?.color.lerp(new THREE.Color('#ffb070'), 0.5);
+                        if (sceneObj.current.ambient) sceneObj.current.ambient.intensity += 0.20;
+                        if (sceneObj.current.dir)     sceneObj.current.dir.intensity     += 0.30;
+                    } else if (!isHeat && sceneObj.current.heatWaveActive) {
+                        sceneObj.current.heatWaveActive = false;
+                        if (sceneObj.current.heatBanner) sceneObj.current.heatBanner.visible = false;
+                        // Restaurar luces al tema actual
+                        sceneObj.current.applySceneTheme?.(sceneObj.current.resolveTheme?.());
+                    }
+                    // Pulsar el banner mientras esté activo
+                    if (isHeat && sceneObj.current.heatBanner) {
+                        const pulse = 0.95 + 0.05 * Math.sin(t * 3);
+                        sceneObj.current.heatBanner.scale.set(3.5 * pulse, 0.88 * pulse, 1);
+                    }
+
+                    // === Íconos de alerta por equipo en falla ===
+                    const infos = [
+                        ...(sceneObj.current.hvacInfo || []),
+                        ...(sceneObj.current.presInfo || [])
+                    ];
+                    infos.forEach(info => {
+                        if (!info.alertSprite) return;
+                        const uid = info.alertSprite.userData.unitId;
+                        const isFaulty = !!faults[uid];
+                        info.alertSprite.visible = isFaulty;
+                        if (isFaulty) {
+                            const pulse = 0.85 + 0.15 * Math.sin(t * 5);
+                            info.alertSprite.scale.set(0.7 * pulse, 0.7 * pulse, 1);
+                        }
                     });
                     // Fan rotation
                     hvacGroup.children.forEach(u => {
@@ -3863,6 +3973,34 @@
                 const presAssignments = presUnits.map((u, i) => ({ wall: 'east', along: presZs[i], idx: i }));
                 const n = hvacUnits.length;
                 const hvacInfo = []; // {wall, alongCoord, canon values..., idx}
+
+                // === Helper: sprite de alerta (triángulo rojo con !) para mostrar sobre equipos en falla ===
+                const makeAlertSprite = (unitId) => {
+                    const c = document.createElement('canvas');
+                    c.width = 128; c.height = 128;
+                    const cx = c.getContext('2d');
+                    // Triángulo rojo con borde
+                    cx.fillStyle = '#dc2626';
+                    cx.strokeStyle = '#ffffff'; cx.lineWidth = 6; cx.lineJoin = 'round';
+                    cx.beginPath();
+                    cx.moveTo(64, 12);
+                    cx.lineTo(116, 108);
+                    cx.lineTo(12, 108);
+                    cx.closePath();
+                    cx.fill(); cx.stroke();
+                    // Exclamación blanca
+                    cx.fillStyle = '#ffffff';
+                    cx.font = 'bold 62px sans-serif';
+                    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+                    cx.fillText('!', 64, 74);
+                    const tex = new THREE.CanvasTexture(c);
+                    if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+                    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+                    sprite.scale.set(0.7, 0.7, 1);
+                    sprite.userData.unitId = unitId;
+                    sprite.renderOrder = 999;   // encima de todo
+                    return sprite;
+                };
 
                 const buildHvac = (idx, wall, alongCoord) => {
                     const u = hvacUnits[idx];
@@ -4193,6 +4331,11 @@
                     g.add(retArrow);
 
                     g.userData = { fan, spinSpeed: spin };
+                    // === Ícono de ALERTA flotando (visible solo con activeFaults[u.id]) ===
+                    const alertSprite = makeAlertSprite(u.id);
+                    alertSprite.position.set(bodyX, y + unitH/2 + 0.6, z);
+                    alertSprite.visible = false;
+                    g.add(alertSprite);
                     // === WRAP-AND-ROTATE: mover el group canónico a la pared destino ===
                     if (wall === 'north') {
                         g.rotation.y =  Math.PI/2;
@@ -4208,7 +4351,7 @@
                         wallX, outSign, interiorX,
                         canon_bodyX: bodyX, y,
                         canon_equipPos: new THREE.Vector3(bodyX, y, z),
-                        groupRef: g
+                        groupRef: g, alertSprite
                     });
                 };
 
@@ -4392,6 +4535,11 @@
 
                     // No hay fan axial visible en CASIBA (ventilador centrífugo interno). La señal de marcha es el LED + banda.
                     g.userData = { fan: null, spinSpeed: 0 };
+                    // Ícono de alerta sobre el presurizador (visible solo con falla)
+                    const alertSprite = makeAlertSprite(u.id);
+                    alertSprite.position.set(bodyX, y + unitH/2 + 0.5, z);
+                    alertSprite.visible = false;
+                    g.add(alertSprite);
                     // PRES canónico este — sin rotación (wall === 'east')
                     presGroup.add(g);
                     presInfo.push({
@@ -4399,7 +4547,7 @@
                         wallX, outSign, interiorX,
                         canon_bodyX: bodyX, y,
                         canon_equipPos: new THREE.Vector3(bodyX, y, z),
-                        groupRef: g
+                        groupRef: g, alertSprite
                     });
                 }
 
@@ -4560,6 +4708,10 @@
                         }
                     });
                 });
+
+                // Exponer hvacInfo/presInfo al animate loop para fault icons
+                obj.hvacInfo = hvacInfo;
+                obj.presInfo = presInfo;
             }, [hvacUnits, presUnits]);
 
             // Toggle interior/exterior — actualiza opacidad de paredes
@@ -5290,6 +5442,8 @@
                                 view={view}
                                 interiorVisible={interiorVisible}
                                 sceneTheme={sceneTheme}
+                                activeFaults={activeFaults}
+                                globalEvents={globalEvents}
                                 hmiValues={{
                                     salaTemp:  telemetry.salaTemp,
                                     humidity:  telemetry.salaHumidity,
