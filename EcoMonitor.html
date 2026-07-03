@@ -4790,9 +4790,10 @@
             const [interiorVisible, setInteriorVisible] = useState(true); // ver interior vs exterior cerrado
             const [sceneTheme, setSceneTheme]     = useState('auto'); // 'auto' | 'day' | 'night' — tema de la escena 3D
             // Layout — priorizar sala 3D:
-            const [panelCollapsed, setPanelCollapsed] = useState(false);   // ocultar panel derecho para ver la sala completa
-            const [trendsOpen, setTrendsOpen]         = useState(false);   // tendencias — colapsable, oculto por default
-            const [ganttOpen,  setGanttOpen]          = useState(false);   // gantt de rotación — colapsable, oculto por default
+            const [panelCollapsed, setPanelCollapsed] = useState(false);   // ocultar HUD flotante para ver la sala completa
+            const [trendsOpen, setTrendsOpen]         = useState(false);   // tendencias dentro del HUD, colapsable
+            const [ganttOpen,  setGanttOpen]          = useState(false);   // gantt dentro del HUD, colapsable
+            const [faultsMenuOpen, setFaultsMenuOpen] = useState(false);   // dropdown de fallas en la barra superior
 
             const [hvacUnits, setHvacUnits]       = useState([]);
             const [presUnits, setPresUnits]       = useState([]);
@@ -5239,222 +5240,194 @@
 
             const activeCount   = hvacUnits.filter(u => u.state === 'TITULAR' || u.state === 'APOYO').length;
             const standbyCount  = hvacUnits.filter(u => u.state === 'SUPLENTE').length;
+            // Bandera para el badge en el dropdown de Fallas (rojo pulsante si hay algo activo)
+            const anyFaultActive = Object.keys(activeFaults).length > 0 || Object.values(globalEvents).some(Boolean);
 
             return (
                 <div className="sim-panel w-full flex flex-col overflow-hidden lg:h-[min(92vh,920px)] lg:min-h-[640px]">
-                    {/* HEADER compacto — todo en una barra fina para que la escena sea protagonista */}
-                    <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-slate-800 bg-slate-900/40 flex-shrink-0">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-eco-blue/20 border border-eco-blue/40 flex items-center justify-center text-eco-lightblue">
-                                <Icon name="cpu" size={20} />
+                    {/* ═══════ TOP BAR — TODOS los controles en una barra fina (2A.3) ═══════ */}
+                    <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b border-slate-800 bg-slate-900/60 flex-shrink-0 relative z-20">
+                        {/* Identidad + play + speed + uptime */}
+                        <div className="flex items-center gap-2 mr-1">
+                            <div className="w-7 h-7 rounded-lg bg-eco-blue/20 border border-eco-blue/40 flex items-center justify-center text-eco-lightblue">
+                                <Icon name="cpu" size={13} />
                             </div>
-                            <div>
-                                <div className="text-white font-bold text-base">Simulador de sala</div>
-                                <div className="text-[11px] text-slate-400 font-mono">ROOM_01 · MASTER + N×HVAC + M×PRES</div>
-                            </div>
+                            <span className="text-white font-bold text-xs uppercase tracking-wider">Simulador</span>
                         </div>
-                        <div className="mt-4 md:mt-0 flex items-center gap-2 flex-wrap">
-                            {/* Play/Pause reloj físico */}
-                            <button
-                                onClick={() => setIsRunning(!isRunning)}
-                                className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 border ${isRunning ? 'bg-eco-lightgreen/20 border-eco-lightgreen/50 text-eco-lightgreen' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
-                                title={isRunning ? 'Pausar reloj físico' : 'Reanudar reloj físico'}>
-                                <Icon name={isRunning ? 'pause' : 'play'} size={12} /> {isRunning ? 'Live' : 'Pausa'}
-                            </button>
-                            {/* Selector de velocidad de simulación */}
-                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-1 flex" title="Velocidad del reloj físico">
-                                {[1, 30, 300].map(v => (
-                                    <button key={v} onClick={() => setSimSpeed(v)} className={`px-2 py-1 rounded text-[10px] font-bold font-mono transition-colors ${simSpeed === v ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>x{v}</button>
+                        <button onClick={() => setIsRunning(!isRunning)}
+                            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 border transition-colors ${isRunning ? 'bg-eco-lightgreen/20 border-eco-lightgreen/50 text-eco-lightgreen' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                            title={isRunning ? 'Pausar' : 'Reanudar'}>
+                            <Icon name={isRunning ? 'pause' : 'play'} size={11} /> {isRunning ? 'Live' : 'Pausa'}
+                        </button>
+                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex" title="Velocidad">
+                            {[1, 30, 300].map(v => (
+                                <button key={v} onClick={() => setSimSpeed(v)} className={`px-2 py-1 rounded text-[10px] font-bold font-mono ${simSpeed === v ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>x{v}</button>
+                            ))}
+                        </div>
+                        <div className="bg-slate-950 border border-slate-800 px-2 py-1 rounded-lg">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase mr-1">Uptime</span>
+                            <span className="text-sm font-mono font-bold text-white">{String(simulationTime + Math.floor(telemetry.accHoursSim)).padStart(4, '0')}<span className="text-[9px] text-eco-lightgreen ml-0.5">h</span></span>
+                        </div>
+                        {/* Vista + interior/exterior + tema */}
+                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex">
+                            <button onClick={() => setView('iso')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${view === 'iso' ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>3D</button>
+                            <button onClick={() => setView('top')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${view === 'top' ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>Top</button>
+                        </div>
+                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex">
+                            <button onClick={() => setInteriorVisible(true)}  className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Int</button>
+                            <button onClick={() => setInteriorVisible(false)} className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${!interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Ext</button>
+                        </div>
+                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex" title="Tema escena">
+                            <button onClick={() => setSceneTheme('auto')}  className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'auto'  ? 'bg-eco-blue text-white'      : 'text-slate-400 hover:text-white'}`}>Auto</button>
+                            <button onClick={() => setSceneTheme('day')}   className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'day'   ? 'bg-amber-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Día</button>
+                            <button onClick={() => setSceneTheme('night')} className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'night' ? 'bg-indigo-400 text-slate-900': 'text-slate-400 hover:text-white'}`}>Noc</button>
+                        </div>
+
+                        <div className="w-px h-6 bg-slate-800 mx-1"></div>
+
+                        {/* Parámetros compactos */}
+                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="HVAC instalados">
+                            <Icon name="snowflake" size={11} className="text-eco-lightgreen" />
+                            <select value={hvacTotal} onChange={handleTotalChange} className="bg-transparent text-[10px] text-white font-mono font-bold outline-none cursor-pointer">
+                                {Array.from({ length: 8 }, (_, i) => i + 1).map(n => (
+                                    <option key={n} value={n} className="bg-slate-950">{n} HVAC</option>
                                 ))}
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Presurizadores">
+                            <Icon name="fan" size={11} className="text-eco-lightblue" />
+                            <select value={presTotal} onChange={(e) => setPresTotal(parseInt(e.target.value))} className="bg-transparent text-[10px] text-white font-mono font-bold outline-none cursor-pointer">
+                                <option value={0} className="bg-slate-950">0 PRES</option>
+                                <option value={1} className="bg-slate-950">1 PRES</option>
+                                <option value={2} className="bg-slate-950">2 PRES</option>
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Suplentes">
+                            <Icon name="shield" size={11} className="text-slate-400" />
+                            <select value={hvacBackup} onChange={(e) => setHvacBackup(parseInt(e.target.value))} className="bg-transparent text-[10px] text-white font-mono font-bold outline-none cursor-pointer">
+                                {Array.from({ length: Math.floor(hvacTotal / 2) + 1 }, (_, i) => i).map(n => (
+                                    <option key={n} value={n} className="bg-slate-950">N-{n}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Ciclo rotación">
+                            <Icon name="refresh-cw" size={11} className="text-slate-400" />
+                            <select value={rotationPeriod} onChange={(e) => setRotationPeriod(e.target.value)} className="bg-transparent text-[10px] text-white font-mono font-bold outline-none cursor-pointer">
+                                <option value="day"   className="bg-slate-950">24 h</option>
+                                <option value="week"  className="bg-slate-950">1 sem</option>
+                                <option value="month" className="bg-slate-950">1 mes</option>
+                            </select>
+                        </div>
+                        <button onClick={() => setOverloadEnabled(!overloadEnabled)}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider ${overloadEnabled ? 'bg-amber-500/15 border-amber-500/50 text-amber-300' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                            title="Protocolo de apoyo automático">
+                            <Icon name="zap" size={11} /> Apoyo {overloadEnabled ? 'ON' : 'OFF'}
+                        </button>
+
+                        {/* Sliders inline compactos */}
+                        <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Temperatura exterior">
+                            <Icon name="thermometer-sun" size={11} className="text-amber-400" />
+                            <input type="range" min="-5" max="42" step="1" value={tExt} onChange={(e) => setTExt(parseInt(e.target.value))} className="sim-input-range" style={{ width: '70px' }}/>
+                            <span className="text-[10px] font-mono text-white font-bold w-9 text-right">{tExt}°C</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Carga térmica VDF">
+                            <Icon name="zap" size={11} className="text-eco-lightgreen" />
+                            <input type="range" min="60" max="140" step="5" value={Q_LOAD} onChange={(e) => setQ_LOAD(parseInt(e.target.value))} className="sim-input-range" style={{ width: '70px' }}/>
+                            <span className="text-[10px] font-mono text-white font-bold w-12 text-right">{Q_LOAD}kW</span>
+                        </div>
+
+                        {/* Ejecución */}
+                        <button onClick={advanceTime}
+                            className="px-2 py-1.5 bg-eco-green/15 hover:bg-eco-green/25 text-eco-lightgreen border border-eco-lightgreen/40 text-[10px] font-bold rounded-lg flex items-center gap-1 uppercase tracking-wider"
+                            title="Avanzar tiempo simulado">
+                            <Icon name="fast-forward" size={11} /> Avanzar
+                        </button>
+                        <button onClick={triggerOverload} disabled={!overloadEnabled || isOverloadActive || standbyCount === 0}
+                            className="px-2 py-1.5 bg-slate-950 hover:bg-amber-500/15 border border-slate-800 hover:border-amber-400/50 disabled:opacity-30 text-slate-400 hover:text-amber-300 text-[10px] font-bold rounded-lg flex items-center gap-1 uppercase tracking-wider"
+                            title="Forzar apoyo manual">
+                            <Icon name="alert-triangle" size={11} /> Apoyo
+                        </button>
+                        <button onClick={reset}
+                            className="px-2 py-1.5 bg-slate-950 hover:bg-red-950/30 border border-slate-800 hover:border-red-900 text-slate-500 hover:text-red-300 text-[10px] font-bold rounded-lg uppercase tracking-wider"
+                            title="Reset simulación">Reset</button>
+
+                        {/* Espaciador flexible + ⚠ Fallas dropdown + HUD toggle */}
+                        <div className="ml-auto flex items-center gap-1.5">
+                            <div className="relative">
+                                <button
+                                    onClick={() => setFaultsMenuOpen(!faultsMenuOpen)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 border transition-colors ${
+                                        anyFaultActive
+                                            ? 'bg-red-500/25 border-red-500/60 text-red-300'
+                                            : (faultsMenuOpen ? 'bg-red-500/15 border-red-500/40 text-red-300' : 'bg-slate-950 border-slate-800 text-red-400 hover:border-red-500/50')
+                                    }`}
+                                    title="Inyectar falla / evento global">
+                                    <Icon name="siren" size={12} /> Fallas
+                                    {anyFaultActive && <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"/>}
+                                    <Icon name={faultsMenuOpen ? 'chevron-up' : 'chevron-down'} size={10}/>
+                                </button>
+                                {faultsMenuOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-30" onClick={() => setFaultsMenuOpen(false)}/>
+                                        <div className="absolute top-full right-0 mt-1 z-40 bg-slate-950/95 backdrop-blur-md border border-slate-700 rounded-lg p-2 shadow-2xl w-[360px] max-h-[70vh] overflow-y-auto sim-no-scroll">
+                                            <div className="flex items-center justify-between mb-2 px-1">
+                                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5"><Icon name="siren" size={12}/> Inyección de fallas</span>
+                                                <button onClick={(e) => { e.stopPropagation(); normalizeAll(); }} className="px-2 py-1 rounded bg-eco-lightgreen/15 border border-eco-lightgreen/40 text-eco-lightgreen text-[9px] font-bold uppercase hover:bg-eco-lightgreen/25 flex items-center gap-1">
+                                                    <Icon name="check-circle-2" size={10}/> Normalizar
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                                {Object.entries(FAULT_EFFECTS).map(([key, f]) => {
+                                                    const activeOnAny = Object.values(activeFaults).includes(key);
+                                                    const sevCol = f.severity === 'crit' ? '#ef4444' : '#f59e0b';
+                                                    return (
+                                                        <button key={key} onClick={(e) => { e.stopPropagation(); injectFault(key); }}
+                                                            className={`text-left p-2 rounded border transition-all ${activeOnAny ? 'bg-red-500/20 border-red-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-600'}`}
+                                                            title={f.msg}>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Icon name={f.icon} size={11} style={{ color: sevCol }} />
+                                                                <span className="text-[9px] font-bold uppercase" style={{ color: sevCol }}>{f.severity === 'crit' ? 'crít' : 'atn'}</span>
+                                                                <span className="text-[8px] font-mono text-slate-500 ml-auto">{f.target}</span>
+                                                            </div>
+                                                            <div className="text-[10px] text-white font-semibold mt-0.5 leading-tight">{f.label}</div>
+                                                        </button>
+                                                    );
+                                                })}
+                                                {Object.entries(GLOBAL_EVENTS).map(([key, e]) => {
+                                                    const on = !!globalEvents[key];
+                                                    const sevCol = e.severity === 'crit' ? '#ef4444' : e.severity === 'warn' ? '#f59e0b' : '#0098c6';
+                                                    return (
+                                                        <button key={key} onClick={(ev) => { ev.stopPropagation(); toggleGlobalEvent(key); }}
+                                                            className={`text-left p-2 rounded border transition-all ${on ? 'bg-amber-500/20 border-amber-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-600'}`}
+                                                            title={e.msg}>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Icon name={e.icon} size={11} style={{ color: sevCol }} />
+                                                                <span className="text-[9px] font-bold uppercase" style={{ color: sevCol }}>{e.severity}</span>
+                                                                <span className="text-[8px] font-mono text-slate-500 ml-auto">GLOBAL</span>
+                                                            </div>
+                                                            <div className="text-[10px] text-white font-semibold mt-0.5 leading-tight">{e.label}{on ? ' · ON' : ''}</div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                            <div className="bg-slate-950 border border-slate-800 px-3 py-2 rounded-lg">
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mr-2">Uptime</span>
-                                <span className="text-lg font-mono font-bold text-white">{String(simulationTime + Math.floor(telemetry.accHoursSim)).padStart(4, '0')}<span className="text-xs text-eco-lightgreen ml-1">h</span></span>
-                            </div>
-                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-1 flex">
-                                <button onClick={() => setView('iso')} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${view === 'iso' ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>3D</button>
-                                <button onClick={() => setView('top')} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${view === 'top' ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>Top</button>
-                            </div>
-                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-1 flex">
-                                <button onClick={() => setInteriorVisible(true)} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Interior</button>
-                                <button onClick={() => setInteriorVisible(false)} className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${!interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Exterior</button>
-                            </div>
-                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-1 flex" title="Tema de la escena 3D">
-                                <button onClick={() => setSceneTheme('auto')}  className={`px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${sceneTheme === 'auto'  ? 'bg-eco-blue text-white' : 'text-slate-400 hover:text-white'}`}>Auto</button>
-                                <button onClick={() => setSceneTheme('day')}   className={`px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${sceneTheme === 'day'   ? 'bg-amber-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Día</button>
-                                <button onClick={() => setSceneTheme('night')} className={`px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${sceneTheme === 'night' ? 'bg-indigo-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Noche</button>
-                            </div>
-                            {/* Toggle panel EcoMonitor — priorizar vista de la sala */}
                             <button
                                 onClick={() => setPanelCollapsed(!panelCollapsed)}
-                                className={`px-2.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 border ${panelCollapsed ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white' : 'bg-eco-lightgreen/15 border-eco-lightgreen/40 text-eco-lightgreen'}`}
-                                title={panelCollapsed ? 'Mostrar panel EcoMonitor' : 'Ocultar panel — ver la sala completa'}>
-                                <Icon name={panelCollapsed ? 'panel-right-open' : 'panel-right-close'} size={12} />
-                                {panelCollapsed ? 'Panel' : 'Ocultar panel'}
+                                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 border transition-colors ${panelCollapsed ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white' : 'bg-eco-lightgreen/15 border-eco-lightgreen/40 text-eco-lightgreen'}`}
+                                title={panelCollapsed ? 'Mostrar HUD' : 'Ocultar HUD — sala completa'}>
+                                <Icon name={panelCollapsed ? 'layout-panel-top' : 'x'} size={11} /> HUD
                             </button>
                         </div>
                     </div>
 
-                    {/* === MAIN — grid: rail controles / escena 3D / panel EcoMonitor (opcional) === */}
-                    <div className={`flex-1 min-h-0 grid grid-cols-1 ${panelCollapsed ? 'lg:grid-cols-[260px_minmax(0,1fr)]' : 'lg:grid-cols-[260px_minmax(0,1fr)_300px]'}`}>
+                    {/* ═══════ MAIN AREA — sala 3D FULL + HUD flotante (2A.3) ═══════ */}
+                    <div className="relative flex-1 min-h-0" style={{ minHeight: '400px' }}>
 
-                        {/* ═══════ COLUMNA IZQUIERDA — rail de controles (scroll interno) ═══════ */}
-                        <div className="border-b lg:border-b-0 lg:border-r border-slate-800 overflow-y-auto sim-no-scroll flex flex-col">
-
-                    {/* Condiciones exteriores (T_ext + carga térmica) */}
-                    <div className="grid grid-cols-1 gap-3 px-3 py-3 bg-slate-900/30 border-b border-slate-800">
-                        <div>
-                            <div className="flex items-center justify-between mb-1">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <Icon name="thermometer-sun" size={12} className="text-amber-400" /> Temp. exterior
-                                </label>
-                                <span className="text-[11px] font-mono text-white">{tExt.toFixed(0)}°C</span>
-                            </div>
-                            <input type="range" min="-5" max="42" step="1" value={tExt} onChange={(e) => setTExt(parseInt(e.target.value))} className="sim-input-range w-full"/>
-                            <div className="flex justify-between text-[9px] font-mono text-slate-600 mt-0.5"><span>-5°C invierno</span><span>42°C pico</span></div>
-                        </div>
-                        <div>
-                            <div className="flex items-center justify-between mb-1">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <Icon name="zap" size={12} className="text-eco-lightgreen" /> Carga térmica VDF
-                                </label>
-                                <span className="text-[11px] font-mono text-white">{Q_LOAD.toFixed(0)} kW</span>
-                            </div>
-                            <input type="range" min="60" max="140" step="5" value={Q_LOAD} onChange={(e) => setQ_LOAD(parseInt(e.target.value))} className="sim-input-range w-full"/>
-                            <div className="flex justify-between text-[9px] font-mono text-slate-600 mt-0.5"><span>60 kW mínimo</span><span>140 kW crítico</span></div>
-                        </div>
-                    </div>
-
-                    {/* Config + Execution — apilados vertical en columna angosta */}
-                    <div className="border-b border-slate-800">
-                        <div className="p-3">
-                            <div className="text-[10px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] mb-3 flex items-center gap-2">
-                                <Icon name="sliders" size={12} /> Parámetros
-                            </div>
-                            <div className="grid grid-cols-2 gap-x-2 gap-y-3">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">HVAC instalados</label>
-                                    <select value={hvacTotal} onChange={handleTotalChange} className="sim-select w-full">
-                                        {Array.from({ length: 8 }, (_, i) => i + 1).map(n => (
-                                            <option key={n} value={n}>{n} {n === 1 ? 'unidad' : 'unidades'}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">Presurizadores</label>
-                                    <select value={presTotal} onChange={(e) => setPresTotal(parseInt(e.target.value))} className="sim-select w-full">
-                                        <option value={0}>0 (ninguno)</option>
-                                        <option value={1}>1 unidad</option>
-                                        <option value={2}>2 unidades</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">HVAC suplentes</label>
-                                    <select value={hvacBackup} onChange={(e) => setHvacBackup(parseInt(e.target.value))} className="sim-select w-full">
-                                        {Array.from({ length: Math.floor(hvacTotal / 2) + 1 }, (_, i) => i).map(n => (
-                                            <option key={n} value={n}>{
-                                                n === 0
-                                                    ? '0 (todos titulares)'
-                                                    : n === Math.floor(hvacTotal / 2)
-                                                        ? `N-${n} (100% redundancia)`
-                                                        : `N-${n} (${n} en reserva)`
-                                            }</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">Ciclo de rotación</label>
-                                    <select value={rotationPeriod} onChange={(e) => setRotationPeriod(e.target.value)} className="sim-select w-full">
-                                        <option value="day">24 h (1 día)</option>
-                                        <option value="week">168 h (1 semana)</option>
-                                        <option value="month">720 h (1 mes)</option>
-                                    </select>
-                                </div>
-                                <div className="col-span-2 flex items-center justify-between pt-3 border-t border-slate-800">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                        <Icon name="zap" size={12} className={overloadEnabled ? 'text-amber-400' : 'text-slate-600'} />
-                                        Protocolo de apoyo
-                                    </span>
-                                    <button onClick={() => setOverloadEnabled(!overloadEnabled)} className={`relative inline-flex h-5 w-10 rounded-full transition-colors border border-slate-700 ${overloadEnabled ? 'bg-amber-500/25' : 'bg-slate-800'}`}>
-                                        <span className={`h-3 w-3 m-0.5 bg-white rounded-full transition-transform mt-1 ml-1 ${overloadEnabled ? 'translate-x-5 shadow-[0_0_8px_rgba(251,191,36,0.9)]' : 'translate-x-0 bg-slate-500'}`} />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="p-3 border-t border-slate-800 flex flex-col gap-2">
-                            <div className="text-[10px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] flex items-center gap-2">
-                                <Icon name="terminal" size={12} /> Ejecución
-                            </div>
-                            <button onClick={advanceTime} className="w-full py-2.5 bg-eco-green/15 hover:bg-eco-green/25 text-eco-lightgreen border border-eco-lightgreen/40 hover:border-eco-lightgreen text-[11px] font-bold rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 uppercase tracking-widest shadow-[inset_0_0_15px_rgba(154,182,59,0.08)]">
-                                <Icon name="fast-forward" size={13} /> Avanzar {PERIOD_LABELS[rotationPeriod]}
-                            </button>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button onClick={triggerOverload} disabled={!overloadEnabled || isOverloadActive || standbyCount === 0} className="py-2 bg-slate-950/50 hover:bg-amber-500/15 border border-slate-800 hover:border-amber-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400 hover:text-amber-300 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider">
-                                    <Icon name="alert-triangle" size={12} /> Forzar apoyo
-                                </button>
-                                <button onClick={reset} className="py-2 bg-slate-950/50 hover:bg-red-950/30 border border-slate-800 hover:border-red-900 text-slate-500 hover:text-red-300 text-[10px] font-bold rounded-lg transition-all uppercase tracking-wider">
-                                    Reset
-                                </button>
-                            </div>
-                            <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-2 border-t border-slate-800">
-                                <span>Act: <span className="text-eco-lightgreen">{activeCount}</span></span>
-                                <span>Res: <span className="text-slate-300">{standbyCount}</span></span>
-                                <span>Cic: <span className="text-eco-lightblue">{history.length - 1}</span></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* === Botonera de INYECCIÓN DE FALLAS + eventos globales === */}
-                    <div className="p-3 bg-slate-950/40 flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="text-[10px] font-bold text-red-400 uppercase tracking-[0.18em] flex items-center gap-2">
-                                <Icon name="siren" size={12} /> Inyección de fallas
-                            </div>
-                            <button onClick={normalizeAll} className="px-2 py-1 rounded bg-eco-lightgreen/15 border border-eco-lightgreen/40 text-eco-lightgreen text-[9px] font-bold uppercase tracking-wider hover:bg-eco-lightgreen/25 transition-colors flex items-center gap-1">
-                                <Icon name="check-circle-2" size={10} /> Normalizar
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-1.5">
-                            {Object.entries(FAULT_EFFECTS).map(([key, f]) => {
-                                const activeOnAny = Object.values(activeFaults).includes(key);
-                                const sevCol = f.severity === 'crit' ? '#ef4444' : '#f59e0b';
-                                return (
-                                    <button key={key} onClick={() => injectFault(key)}
-                                        className={`text-left p-2 rounded border transition-all ${activeOnAny ? 'bg-red-500/20 border-red-500/50' : 'bg-slate-950/60 border-slate-800 hover:border-slate-600'}`}
-                                        title={f.msg}>
-                                        <div className="flex items-center gap-1.5">
-                                            <Icon name={f.icon} size={12} style={{ color: sevCol }} />
-                                            <span className="text-[9px] font-bold uppercase" style={{ color: sevCol }}>{f.severity === 'crit' ? 'crít' : 'atn'}</span>
-                                            <span className="text-[8px] font-mono text-slate-500 ml-auto">{f.target}</span>
-                                        </div>
-                                        <div className="text-[10px] text-white font-semibold mt-0.5 leading-tight">{f.label}</div>
-                                    </button>
-                                );
-                            })}
-                            {Object.entries(GLOBAL_EVENTS).map(([key, e]) => {
-                                const on = !!globalEvents[key];
-                                const sevCol = e.severity === 'crit' ? '#ef4444' : e.severity === 'warn' ? '#f59e0b' : '#0098c6';
-                                return (
-                                    <button key={key} onClick={() => toggleGlobalEvent(key)}
-                                        className={`text-left p-2 rounded border transition-all ${on ? 'bg-amber-500/20 border-amber-500/50' : 'bg-slate-950/60 border-slate-800 hover:border-slate-600'}`}
-                                        title={e.msg}>
-                                        <div className="flex items-center gap-1.5">
-                                            <Icon name={e.icon} size={12} style={{ color: sevCol }} />
-                                            <span className="text-[9px] font-bold uppercase" style={{ color: sevCol }}>{e.severity}</span>
-                                            <span className="text-[8px] font-mono text-slate-500 ml-auto">GLOBAL</span>
-                                        </div>
-                                        <div className="text-[10px] text-white font-semibold mt-0.5 leading-tight">{e.label}{on ? ' · ON' : ''}</div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                        </div>{/* ═══════ /COLUMNA IZQUIERDA ═══════ */}
-
-                        {/* ═══════ COLUMNA CENTRO — escena 3D (protagonista, ocupa todo el alto) ═══════ */}
-                        <div className="relative min-w-0 h-full border-t lg:border-t-0 border-slate-800" style={{ minHeight: '360px' }}>
+                        {/* Sala 3D — llena todo el ancho del main area (sin columnas laterales) */}
+                        <div className="absolute inset-0">
                             <Sala3D
                                 hvacUnits={hvacUnits}
                                 presUnits={presUnits}
@@ -5472,11 +5445,12 @@
                                     trendExt:  telemetry.trends.tempExt
                                 }}
                             />
-                        </div>{/* ═══════ /COLUMNA CENTRO ═══════ */}
+                        </div>{/* /Sala3D wrapper (absolute inset-0) */}
 
-                        {/* ═══════ COLUMNA DERECHA — Panel EcoMonitor + Timeline (scroll interno) ═══════ */}
+                        {/* ═══════ HUD FLOTANTE — panel translúcido sobre la esquina de la escena ═══════ */}
                         {!panelCollapsed && (
-                        <div className="relative bg-slate-900/50 flex flex-col border-t lg:border-t-0 lg:border-l border-slate-800 overflow-y-auto sim-no-scroll">
+                        <div className="absolute top-3 right-3 z-10 w-72 max-w-[calc(100vw-24px)] rounded-xl shadow-2xl bg-slate-950/85 backdrop-blur-md border border-slate-700 flex flex-col overflow-y-auto sim-no-scroll hud-panel"
+                             style={{ maxHeight: 'calc(100% - 24px)' }}>
                             {(() => {
                                 const t = telemetry;
                                 // Semáforo global
@@ -5716,8 +5690,8 @@
                                 )}
                             </div>
                         </div>
-                        )}{/* ═══════ /COLUMNA DERECHA ═══════ */}
-                    </div>{/* ═══════ /MAIN 3-columnas ═══════ */}
+                        )}{/* ═══════ /HUD FLOTANTE ═══════ */}
+                    </div>{/* ═══════ /MAIN AREA ═══════ */}
                 </div>
             );
         }
