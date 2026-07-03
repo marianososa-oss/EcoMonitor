@@ -3296,15 +3296,15 @@
                     lineMat
                 );
                 doorGroup.add(doorSplit);
-                // Barras horizontales tipo crash-bar (push to open)
-                [-leafW/2, leafW/2].forEach(xOff => {
-                    const crashBar = new THREE.Mesh(
-                        new THREE.BoxGeometry(leafW * 0.85, 0.06, 0.04),
-                        new THREE.MeshLambertMaterial({ color: '#3a3a42' })
-                    );
-                    crashBar.position.set(doorCenterX + xOff, doorY, doorZ + 0.04);
-                    doorGroup.add(crashBar);
-                });
+                // Barras horizontales tipo crash-bar (push to open) — VAN CON LA HOJA (child del pivot)
+                // Left leaf: pivot en el borde exterior (offset local +leafW/2 hacia el centro)
+                const crashBarMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
+                const crashL = new THREE.Mesh(new THREE.BoxGeometry(leafW * 0.85, 0.06, 0.04), crashBarMat);
+                crashL.position.set(leafW/2, 0, 0.04);   // relativo al leftLeafPivot
+                leftLeafPivot.add(crashL);
+                const crashR = new THREE.Mesh(new THREE.BoxGeometry(leafW * 0.85, 0.06, 0.04), crashBarMat);
+                crashR.position.set(-leafW/2, 0, 0.04);  // relativo al rightLeafPivot
+                rightLeafPivot.add(crashR);
                 // Cartel verde "SALIDA" (CanvasTexture con texto) arriba de la puerta
                 const exitCanvas = document.createElement('canvas');
                 exitCanvas.width = 256; exitCanvas.height = 72;
