@@ -2679,7 +2679,7 @@
                 themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
                 // Room dimensions (más grandes que antes)
-                const roomW = 12, roomD = 8, roomH = 2.6;  // shelter bajo (2.60m) — equipos internos casi tocan el techo
+                const roomW = 12, roomD = 8, roomH = 3.0;  // shelter 3.0m — deja aire para bandeja portacables + techo respetable
                 const lineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line });
                 const slabPad = 1; // slab extiende 1u más allá del shelter
 
@@ -3006,29 +3006,7 @@
                         scene.add(sup);
                     });
                 });
-                // Caño metálico grande perpendicular (saliendo del shelter por un lateral)
-                const bigPipeMat = new THREE.MeshLambertMaterial({ color: '#787880' });
-                const bigPipe = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.12, 0.12, roomD * 1.2, 12),
-                    bigPipeMat
-                );
-                bigPipe.rotation.x = Math.PI / 2;
-                bigPipe.position.set(-roomW * 0.30, 0.85, 0);
-                bigPipe.castShadow = true;
-                scene.add(bigPipe);
-                // Codos del caño grande
-                const elbow1 = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.13, 12, 8),
-                    bigPipeMat
-                );
-                elbow1.position.set(-roomW * 0.30, 0.85, -roomD * 0.60);
-                scene.add(elbow1);
-                const elbow2 = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.13, 12, 8),
-                    bigPipeMat
-                );
-                elbow2.position.set(-roomW * 0.30, 0.85,  roomD * 0.60);
-                scene.add(elbow2);
+                // (Caño metálico grande removido — no cumplía función)
 
                 // === PUERTA + PLATAFORMA + ESCALERA (wrap-and-rotate a cara corta OESTE) ===
                 // Construido en canónico (cara larga frontal), luego roto -π/2 y translado para
@@ -3353,16 +3331,16 @@
                 // En una sala eléctrica los equipos que disipan calor van pegados a la pared, nunca en el medio.
                 const heatMeshes = [];
                 const heatWaves = [];
-                const eqW = 1.3, eqH = 2.0, eqD = 0.9;  // VFDs 2.0m para caber bajo el techo 2.60m
-                const vfdBackZ = -roomD/2 + eqD/2 + 0.10;  // pegados a la pared del fondo
-                // Hilera CONTIGUA (sin separación entre unidades) — paso = eqW
+                const eqW = 1.3, eqH = 2.0, eqD = 0.9;
+                const vfdBackZ  = -roomD/2 + eqD/2 + 0.10;  // pared FONDO (norte)
+                const vfdFrontZ =  roomD/2 - eqD/2 - 0.10;  // pared FRENTE (sur) — hilera espejada
+                // DOS hileras contiguas (6 + 6), una contra cada pared larga.
+                // NOTA: espejado SOLO visual — la simulación térmica sigue usando Q_LOAD del slider,
+                // no la cantidad de VFDs dibujados.
+                const vfdXs = [-eqW * 2.5, -eqW * 1.5, -eqW * 0.5, eqW * 0.5, eqW * 1.5, eqW * 2.5];
                 const vfdPositions = [
-                    { x: -eqW * 2.5, z: vfdBackZ },
-                    { x: -eqW * 1.5, z: vfdBackZ },
-                    { x: -eqW * 0.5, z: vfdBackZ },
-                    { x:  eqW * 0.5, z: vfdBackZ },
-                    { x:  eqW * 1.5, z: vfdBackZ },
-                    { x:  eqW * 2.5, z: vfdBackZ }
+                    ...vfdXs.map(x => ({ x, z: vfdBackZ  })),
+                    ...vfdXs.map(x => ({ x, z: vfdFrontZ }))
                 ];
                 vfdPositions.forEach((pos, i) => {
                     const x = pos.x, z = pos.z;
@@ -3391,12 +3369,14 @@
                             scene.add(vent);
                         });
                     }
-                    // Etiqueta naranja (advertencia calor)
+                    // Etiqueta naranja (advertencia calor) — cara MIRANDO al pasillo central
+                    const facesCenter = z > 0 ? -1 : 1;  // z>0 (pared sur): cara mira a -Z; z<0 (fondo): mira a +Z
                     const label = new THREE.Mesh(
                         new THREE.PlaneGeometry(0.55, 0.2),
                         new THREE.MeshBasicMaterial({ color: '#f97316' })
                     );
-                    label.position.set(x, y + eqH/2 - 0.3, z + eqD/2 + 0.006);
+                    label.position.set(x, y + eqH/2 - 0.3, z + facesCenter * (eqD/2 + 0.006));
+                    if (facesCenter < 0) label.rotation.y = Math.PI;  // dar vuelta la cara si mira -Z
                     scene.add(label);
                     // Halo muy sutil sobre el equipo (apenas un brillo cálido, NO una bola que pulsa)
                     const heat = new THREE.Mesh(
@@ -3572,40 +3552,61 @@
                     cloudGroup.add(sph);
                 });
                 scene.add(cloudGroup);
-                // Pequeño icono Wi-Fi (3 arcos concéntricos) en el centro de la nube
-                for (let i = 0; i < 3; i++) {
-                    const arcGeo = new THREE.RingGeometry(0.18 + i*0.1, 0.22 + i*0.1, 24, 1, Math.PI * 0.85, Math.PI * 0.3);
-                    const arcMat = new THREE.MeshBasicMaterial({
-                        color: TH_COLOR.cloudGreen, transparent: true, opacity: 0.85, side: THREE.DoubleSide
-                    });
-                    const arc = new THREE.Mesh(arcGeo, arcMat);
-                    arc.rotation.x = -Math.PI / 2;
-                    arc.position.set(cloudX, cloudY + 0.7, cloudZ);
-                    scene.add(arc);
-                }
+                // === ETIQUETA "EcoMonitor Cloud · Base de datos" (sprite mirando a cámara) ===
+                const labelCanvas = document.createElement('canvas');
+                labelCanvas.width = 512; labelCanvas.height = 128;
+                const lctx = labelCanvas.getContext('2d');
+                // Fondo redondeado
+                lctx.fillStyle = 'rgba(0,71,143,0.95)';
+                const r = 20;
+                lctx.beginPath();
+                lctx.moveTo(r, 0);
+                lctx.lineTo(512 - r, 0); lctx.quadraticCurveTo(512, 0, 512, r);
+                lctx.lineTo(512, 128 - r); lctx.quadraticCurveTo(512, 128, 512 - r, 128);
+                lctx.lineTo(r, 128); lctx.quadraticCurveTo(0, 128, 0, 128 - r);
+                lctx.lineTo(0, r); lctx.quadraticCurveTo(0, 0, r, 0);
+                lctx.fill();
+                // Borde verde
+                lctx.strokeStyle = '#9ab63b'; lctx.lineWidth = 3;
+                lctx.stroke();
+                // Texto
+                lctx.fillStyle = '#ffffff';
+                lctx.font = 'bold 38px "Geist Mono", ui-monospace, monospace';
+                lctx.textAlign = 'center';
+                lctx.textBaseline = 'middle';
+                lctx.fillText('EcoMonitor Cloud', 256, 46);
+                lctx.fillStyle = '#9ab63b';
+                lctx.font = '22px "Geist Mono", ui-monospace, monospace';
+                lctx.fillText('▲ Base de datos', 256, 88);
+                const labelTex = new THREE.CanvasTexture(labelCanvas);
+                if (THREE.SRGBColorSpace) labelTex.colorSpace = THREE.SRGBColorSpace;
+                const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, transparent: true }));
+                labelSprite.scale.set(2.6, 0.65, 1);
+                labelSprite.position.set(cloudX, cloudY + 1.35, cloudZ);
+                scene.add(labelSprite);
+
                 const cloudPos = new THREE.Vector3(cloudX, cloudY, cloudZ);
 
-                // === WiFi pulses (4 anillos GRANDES viajando Master→Cloud, visibles en 3D) ===
-                const wifiRings = [];
-                const dirToCloud = new THREE.Vector3().subVectors(cloudPos, masterOutputPos).normalize();
-                for (let i = 0; i < 4; i++) {
-                    const ringGeo = new THREE.RingGeometry(0.32, 0.42, 32);
-                    const ringMat = new THREE.MeshBasicMaterial({
-                        color: TH_COLOR.cloudGreen, transparent: true, opacity: 0,
-                        side: THREE.DoubleSide, depthWrite: false
-                    });
-                    const ring = new THREE.Mesh(ringGeo, ringMat);
-                    // Orienta el anillo perpendicular a la trayectoria master→cloud
-                    ring.lookAt(masterOutputPos.clone().add(dirToCloud));
-                    ring.position.copy(masterOutputPos);
-                    ring.userData.phase = i / 4;
-                    scene.add(ring); wifiRings.push(ring);
+                // === PAQUETES DE DATOS (cubitos subiendo Master → Cloud en loop) ===
+                const dataPackets = [];
+                const packetMat = new THREE.MeshStandardMaterial({
+                    color: '#9ab63b', emissive: '#4f7725', emissiveIntensity: 0.6,
+                    metalness: 0.3, roughness: 0.4
+                });
+                for (let i = 0; i < 6; i++) {
+                    const pkt = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.10), packetMat);
+                    pkt.userData.phase = i / 6;
+                    pkt.position.copy(masterOutputPos);
+                    scene.add(pkt);
+                    dataPackets.push(pkt);
                 }
+                // Compat alias — algunas referencias antiguas usan wifiRings; queda vacío para no romper.
+                const wifiRings = [];
 
                 sceneObj.current = {
                     THREE, scene, camera, renderer,
                     hvacGroup, presGroup, esclavoGroup, cableGroup,
-                    heatMeshes, heatWaves, wifiRings, wallMeshes,
+                    heatMeshes, heatWaves, wifiRings, dataPackets, wallMeshes,
                     masterOutputPos, cloudPos,
                     roomW, roomD, roomH,
                     targetView: 'iso',
@@ -3729,17 +3730,21 @@
                             u.userData.fan.rotation.y += u.userData.spinSpeed;
                         }
                     });
-                    // WiFi pulses con heartbeat (lub-dub) viajando de Master a Cloud
-                    wifiRings.forEach(r => {
-                        const cycle = t * 0.55 + r.userData.phase;
-                        const beat = heartbeat(cycle);
-                        const u = (cycle % 1);
-                        r.position.x = masterOutputPos.x + (cloudPos.x - masterOutputPos.x) * u;
-                        r.position.y = masterOutputPos.y + (cloudPos.y - masterOutputPos.y) * u;
-                        r.position.z = masterOutputPos.z + (cloudPos.z - masterOutputPos.z) * u;
-                        const sc = 1 + u * 2.5;
-                        r.scale.set(sc, sc, sc);
-                        r.material.opacity = beat * 0.9;
+                    // Paquetes de datos: cubitos que SUBEN del master a la cloud en loop
+                    sceneObj.current.dataPackets?.forEach(pkt => {
+                        const cycle = t * 0.35 + pkt.userData.phase;
+                        const u = cycle % 1;
+                        pkt.position.x = masterOutputPos.x + (cloudPos.x - masterOutputPos.x) * u;
+                        pkt.position.y = masterOutputPos.y + (cloudPos.y - masterOutputPos.y) * u;
+                        pkt.position.z = masterOutputPos.z + (cloudPos.z - masterOutputPos.z) * u;
+                        // Rotación suave para verse "vivo"
+                        pkt.rotation.y = cycle * 3;
+                        pkt.rotation.x = cycle * 2;
+                        // Fade-in al salir, fade-out al llegar
+                        const fadeIn  = Math.min(1, u * 6);
+                        const fadeOut = Math.min(1, (1 - u) * 6);
+                        pkt.material.emissiveIntensity = 0.6 * Math.min(fadeIn, fadeOut);
+                        pkt.scale.setScalar(0.55 + 0.45 * Math.min(fadeIn, fadeOut));
                     });
                     // Camera: orbit con lerp para transiciones suaves
                     orbit.actualAzimuth += (orbit.targetAzimuth - orbit.actualAzimuth) * 0.12;
@@ -4056,42 +4061,48 @@
                         g.add(tab);
                     });
 
-                    // SOPORTE TRIANGULAR de acero (debajo del HVAC, contra la pared)
+                    // SOPORTES: ménsula pegada a la pared que nace del piso del shelter (2.21) y llega al HVAC.
+                    // Sin nada dangling — todo apoya contra la pared, realista.
                     const bracketMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
-                    const bracketBase = y - unitH/2;       // base donde apoya
+                    const bracketBase = y - unitH/2;
                     const bracketDepth = unitW * 0.9;
-                    // Viga horizontal (sostiene el HVAC)
+                    // Viga horizontal (sostiene el HVAC bottom)
                     const bHoriz = new THREE.Mesh(
-                        new THREE.BoxGeometry(bracketDepth, 0.08, 0.15),
+                        new THREE.BoxGeometry(bracketDepth, 0.08, unitD * 0.9),
                         bracketMat
                     );
-                    bHoriz.position.set(bodyX, bracketBase, z);
+                    bHoriz.position.set(bodyX, bracketBase - 0.04, z);
                     bHoriz.castShadow = true;
                     g.add(bHoriz);
-                    // Diagonal del bracket (de la pared al final de la horizontal)
-                    const diagLen = Math.sqrt(Math.pow(bracketDepth, 2) + Math.pow(bracketDepth * 0.9, 2));
-                    const bDiag = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.08, 0.08, 0.15),
-                        bracketMat
-                    );
-                    bDiag.scale.y = diagLen / 0.08;
-                    // Posicionar diagonal: desde (wallX, bracketBase - bracketDepth*0.9, z) hasta (bodyX + outSign*unitW/2, bracketBase, z)
-                    const from = new THREE.Vector3(wallX, bracketBase - bracketDepth * 0.9, z);
-                    const to   = new THREE.Vector3(bodyX + outSign * unitW/2 * 0.95, bracketBase, z);
-                    bDiag.position.copy(from.clone().add(to).multiplyScalar(0.5));
-                    bDiag.quaternion.setFromUnitVectors(
-                        new THREE.Vector3(0, 1, 0),
-                        new THREE.Vector3().subVectors(to, from).normalize()
-                    );
-                    bDiag.castShadow = true;
-                    g.add(bDiag);
-                    // Pegado a la pared (viga vertical corta donde se ancla)
-                    const bWall = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.08, 0.9, 0.15),
-                        bracketMat
-                    );
-                    bWall.position.set(wallX, bracketBase - 0.45, z);
-                    g.add(bWall);
+                    // Panel vertical pegado a la pared del shelter, desde el piso (2.21) hasta la base del HVAC.
+                    // Nace del piso, apoyado contra la pared — no queda aire debajo.
+                    const wallAttachH = Math.max(0.05, bracketBase - 2.21);
+                    if (wallAttachH > 0.05) {
+                        const wallPanel = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.08, wallAttachH, unitD * 0.9),
+                            bracketMat
+                        );
+                        wallPanel.position.set(wallX + outSign * 0.045, 2.21 + wallAttachH/2, z);
+                        wallPanel.castShadow = true;
+                        g.add(wallPanel);
+                        // 2 escuadras diagonales de refuerzo (una a cada extremo, en dz)
+                        [-unitD * 0.35, unitD * 0.35].forEach(dz => {
+                            const diagLen = Math.sqrt(bracketDepth * bracketDepth + wallAttachH * wallAttachH);
+                            const bDiag = new THREE.Mesh(
+                                new THREE.BoxGeometry(0.05, diagLen, 0.05),
+                                bracketMat
+                            );
+                            const from = new THREE.Vector3(wallX + outSign * 0.05, 2.21, z + dz);
+                            const to   = new THREE.Vector3(bodyX + outSign * unitW/2 * 0.85, bracketBase - 0.04, z + dz);
+                            bDiag.position.copy(from.clone().add(to).multiplyScalar(0.5));
+                            bDiag.quaternion.setFromUnitVectors(
+                                new THREE.Vector3(0, 1, 0),
+                                new THREE.Vector3().subVectors(to, from).normalize()
+                            );
+                            bDiag.castShadow = true;
+                            g.add(bDiag);
+                        });
+                    }
 
                     // === REJILLAS INTERIORES (en la pared del shelter, alineadas con el HVAC) ===
                     const interiorX = wallX + (-outSign) * 0.025;  // 2.5cm hacia el interior de la pared
@@ -4443,24 +4454,59 @@
                 };
                 if (esclavoData.length > 0) {
                     const cableY = roomH * 0.92 + 2.21;
-                    // Orden PERIMETRAL sin cruces: norte (izq→der) → este (arriba→abajo) → sur (der→izq).
-                    // Todos los canónicos usan Z como along-wall → sort por canon_z ASC produce
-                    // el recorrido antihorario correcto para las tres paredes (norte, este, sur).
+                    // Orden PERIMETRAL sin cruces
                     const byCanonZ = (a, b) => a.pos_canonical.z - b.pos_canonical.z;
                     const northEs = esclavoData.filter(e => e.wall === 'north').sort(byCanonZ);
                     const eastEs  = esclavoData.filter(e => e.wall === 'east').sort(byCanonZ);
                     const southEs = esclavoData.filter(e => e.wall === 'south').sort(byCanonZ);
-                    const orderedEs = [...northEs, ...eastEs, ...southEs];
+
+                    // Cable PEGADO A LA PARED: horizontal siempre pinneado a la esquina pared-techo,
+                    // bajadas verticales por la pared hasta cada esclavo. Cero diagonales por el aire.
+                    const cableOffset = 0.12;   // separación del cable respecto a la pared
+                    const wallZ_north = -roomD/2 + cableOffset;
+                    const wallX_east  =  roomW/2 - cableOffset;
+                    const wallZ_south =  roomD/2 - cableOffset;
+                    const wallX_west  = -roomW/2 + cableOffset;
 
                     const pts = [masterOutputPos.clone()];
-                    // Sube del master al techo
-                    pts.push(new THREE.Vector3(masterOutputPos.x, cableY, masterOutputPos.z));
-                    // Visita cada esclavo (posición en MUNDO)
-                    orderedEs.forEach(e => {
+                    // Sube del master a la altura de la esquina pared-techo (aún en la pared oeste)
+                    pts.push(new THREE.Vector3(wallX_west, cableY, masterOutputPos.z));
+                    // A lo largo de la pared oeste hasta la esquina NO (si hay norte esclavos)
+                    if (northEs.length > 0) {
+                        pts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));   // esquina NO
+                    }
+                    // Norte: pin Z al wall interior, X varía con cada esclavo
+                    northEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        pts.push(new THREE.Vector3(wp.x, cableY, wp.z));
-                        pts.push(new THREE.Vector3(wp.x, wp.y + escH/2 + 0.05, wp.z));
-                        pts.push(new THREE.Vector3(wp.x, cableY, wp.z));
+                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_north));  // top de la pared en X
+                        pts.push(new THREE.Vector3(wp.x, wp.y + escH/2 + 0.05,  wallZ_north));  // baja al esclavo
+                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_north));  // vuelve al techo
+                    });
+                    // Transición NE → Este si aplica
+                    if (northEs.length > 0 && eastEs.length > 0) {
+                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));   // esquina NE
+                    } else if (eastEs.length > 0) {
+                        // No hay norte: viene directo desde master (pared oeste) → cruza norte para llegar al este
+                        pts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));
+                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));
+                    }
+                    // Este: pin X al wall interior, Z varía
+                    eastEs.forEach(e => {
+                        const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
+                        pts.push(new THREE.Vector3(wallX_east, cableY,                wp.z));
+                        pts.push(new THREE.Vector3(wallX_east, wp.y + escH/2 + 0.05,  wp.z));
+                        pts.push(new THREE.Vector3(wallX_east, cableY,                wp.z));
+                    });
+                    // Transición SE → Sur si aplica
+                    if (eastEs.length > 0 && southEs.length > 0) {
+                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_south));   // esquina SE
+                    }
+                    // Sur: pin Z al wall interior
+                    southEs.forEach(e => {
+                        const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
+                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_south));
+                        pts.push(new THREE.Vector3(wp.x, wp.y + escH/2 + 0.05,  wallZ_south));
+                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_south));
                     });
 
                     if (pts.length >= 2) {
