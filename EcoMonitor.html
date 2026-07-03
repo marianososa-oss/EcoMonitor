@@ -3297,12 +3297,25 @@
                     crashBar.position.set(doorCenterX + xOff, doorY, doorZ + 0.04);
                     doorGroup.add(crashBar);
                 });
-                // Cartel "EXIT / EMERGENCY" verde arriba de la puerta
+                // Cartel verde "SALIDA" (CanvasTexture con texto) arriba de la puerta
+                const exitCanvas = document.createElement('canvas');
+                exitCanvas.width = 256; exitCanvas.height = 72;
+                const ectx = exitCanvas.getContext('2d');
+                ectx.fillStyle = '#16a34a'; ectx.fillRect(0, 0, 256, 72);
+                ectx.strokeStyle = '#ffffff'; ectx.lineWidth = 3;
+                ectx.strokeRect(3, 3, 250, 66);
+                ectx.fillStyle = '#ffffff';
+                ectx.font = 'bold 34px "Geist", Arial, sans-serif';
+                ectx.textAlign = 'center';
+                ectx.textBaseline = 'middle';
+                ectx.fillText('▶  SALIDA', 128, 38);
+                const exitTex = new THREE.CanvasTexture(exitCanvas);
+                if (THREE.SRGBColorSpace) exitTex.colorSpace = THREE.SRGBColorSpace;
                 const exitSign = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.55, 0.15, 0.04),
-                    new THREE.MeshBasicMaterial({ color: '#16a34a' })
+                    new THREE.PlaneGeometry(0.7, 0.20),
+                    new THREE.MeshBasicMaterial({ map: exitTex })
                 );
-                exitSign.position.set(doorCenterX, 2.21 + doorH + 0.13, doorZ + 0.03);
+                exitSign.position.set(doorCenterX, 2.21 + doorH + 0.14, doorZ + 0.03);
                 doorGroup.add(exitSign);
                 // Bisagras (2 por hoja)
                 const hingeMat = new THREE.MeshLambertMaterial({ color: '#3a3a42' });
@@ -3317,15 +3330,19 @@
                         doorGroup.add(hinge);
                     });
                 });
-                // Aplicar rotación + traslación al doorGroup para llevarlo a la cara corta OESTE
-                // Canónico: puerta en (-roomW/4, y, +roomD/2). Target: (-roomW/2, y, +2) offset del master en z=0.
-                // Rot Y=-π/2 mapea +Z → -X (normal de la puerta apunta hacia -X, que es afuera del oeste).
+                // === PUERTA PRINCIPAL — cara corta OESTE ===
+                // Rot Y=-π/2 + trans (-2, 0, +5) mapea canónico (-3, y, +4) → mundo (-6, y, +2).
                 doorGroup.rotation.y = -Math.PI/2;
-                // Delta translation:
-                //   canonical door center (-3, y, +4) after rot Y=-π/2 → (-4, y, -3)
-                //   target (-6, y, +2). Delta = (-6-(-4), 0, 2-(-3)) = (-2, 0, +5)
                 doorGroup.position.set(-2, 0, 5);
                 scene.add(doorGroup);
+
+                // === PUERTA DE EMERGENCIA — cara corta ESTE (clonando el mismo doorGroup) ===
+                // Rot Y=+π/2 + trans (+2, 0, -5) mapea canónico (-3, y, +4) → mundo (+6, y, -2).
+                // Compartimos la cara este con los presurizadores; puerta en z=-2, PRES quedan en z positivo.
+                const emergencyGroup = doorGroup.clone(true);
+                emergencyGroup.rotation.y = Math.PI/2;
+                emergencyGroup.position.set(2, 0, -5);
+                scene.add(emergencyGroup);
 
                 // === VFDs (6 cabinets contra la pared del FONDO — pasillo central libre) ===
                 // En una sala eléctrica los equipos que disipan calor van pegados a la pared, nunca en el medio.
@@ -3838,8 +3855,11 @@
                         : { wall: 'south', along: southXs[i - nNorth],  idx: i }
                 );
                 // PRES: todos en cara corta ESTE (x=+roomW/2)
-                const presSpread = roomD * 0.55;
-                const presZs = distributeAlong(presUnits.length, presSpread);
+                // PRES comparten la cara ESTE con la puerta de emergencia (que va en z=-2).
+                // Ponemos los PRES en el HEMISFERIO POSITIVO de Z para no colisionar.
+                const presZs = presUnits.length === 0 ? []
+                    : presUnits.length === 1 ? [+1.6]
+                    : [+0.6, +2.6];  // 2 unidades, espaciadas en el hemisferio +Z
                 const presAssignments = presUnits.map((u, i) => ({ wall: 'east', along: presZs[i], idx: i }));
                 const n = hvacUnits.length;
                 const hvacInfo = []; // {wall, alongCoord, canon values..., idx}
