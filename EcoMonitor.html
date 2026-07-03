@@ -3352,6 +3352,74 @@
                 emergencyGroup.position.set(2, 0, -5);
                 scene.add(emergencyGroup);
 
+                // === AIRE VISIBLE — wisps sutiles en cerramientos + chorros por las puertas al abrirse ===
+                // Ligero: pocos meshes, blending aditivo, fade in/out por partícula.
+                const airGroup = new THREE.Group();
+                scene.add(airGroup);
+                const airMat = new THREE.MeshBasicMaterial({
+                    color: '#cfe8ff', transparent: true, opacity: 0.35,
+                    blending: THREE.AdditiveBlending, depthWrite: false
+                });
+                // Sprite geometry — pequeña esfera baja poly
+                const airGeo = new THREE.SphereGeometry(0.08, 8, 6);
+                // === Perimeter wisps — siempre visibles, muy sutiles (sala en sobrepresión +50 Pa) ===
+                const perimeterWisps = [];
+                const wispOriginsPerimeter = [
+                    // Juntas de la puerta oeste (arriba/abajo del marco)
+                    { origin: new THREE.Vector3(-roomW/2 - 0.05, 2.21 + 2.2 + 0.05, +2), dir: new THREE.Vector3(-1, 0.2, 0), len: 1.5, speed: 0.15 },
+                    { origin: new THREE.Vector3(-roomW/2 - 0.05, 2.21 + 0.05,       +2), dir: new THREE.Vector3(-1,-0.2, 0), len: 1.5, speed: 0.14 },
+                    // Juntas de la puerta este (arriba/abajo)
+                    { origin: new THREE.Vector3( roomW/2 + 0.05, 2.21 + 2.2 + 0.05, -2), dir: new THREE.Vector3( 1, 0.2, 0), len: 1.5, speed: 0.15 },
+                    { origin: new THREE.Vector3( roomW/2 + 0.05, 2.21 + 0.05,       -2), dir: new THREE.Vector3( 1,-0.2, 0), len: 1.5, speed: 0.14 },
+                    // Juntas pared norte (2 puntos a lo largo)
+                    { origin: new THREE.Vector3(-3, 2.21 + roomH * 0.5, -roomD/2 - 0.02), dir: new THREE.Vector3(0.05, 0.15, -1), len: 1.2, speed: 0.12 },
+                    { origin: new THREE.Vector3( 3, 2.21 + roomH * 0.5, -roomD/2 - 0.02), dir: new THREE.Vector3(-0.05,0.15, -1), len: 1.2, speed: 0.13 },
+                    // Juntas pared sur
+                    { origin: new THREE.Vector3(-3, 2.21 + roomH * 0.5,  roomD/2 + 0.02), dir: new THREE.Vector3(0.05, 0.15,  1), len: 1.2, speed: 0.11 },
+                    { origin: new THREE.Vector3( 3, 2.21 + roomH * 0.5,  roomD/2 + 0.02), dir: new THREE.Vector3(-0.05,0.15,  1), len: 1.2, speed: 0.12 },
+                    // Juntas del techo (4 esquinas superiores)
+                    { origin: new THREE.Vector3(-roomW/2 + 0.5, 2.21 + roomH - 0.05, -roomD/2 + 0.5), dir: new THREE.Vector3(-0.6, 0.5, -0.6), len: 1.4, speed: 0.10 },
+                    { origin: new THREE.Vector3( roomW/2 - 0.5, 2.21 + roomH - 0.05, -roomD/2 + 0.5), dir: new THREE.Vector3( 0.6, 0.5, -0.6), len: 1.4, speed: 0.10 },
+                    { origin: new THREE.Vector3(-roomW/2 + 0.5, 2.21 + roomH - 0.05,  roomD/2 - 0.5), dir: new THREE.Vector3(-0.6, 0.5,  0.6), len: 1.4, speed: 0.10 },
+                    { origin: new THREE.Vector3( roomW/2 - 0.5, 2.21 + roomH - 0.05,  roomD/2 - 0.5), dir: new THREE.Vector3( 0.6, 0.5,  0.6), len: 1.4, speed: 0.10 }
+                ];
+                wispOriginsPerimeter.forEach((w, i) => {
+                    const mesh = new THREE.Mesh(airGeo, airMat.clone());
+                    mesh.userData = { ...w, phase: i / wispOriginsPerimeter.length, kind: 'perimeter' };
+                    mesh.userData.dir.normalize();
+                    airGroup.add(mesh);
+                    perimeterWisps.push(mesh);
+                });
+                // === Door streams — chorros por las puertas cuando door_open ===
+                const doorStreams = [];
+                const doorY_world = 2.21 + 1.1;   // altura media de la puerta
+                // Main door (oeste) — flow -X
+                for (let d = 0; d < 6; d++) {
+                    const stream = new THREE.Mesh(airGeo, airMat.clone());
+                    stream.userData = {
+                        origin: new THREE.Vector3(-roomW/2 - 0.05, doorY_world + (d - 2.5) * 0.35, +2),
+                        dir: new THREE.Vector3(-1, 0, 0),
+                        len: 2.5, speed: 0.55,
+                        phase: d / 6, kind: 'door'
+                    };
+                    stream.visible = false;
+                    airGroup.add(stream);
+                    doorStreams.push(stream);
+                }
+                // Emergency door (este) — flow +X
+                for (let d = 0; d < 6; d++) {
+                    const stream = new THREE.Mesh(airGeo, airMat.clone());
+                    stream.userData = {
+                        origin: new THREE.Vector3(roomW/2 + 0.05, doorY_world + (d - 2.5) * 0.35, -2),
+                        dir: new THREE.Vector3(1, 0, 0),
+                        len: 2.5, speed: 0.55,
+                        phase: d / 6, kind: 'door'
+                    };
+                    stream.visible = false;
+                    airGroup.add(stream);
+                    doorStreams.push(stream);
+                }
+
                 // === VFDs (6 cabinets contra la pared del FONDO — pasillo central libre) ===
                 // En una sala eléctrica los equipos que disipan calor van pegados a la pared, nunca en el medio.
                 const heatMeshes = [];
@@ -3556,58 +3624,95 @@
                 // Punto de salida del cable Modbus: ARRIBA del master (sale por el TOP)
                 const masterOutputPos = new THREE.Vector3(masterX + 0.1, masterY + mH/2 + 0.05, masterZ);
 
-                // === Cloud (esferas puffy, cerca del Master) ===
-                // Master está en pared izquierda interior. Cloud arriba a la izquierda, cerca pero claramente afuera.
-                const cloudY = 7;
-                const cloudX = -roomW/2 - 1.8, cloudZ = -1.5;
+                // === Cloud (esferas puffy grandes, arriba a la izquierda del Master) ===
+                const cloudY = 8;
+                const cloudX = -roomW/2 - 2.5, cloudZ = -2;
                 const cloudGroup = new THREE.Group();
-                const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-                // Cluster de esferas overlapping para look "puffy"
+                // Multiple materiales para dar volumen (2 shades — más claro arriba, más oscuro abajo)
+                const cloudMatLight = new THREE.MeshStandardMaterial({ color: '#ffffff', metalness: 0.0, roughness: 0.95 });
+                const cloudMatMid   = new THREE.MeshStandardMaterial({ color: '#f0f4fb', metalness: 0.0, roughness: 0.95 });
+                const cloudMatDeep  = new THREE.MeshStandardMaterial({ color: '#dae0ea', metalness: 0.0, roughness: 0.95 });
+                // Nube más grande — 12 esferas overlapping con distinto tamaño y tono
                 const cloudBlobs = [
-                    { x: 0,     y: 0,     z: 0,    r: 0.55 },
-                    { x: 0.55,  y: 0.05,  z: 0,    r: 0.45 },
-                    { x: -0.5,  y: 0.02,  z: 0.1,  r: 0.5  },
-                    { x: 0.25,  y: 0.32,  z: -0.05,r: 0.4  },
-                    { x: -0.25, y: 0.28,  z: 0.05, r: 0.38 },
-                    { x: 0.1,   y: -0.1,  z: 0.15, r: 0.42 }
+                    // Base más oscura (parte inferior de la nube)
+                    { x: -0.6, y: -0.15, z: 0,    r: 0.80, mat: cloudMatDeep },
+                    { x:  0.6, y: -0.10, z: 0.05, r: 0.75, mat: cloudMatDeep },
+                    { x:  0.0, y: -0.25, z: 0.1,  r: 0.72, mat: cloudMatDeep },
+                    // Cuerpo medio
+                    { x: -1.15, y: 0.15,  z: 0,     r: 0.65, mat: cloudMatMid },
+                    { x:  1.20, y: 0.20,  z: 0.05,  r: 0.70, mat: cloudMatMid },
+                    { x: -0.30, y: 0.10,  z: -0.1,  r: 0.85, mat: cloudMatMid },
+                    { x:  0.40, y: 0.15,  z:  0.1,  r: 0.82, mat: cloudMatMid },
+                    // Puffs superiores (más claros)
+                    { x: -0.60, y: 0.55,  z:  0.05, r: 0.55, mat: cloudMatLight },
+                    { x:  0.55, y: 0.60,  z: -0.05, r: 0.58, mat: cloudMatLight },
+                    { x:  0.00, y: 0.75,  z:  0.10, r: 0.52, mat: cloudMatLight },
+                    { x: -1.00, y: 0.45,  z:  0.10, r: 0.42, mat: cloudMatLight },
+                    { x:  1.05, y: 0.50,  z:  0.05, r: 0.45, mat: cloudMatLight }
                 ];
                 cloudBlobs.forEach(b => {
-                    const sph = new THREE.Mesh(new THREE.SphereGeometry(b.r, 18, 14), cloudMat);
+                    const sph = new THREE.Mesh(new THREE.SphereGeometry(b.r, 22, 16), b.mat);
                     sph.position.set(cloudX + b.x, cloudY + b.y, cloudZ + b.z);
+                    sph.castShadow = false; sph.receiveShadow = false;
                     cloudGroup.add(sph);
                 });
                 scene.add(cloudGroup);
-                // === ETIQUETA "EcoMonitor Cloud · Base de datos" (sprite mirando a cámara) ===
+
+                // === ETIQUETA "EcoMonitor Cloud · Base de datos" — sprite billboard ===
                 const labelCanvas = document.createElement('canvas');
-                labelCanvas.width = 512; labelCanvas.height = 128;
+                labelCanvas.width = 640; labelCanvas.height = 176;
                 const lctx = labelCanvas.getContext('2d');
-                // Fondo redondeado
-                lctx.fillStyle = 'rgba(0,71,143,0.95)';
-                const r = 20;
+                // Fondo con gradiente (azul oscuro → azul brillante) redondeado
+                const rBg = 26;
+                const bgGrad = lctx.createLinearGradient(0, 0, 0, 176);
+                bgGrad.addColorStop(0,   'rgba(0, 71, 143, 0.98)');
+                bgGrad.addColorStop(1,   'rgba(15, 44, 82, 0.98)');
+                lctx.fillStyle = bgGrad;
                 lctx.beginPath();
-                lctx.moveTo(r, 0);
-                lctx.lineTo(512 - r, 0); lctx.quadraticCurveTo(512, 0, 512, r);
-                lctx.lineTo(512, 128 - r); lctx.quadraticCurveTo(512, 128, 512 - r, 128);
-                lctx.lineTo(r, 128); lctx.quadraticCurveTo(0, 128, 0, 128 - r);
-                lctx.lineTo(0, r); lctx.quadraticCurveTo(0, 0, r, 0);
+                lctx.moveTo(rBg, 0);
+                lctx.lineTo(640 - rBg, 0); lctx.quadraticCurveTo(640, 0, 640, rBg);
+                lctx.lineTo(640, 176 - rBg); lctx.quadraticCurveTo(640, 176, 640 - rBg, 176);
+                lctx.lineTo(rBg, 176); lctx.quadraticCurveTo(0, 176, 0, 176 - rBg);
+                lctx.lineTo(0, rBg); lctx.quadraticCurveTo(0, 0, rBg, 0);
                 lctx.fill();
-                // Borde verde
-                lctx.strokeStyle = '#9ab63b'; lctx.lineWidth = 3;
+                // Borde exterior verde brand + interior blanco
+                lctx.strokeStyle = '#9ab63b'; lctx.lineWidth = 4; lctx.stroke();
+                lctx.strokeStyle = 'rgba(255,255,255,0.15)'; lctx.lineWidth = 1.5;
+                lctx.beginPath();
+                lctx.moveTo(rBg + 6, 6);
+                lctx.lineTo(640 - rBg - 6, 6);
+                lctx.quadraticCurveTo(634, 6, 634, rBg + 6);
+                lctx.lineTo(634, 176 - rBg - 6);
+                lctx.quadraticCurveTo(634, 170, 640 - rBg - 6, 170);
+                lctx.lineTo(rBg + 6, 170);
+                lctx.quadraticCurveTo(6, 170, 6, 176 - rBg - 6);
+                lctx.lineTo(6, rBg + 6);
+                lctx.quadraticCurveTo(6, 6, rBg + 6, 6);
                 lctx.stroke();
-                // Texto
-                lctx.fillStyle = '#ffffff';
-                lctx.font = 'bold 38px "Geist Mono", ui-monospace, monospace';
-                lctx.textAlign = 'center';
-                lctx.textBaseline = 'middle';
-                lctx.fillText('EcoMonitor Cloud', 256, 46);
+                // Icono nube a la izquierda (dibujado simple)
                 lctx.fillStyle = '#9ab63b';
-                lctx.font = '22px "Geist Mono", ui-monospace, monospace';
-                lctx.fillText('▲ Base de datos', 256, 88);
+                lctx.beginPath();
+                lctx.arc(60, 92, 22, 0, Math.PI*2);
+                lctx.arc(88, 88, 26, 0, Math.PI*2);
+                lctx.arc(72, 76, 20, 0, Math.PI*2);
+                lctx.arc(102, 96, 20, 0, Math.PI*2);
+                lctx.fill();
+                // Texto principal
+                lctx.fillStyle = '#ffffff';
+                lctx.font = 'bold 46px "Geist", "Geist Mono", ui-monospace, sans-serif';
+                lctx.textAlign = 'left';
+                lctx.textBaseline = 'middle';
+                lctx.fillText('EcoMonitor Cloud', 140, 72);
+                // Subtítulo
+                lctx.fillStyle = '#9ab63b';
+                lctx.font = '24px "Geist Mono", ui-monospace, monospace';
+                lctx.fillText('▲  Base de datos', 140, 118);
                 const labelTex = new THREE.CanvasTexture(labelCanvas);
                 if (THREE.SRGBColorSpace) labelTex.colorSpace = THREE.SRGBColorSpace;
-                const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, transparent: true }));
-                labelSprite.scale.set(2.6, 0.65, 1);
-                labelSprite.position.set(cloudX, cloudY + 1.35, cloudZ);
+                const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, transparent: true, depthTest: false }));
+                labelSprite.scale.set(3.6, 1.0, 1);
+                labelSprite.position.set(cloudX, cloudY + 1.8, cloudZ);
+                labelSprite.renderOrder = 900;
                 scene.add(labelSprite);
 
                 // === Banner "🌡 OLA DE CALOR" — visible solo cuando globalEvents.heat_wave ===
@@ -3661,6 +3766,7 @@
                     THREE, scene, camera, renderer,
                     hvacGroup, presGroup, esclavoGroup, cableGroup,
                     heatMeshes, heatWaves, wifiRings, dataPackets, wallMeshes,
+                    perimeterWisps, doorStreams,
                     masterOutputPos, cloudPos,
                     roomW, roomD, roomH,
                     targetView: 'iso',
@@ -3742,8 +3848,9 @@
                     if (!orbit.isDragging) return;
                     const dx = ev.clientX - orbit.prevMouse.x;
                     const dy = ev.clientY - orbit.prevMouse.y;
-                    orbit.targetAzimuth -= dx * 0.0075;
-                    orbit.targetPolar  -= dy * 0.0075;
+                    // Fix 2B: sentido natural — arrastrar a la derecha rota la vista a la derecha
+                    orbit.targetAzimuth += dx * 0.0075;
+                    orbit.targetPolar  -= dy * 0.0075;   // vertical: arrastrar arriba mira más desde arriba
                     // Clamp polar para evitar voltearse (entre casi top-down y casi al ras del suelo)
                     orbit.targetPolar = Math.max(0.05, Math.min(Math.PI / 2 - 0.02, orbit.targetPolar));
                     orbit.prevMouse = { x: ev.clientX, y: ev.clientY };
@@ -3859,6 +3966,36 @@
                         if (u.userData && u.userData.fan && u.userData.spinSpeed > 0) {
                             u.userData.fan.rotation.y += u.userData.spinSpeed;
                         }
+                    });
+                    // Persianas (dampers) de CASIBA: abren/cierran según estado + full en door_open
+                    presGroup.children.forEach(pg => {
+                        if (!pg.userData?.damperBlades) return;
+                        const target = isDoorOpen ? (Math.PI/2 * 0.95) : pg.userData.damperBaseAngle;
+                        pg.userData.damperBlades.forEach(pivot => {
+                            pivot.rotation.z += (target - pivot.rotation.z) * 0.08;
+                        });
+                    });
+                    // Aire visible — perimeter wisps siempre + door streams solo con door_open
+                    sceneObj.current.perimeterWisps?.forEach(w => {
+                        const cycle = (t * w.userData.speed + w.userData.phase) % 1;
+                        w.position.copy(w.userData.origin).addScaledVector(w.userData.dir, cycle * w.userData.len);
+                        // Fade in al salir, fade out al llegar al final
+                        const fadeIn  = Math.min(1, cycle * 6);
+                        const fadeOut = Math.min(1, (1 - cycle) * 3);
+                        w.material.opacity = 0.28 * Math.min(fadeIn, fadeOut);
+                        const sc = 0.6 + cycle * 1.4;   // se expande a medida que sale
+                        w.scale.setScalar(sc);
+                    });
+                    sceneObj.current.doorStreams?.forEach(s => {
+                        s.visible = isDoorOpen;
+                        if (!isDoorOpen) return;
+                        const cycle = (t * s.userData.speed + s.userData.phase) % 1;
+                        s.position.copy(s.userData.origin).addScaledVector(s.userData.dir, cycle * s.userData.len);
+                        const fadeIn  = Math.min(1, cycle * 5);
+                        const fadeOut = Math.min(1, (1 - cycle) * 2);
+                        s.material.opacity = 0.62 * Math.min(fadeIn, fadeOut);
+                        const sc = 0.7 + cycle * 2.2;
+                        s.scale.setScalar(sc);
                     });
                     // Paquetes de datos: cubitos que SUBEN del master a la cloud en loop
                     sceneObj.current.dataPackets?.forEach(pkt => {
@@ -4536,8 +4673,54 @@
                     );
                     wallPassPlate.position.copy(presInj.position); g.add(wallPassPlate);
 
+                    // === PERSIANA (damper) — 3 álabes con pivote, abren/cierran según caudal ===
+                    // Se apoya sobre la boca de inyección. Cerrada por default; en marcha, gira hasta ~90°.
+                    const damperGroup = new THREE.Group();
+                    const damperCenterX = interiorX - outSign * 0.05;   // 5cm INSIDE the room from the grille
+                    const damperCenterY = interiorGrilleY;
+                    const damperCenterZ = z;
+                    // Marco (rectángulo delgado que contiene los álabes)
+                    const damperFrameMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.75, roughness: 0.4 });
+                    const damperFrame = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.38, 0.58), damperFrameMat);
+                    damperFrame.position.set(damperCenterX, damperCenterY, damperCenterZ);
+                    damperGroup.add(damperFrame);
+                    // Marco visible (bordes)
+                    const damperFrameEdges = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.02, 0.38, 0.58)),
+                        new THREE.LineBasicMaterial({ color: '#0f172a', transparent: true, opacity: 0.7 })
+                    );
+                    damperFrameEdges.position.copy(damperFrame.position);
+                    damperGroup.add(damperFrameEdges);
+                    // 3 álabes con pivote — cada pivot rota en Z (eje horizontal Z) para abrir/cerrar
+                    const numBlades = 3;
+                    const bladeAvailableH = 0.34;
+                    const bladeH = bladeAvailableH / numBlades;
+                    const bladeMat = new THREE.MeshStandardMaterial({ color: '#e2e8f0', metalness: 0.6, roughness: 0.4 });
+                    const axleMat  = new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.9, roughness: 0.3 });
+                    const damperBlades = [];
+                    for (let bi = 0; bi < numBlades; bi++) {
+                        const pivot = new THREE.Group();
+                        const yOff = damperCenterY + bladeAvailableH/2 - bladeH/2 - bi * bladeH;
+                        pivot.position.set(damperCenterX, yOff, damperCenterZ);
+                        // Álabe — plancha delgada en X, alta en Y (bladeH), ancha en Z
+                        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.015, bladeH * 0.94, 0.54), bladeMat);
+                        pivot.add(blade);
+                        // Eje visible atravesando el pivot (a lo largo de Z)
+                        const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.56, 8), axleMat);
+                        axle.rotation.x = Math.PI/2;
+                        pivot.add(axle);
+                        damperGroup.add(pivot);
+                        damperBlades.push(pivot);
+                    }
+                    g.add(damperGroup);
+
+                    // Ángulo base del damper según estado — TITULAR/APOYO abre, SUPLENTE/FALLA cierra
+                    const damperOpenActive = (u.state === 'TITULAR' || u.state === 'APOYO');
+                    const damperBaseAngle  = damperOpenActive ? Math.PI/2 * 0.82 : 0;
+                    damperBlades.forEach(pv => { pv.rotation.z = damperBaseAngle; });
+
                     // No hay fan axial visible en CASIBA (ventilador centrífugo interno). La señal de marcha es el LED + banda.
-                    g.userData = { fan: null, spinSpeed: 0 };
+                    g.userData = { fan: null, spinSpeed: 0, damperBlades, damperBaseAngle };
                     // Ícono de alerta sobre el presurizador (visible solo con falla)
                     const alertSprite = makeAlertSprite(u.id);
                     alertSprite.position.set(bodyX, y + unitH/2 + 0.5, z);
