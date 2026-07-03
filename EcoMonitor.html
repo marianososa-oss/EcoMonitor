@@ -2576,7 +2576,7 @@
                 if (!canvas || !container) return;
 
                 let W = container.clientWidth || 800;
-                const H = 560;
+                let H = container.clientHeight || 560;   // altura dinámica: llena el contenedor padre
 
                 const scene = new THREE.Scene();
                 // === Cielo con gradiente vertical (CanvasTexture) — día y noche pre-generados ===
@@ -3699,12 +3699,15 @@
                 };
                 enableShadows(scene);
 
-                // Resize
+                // Resize (leyendo alto también, para llenar el contenedor 100%)
                 const onResize = () => {
-                    W = container.clientWidth;
+                    W = container.clientWidth || W;
+                    H = container.clientHeight || H;
                     aspect = W / H;
-                    camera.left = -fs * aspect / 2;
-                    camera.right = fs * aspect / 2;
+                    camera.left  = -fs * aspect / 2;
+                    camera.right =  fs * aspect / 2;
+                    camera.top   =  fs / 2;
+                    camera.bottom= -fs / 2;
                     camera.updateProjectionMatrix();
                     renderer.setSize(W, H);
                 };
@@ -4755,8 +4758,8 @@
             }, [hmiValues]);
 
             return (
-                <div ref={containerRef} className="relative w-full" style={{ background: '#0a0a12' }}>
-                    <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '560px', cursor: 'grab' }}></canvas>
+                <div ref={containerRef} className="relative w-full h-full" style={{ background: '#0a0a12', minHeight: '360px' }}>
+                    <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%', cursor: 'grab' }}></canvas>
                     <div className="absolute top-3 left-4 z-10 text-[11px] font-bold uppercase tracking-widest pointer-events-none" style={{ color: TH_COLOR.master, opacity: 0.85 }}>
                         Simulación
                     </div>
@@ -5234,9 +5237,9 @@
             const standbyCount  = hvacUnits.filter(u => u.state === 'SUPLENTE').length;
 
             return (
-                <div className="sim-panel w-full overflow-hidden">
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-5 border-b border-slate-800 bg-slate-900/40">
+                <div className="sim-panel w-full flex flex-col overflow-hidden lg:h-[min(92vh,920px)] lg:min-h-[640px]">
+                    {/* HEADER compacto — todo en una barra fina para que la escena sea protagonista */}
+                    <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-slate-800 bg-slate-900/40 flex-shrink-0">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-eco-blue/20 border border-eco-blue/40 flex items-center justify-center text-eco-lightblue">
                                 <Icon name="cpu" size={20} />
@@ -5280,10 +5283,14 @@
                         </div>
                     </div>
 
-                    {/* KPI strip provisional removida: los KPIs viven ahora exclusivamente en el panel EcoMonitor (columna derecha) */}
+                    {/* === MAIN — grid de 3 columnas: rail controles / escena 3D / panel EcoMonitor === */}
+                    <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[290px_minmax(0,1fr)_340px]">
+
+                        {/* ═══════ COLUMNA IZQUIERDA — rail de controles (scroll interno) ═══════ */}
+                        <div className="border-b lg:border-b-0 lg:border-r border-slate-800 overflow-y-auto sim-no-scroll flex flex-col">
 
                     {/* Condiciones exteriores (T_ext + carga térmica) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-5 py-3 bg-slate-900/30 border-b border-slate-800">
+                    <div className="grid grid-cols-1 gap-3 px-3 py-3 bg-slate-900/30 border-b border-slate-800">
                         <div>
                             <div className="flex items-center justify-between mb-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -5306,13 +5313,13 @@
                         </div>
                     </div>
 
-                    {/* Config + Execution */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-0 border-b border-slate-800">
-                        <div className="md:col-span-7 p-5 border-r border-slate-800">
-                            <div className="text-[11px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] mb-4 flex items-center gap-2">
-                                <Icon name="sliders" size={14} /> Parámetros
+                    {/* Config + Execution — apilados vertical en columna angosta */}
+                    <div className="border-b border-slate-800">
+                        <div className="p-3">
+                            <div className="text-[10px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] mb-3 flex items-center gap-2">
+                                <Icon name="sliders" size={12} /> Parámetros
                             </div>
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                            <div className="grid grid-cols-2 gap-x-2 gap-y-3">
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-wider">HVAC instalados</label>
                                     <select value={hvacTotal} onChange={handleTotalChange} className="sim-select w-full">
@@ -5363,40 +5370,40 @@
                             </div>
                         </div>
 
-                        <div className="md:col-span-5 p-5 flex flex-col gap-3">
-                            <div className="text-[11px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] mb-1 flex items-center gap-2">
-                                <Icon name="terminal" size={14} /> Ejecución
+                        <div className="p-3 border-t border-slate-800 flex flex-col gap-2">
+                            <div className="text-[10px] font-bold text-eco-lightgreen uppercase tracking-[0.18em] flex items-center gap-2">
+                                <Icon name="terminal" size={12} /> Ejecución
                             </div>
-                            <button onClick={advanceTime} className="w-full py-3.5 bg-eco-green/15 hover:bg-eco-green/25 text-eco-lightgreen border border-eco-lightgreen/40 hover:border-eco-lightgreen text-sm font-bold rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-widest shadow-[inset_0_0_15px_rgba(154,182,59,0.08)]">
-                                <Icon name="fast-forward" size={16} /> Avanzar {PERIOD_LABELS[rotationPeriod]}
+                            <button onClick={advanceTime} className="w-full py-2.5 bg-eco-green/15 hover:bg-eco-green/25 text-eco-lightgreen border border-eco-lightgreen/40 hover:border-eco-lightgreen text-[11px] font-bold rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 uppercase tracking-widest shadow-[inset_0_0_15px_rgba(154,182,59,0.08)]">
+                                <Icon name="fast-forward" size={13} /> Avanzar {PERIOD_LABELS[rotationPeriod]}
                             </button>
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={triggerOverload} disabled={!overloadEnabled || isOverloadActive || standbyCount === 0} className="py-2.5 bg-slate-950/50 hover:bg-amber-500/15 border border-slate-800 hover:border-amber-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400 hover:text-amber-300 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-2 uppercase tracking-wider">
-                                    <Icon name="alert-triangle" size={13} /> Forzar apoyo
+                                <button onClick={triggerOverload} disabled={!overloadEnabled || isOverloadActive || standbyCount === 0} className="py-2 bg-slate-950/50 hover:bg-amber-500/15 border border-slate-800 hover:border-amber-400/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400 hover:text-amber-300 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider">
+                                    <Icon name="alert-triangle" size={12} /> Forzar apoyo
                                 </button>
-                                <button onClick={reset} className="py-2.5 bg-slate-950/50 hover:bg-red-950/30 border border-slate-800 hover:border-red-900 text-slate-500 hover:text-red-300 text-[11px] font-bold rounded-lg transition-all uppercase tracking-wider">
+                                <button onClick={reset} className="py-2 bg-slate-950/50 hover:bg-red-950/30 border border-slate-800 hover:border-red-900 text-slate-500 hover:text-red-300 text-[10px] font-bold rounded-lg transition-all uppercase tracking-wider">
                                     Reset
                                 </button>
                             </div>
-                            <div className="mt-2 flex justify-between text-[10px] font-mono text-slate-500 pt-3 border-t border-slate-800">
-                                <span>Activos: <span className="text-eco-lightgreen">{activeCount}</span></span>
-                                <span>Reserva: <span className="text-slate-300">{standbyCount}</span></span>
-                                <span>Ciclos: <span className="text-eco-lightblue">{history.length - 1}</span></span>
+                            <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-2 border-t border-slate-800">
+                                <span>Act: <span className="text-eco-lightgreen">{activeCount}</span></span>
+                                <span>Res: <span className="text-slate-300">{standbyCount}</span></span>
+                                <span>Cic: <span className="text-eco-lightblue">{history.length - 1}</span></span>
                             </div>
                         </div>
                     </div>
 
                     {/* === Botonera de INYECCIÓN DE FALLAS + eventos globales === */}
-                    <div className="p-4 border-b border-slate-800 bg-slate-950/40">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="text-[11px] font-bold text-red-400 uppercase tracking-[0.18em] flex items-center gap-2">
-                                <Icon name="siren" size={14} /> Inyección de fallas
+                    <div className="p-3 bg-slate-950/40 flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="text-[10px] font-bold text-red-400 uppercase tracking-[0.18em] flex items-center gap-2">
+                                <Icon name="siren" size={12} /> Inyección de fallas
                             </div>
-                            <button onClick={normalizeAll} className="px-3 py-1.5 rounded bg-eco-lightgreen/15 border border-eco-lightgreen/40 text-eco-lightgreen text-[10px] font-bold uppercase tracking-wider hover:bg-eco-lightgreen/25 transition-colors flex items-center gap-1.5">
-                                <Icon name="check-circle-2" size={12} /> Normalizar todo
+                            <button onClick={normalizeAll} className="px-2 py-1 rounded bg-eco-lightgreen/15 border border-eco-lightgreen/40 text-eco-lightgreen text-[9px] font-bold uppercase tracking-wider hover:bg-eco-lightgreen/25 transition-colors flex items-center gap-1">
+                                <Icon name="check-circle-2" size={10} /> Normalizar
                             </button>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
+                        <div className="grid grid-cols-2 gap-1.5">
                             {Object.entries(FAULT_EFFECTS).map(([key, f]) => {
                                 const activeOnAny = Object.values(activeFaults).includes(key);
                                 const sevCol = f.severity === 'crit' ? '#ef4444' : '#f59e0b';
@@ -5432,10 +5439,10 @@
                         </div>
                     </div>
 
-                    {/* === GRID: escena 3D principal + panel lateral EcoMonitor (desktop) / stacked (mobile) === */}
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] border-b border-slate-800">
-                        {/* Escena 3D */}
-                        <div className="relative min-w-0 border-b lg:border-b-0 lg:border-r border-slate-800">
+                        </div>{/* ═══════ /COLUMNA IZQUIERDA ═══════ */}
+
+                        {/* ═══════ COLUMNA CENTRO — escena 3D (protagonista, ocupa todo el alto) ═══════ */}
+                        <div className="relative min-w-0 h-full border-t lg:border-t-0 border-slate-800" style={{ minHeight: '360px' }}>
                             <Sala3D
                                 hvacUnits={hvacUnits}
                                 presUnits={presUnits}
@@ -5453,10 +5460,10 @@
                                     trendExt:  telemetry.trends.tempExt
                                 }}
                             />
-                        </div>
+                        </div>{/* ═══════ /COLUMNA CENTRO ═══════ */}
 
-                        {/* Panel lateral EcoMonitor — max-h fija al alto del canvas (560px) con scroll interno para no dejar hueco */}
-                        <div className="relative bg-slate-900/50 flex flex-col lg:max-h-[560px] lg:overflow-y-auto sim-no-scroll">
+                        {/* ═══════ COLUMNA DERECHA — Panel EcoMonitor + Timeline (scroll interno) ═══════ */}
+                        <div className="relative bg-slate-900/50 flex flex-col border-t lg:border-t-0 lg:border-l border-slate-800 overflow-y-auto sim-no-scroll">
                             {(() => {
                                 const t = telemetry;
                                 // Semáforo global
@@ -5645,55 +5652,54 @@
                                     </>
                                 );
                             })()}
-                        </div>
-                    </div>
 
-
-                    {/* Timeline Gantt */}
-                    <div className="p-4 border-t border-slate-800 bg-slate-900/30">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Icon name="activity" size={14} className="text-eco-lightgreen" />
-                            <h4 className="text-[11px] font-bold text-eco-lightgreen uppercase tracking-[0.18em]">Telemetría · historial de rotación</h4>
-                        </div>
-                        <div className="overflow-x-auto sim-no-scroll pb-2">
-                            <div className="min-w-max">
-                                <div className="flex mb-2 ml-28 border-b border-slate-800 pb-1">
-                                    {history.map((h, i) => (
-                                        <div key={i} className="w-10 text-center text-[9px] font-mono text-slate-600">C{String(i).padStart(2,'0')}</div>
-                                    ))}
+                            {/* Timeline Gantt — al final del panel derecho, scrolea con el resto */}
+                            <div className="p-3 border-t border-slate-800 bg-slate-900/30">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Icon name="activity" size={12} className="text-eco-lightgreen" />
+                                    <h4 className="text-[10px] font-bold text-eco-lightgreen uppercase tracking-[0.18em]">Historial de rotación</h4>
                                 </div>
-                                {hvacUnits.map(unit => (
-                                    <div key={unit.id} className="flex items-center mb-0.5 hover:bg-slate-800/30 p-0.5 rounded transition-colors">
-                                        <div className="w-28 flex flex-col items-end pr-3 leading-tight border-r border-slate-800 mr-2">
-                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{unit.id}</span>
-                                            <span className="text-[9px] font-mono text-eco-lightblue/70">{String(unit.hours).padStart(4,'0')}h</span>
+                                <div className="overflow-x-auto sim-no-scroll pb-2">
+                                    <div className="min-w-max">
+                                        <div className="flex mb-2 ml-20 border-b border-slate-800 pb-1">
+                                            {history.map((h, i) => (
+                                                <div key={i} className="w-6 text-center text-[8px] font-mono text-slate-600">{String(i).padStart(2,'0')}</div>
+                                            ))}
                                         </div>
-                                        <div className="flex bg-slate-950 rounded-sm border border-slate-800 overflow-hidden shadow-inner">
-                                            {history.map((c, i) => {
-                                                const s = c.hvacs.find(u => u.id === unit.id)?.state;
-                                                return <div key={i} className="w-10 h-4 border-r border-slate-900" style={ganttBg[s] || {}}></div>;
-                                            })}
-                                        </div>
+                                        {hvacUnits.map(unit => (
+                                            <div key={unit.id} className="flex items-center mb-0.5">
+                                                <div className="w-20 flex flex-col items-end pr-2 leading-tight border-r border-slate-800 mr-1.5">
+                                                    <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">{unit.id}</span>
+                                                    <span className="text-[8px] font-mono text-eco-lightblue/70">{String(unit.hours).padStart(4,'0')}h</span>
+                                                </div>
+                                                <div className="flex bg-slate-950 rounded-sm border border-slate-800 overflow-hidden shadow-inner">
+                                                    {history.map((c, i) => {
+                                                        const s = c.hvacs.find(u => u.id === unit.id)?.state;
+                                                        return <div key={i} className="w-6 h-3 border-r border-slate-900" style={ganttBg[s] || {}}></div>;
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {presUnits.length > 0 && <div className="h-2"></div>}
+                                        {presUnits.map(unit => (
+                                            <div key={unit.id} className="flex items-center mb-0.5">
+                                                <div className="w-20 flex flex-col items-end pr-2 leading-tight border-r border-slate-800 mr-1.5">
+                                                    <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">{unit.id}</span>
+                                                    <span className="text-[8px] font-mono text-eco-lightblue/70">{String(unit.hours).padStart(4,'0')}h</span>
+                                                </div>
+                                                <div className="flex bg-slate-950 rounded-sm border border-slate-800 overflow-hidden shadow-inner">
+                                                    {history.map((c, i) => {
+                                                        const s = c.pres.find(u => u.id === unit.id)?.state;
+                                                        return <div key={i} className="w-6 h-3 border-r border-slate-900" style={ganttBg[s] || {}}></div>;
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                                {presUnits.length > 0 && <div className="h-2"></div>}
-                                {presUnits.map(unit => (
-                                    <div key={unit.id} className="flex items-center mb-0.5 hover:bg-slate-800/30 p-0.5 rounded transition-colors">
-                                        <div className="w-28 flex flex-col items-end pr-3 leading-tight border-r border-slate-800 mr-2">
-                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{unit.id}</span>
-                                            <span className="text-[9px] font-mono text-eco-lightblue/70">{String(unit.hours).padStart(4,'0')}h</span>
-                                        </div>
-                                        <div className="flex bg-slate-950 rounded-sm border border-slate-800 overflow-hidden shadow-inner">
-                                            {history.map((c, i) => {
-                                                const s = c.pres.find(u => u.id === unit.id)?.state;
-                                                return <div key={i} className="w-10 h-4 border-r border-slate-900" style={ganttBg[s] || {}}></div>;
-                                            })}
-                                        </div>
-                                    </div>
-                                ))}
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        </div>{/* ═══════ /COLUMNA DERECHA ═══════ */}
+                    </div>{/* ═══════ /MAIN 3-columnas ═══════ */}
                 </div>
             );
         }
