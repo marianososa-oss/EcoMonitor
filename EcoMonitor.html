@@ -3481,6 +3481,51 @@
                     doorStreams.push(stream);
                 }
 
+                // === CHARCO DE AGUA en el piso — visible solo cuando globalEvents.drain_blocked ===
+                // Simula agua desbordada de la bandeja de condensado por drenaje obstruido.
+                const puddleGroup = new THREE.Group();
+                const puddleFloorY = 2.21 + 0.008;   // apenas encima del piso para no z-fighting
+                // Charco principal — elipse achatada, azul claro semi-transparente con leve emissive (mojado brilla)
+                const puddleMain = new THREE.Mesh(
+                    new THREE.CircleGeometry(0.55, 32),
+                    new THREE.MeshStandardMaterial({
+                        color: '#4a9dcc', transparent: true, opacity: 0.55,
+                        metalness: 0.4, roughness: 0.15,
+                        emissive: '#1e4a68', emissiveIntensity: 0.25,
+                        depthWrite: false
+                    })
+                );
+                puddleMain.rotation.x = -Math.PI/2;
+                puddleMain.scale.set(1.3, 1, 1);   // elipse (más largo en X)
+                puddleMain.position.set(0.2, puddleFloorY, 2.8);   // sur del shelter, cerca del pasillo
+                puddleMain.receiveShadow = true;
+                puddleGroup.add(puddleMain);
+                // Charco secundario — más chico, adyacente al principal (para look de derrame)
+                const puddleSmall = new THREE.Mesh(
+                    new THREE.CircleGeometry(0.28, 24),
+                    new THREE.MeshStandardMaterial({
+                        color: '#4a9dcc', transparent: true, opacity: 0.48,
+                        metalness: 0.4, roughness: 0.2,
+                        emissive: '#1e4a68', emissiveIntensity: 0.22,
+                        depthWrite: false
+                    })
+                );
+                puddleSmall.rotation.x = -Math.PI/2;
+                puddleSmall.position.set(-0.75, puddleFloorY, 3.15);
+                puddleGroup.add(puddleSmall);
+                // Reflejo brillante en el centro (highlight)
+                const puddleHighlight = new THREE.Mesh(
+                    new THREE.CircleGeometry(0.18, 20),
+                    new THREE.MeshBasicMaterial({
+                        color: '#ffffff', transparent: true, opacity: 0.35, depthWrite: false
+                    })
+                );
+                puddleHighlight.rotation.x = -Math.PI/2;
+                puddleHighlight.position.set(0.35, puddleFloorY + 0.001, 2.7);
+                puddleGroup.add(puddleHighlight);
+                puddleGroup.visible = false;   // oculto por default
+                scene.add(puddleGroup);
+
                 // === VFDs (6 cabinets contra la pared del FONDO — pasillo central libre) ===
                 // En una sala eléctrica los equipos que disipan calor van pegados a la pared, nunca en el medio.
                 const heatMeshes = [];
@@ -3827,7 +3872,7 @@
                     THREE, scene, camera, renderer,
                     hvacGroup, presGroup, esclavoGroup, cableGroup,
                     heatMeshes, heatWaves, wifiRings, dataPackets, wallMeshes,
-                    perimeterWisps, doorStreams,
+                    perimeterWisps, doorStreams, puddleGroup,
                     masterOutputPos, cloudPos,
                     roomW, roomD, roomH,
                     targetView: 'iso',
@@ -4005,6 +4050,8 @@
                     }
 
                     // === Íconos de alerta por equipo en falla ===
+                    // Cada sprite lee el faultKey activo de su unidad y swap-ea su textura.
+                    // Además, phase_loss dispara parpadeo rápido (simula corte eléctrico intermitente).
                     const infos = [
                         ...(sceneObj.current.hvacInfo || []),
                         ...(sceneObj.current.presInfo || [])
@@ -4012,11 +4059,40 @@
                     infos.forEach(info => {
                         if (!info.alertSprite) return;
                         const uid = info.alertSprite.userData.unitId;
-                        const isFaulty = !!faults[uid];
+                        const faultKey = faults[uid];
+                        const isFaulty = !!faultKey;
                         info.alertSprite.visible = isFaulty;
-                        if (isFaulty) {
+                        if (!isFaulty) return;
+                        // Swap de textura solo si el fault cambió (evita crear/asignar cada frame)
+                        if (info.alertSprite.userData.currentFault !== faultKey) {
+                            info.alertSprite.material.map = getFaultTexture(faultKey);
+                            info.alertSprite.material.needsUpdate = true;
+                            info.alertSprite.userData.currentFault = faultKey;
+                        }
+                        // Pulsación: normal para todas, MUY rápida para phase_loss (parpadeo eléctrico)
+                        if (faultKey === 'phase_loss') {
+                            // Blink duro on/off — 4 Hz, sensación de corte de fase
+                            const on = Math.floor(t * 8) % 2 === 0;
+                            info.alertSprite.material.opacity = on ? 1.0 : 0.15;
+                            info.alertSprite.scale.set(0.75, 0.75, 1);
+                        } else {
                             const pulse = 0.85 + 0.15 * Math.sin(t * 5);
+                            info.alertSprite.material.opacity = 1.0;
                             info.alertSprite.scale.set(0.7 * pulse, 0.7 * pulse, 1);
+                        }
+                    });
+
+                    // === phase_loss también parpadea la BANDA DE ESTADO del equipo (corte eléctrico) ===
+                    hvacGroup.children.forEach(u => {
+                        if (!u.userData?.stateBand) return;
+                        const uid = u.userData.unitId;
+                        if (faults[uid] === 'phase_loss') {
+                            const on = Math.floor(t * 6) % 2 === 0;
+                            u.userData.stateBand.material.emissiveIntensity = on ? 0.9 : 0.05;
+                        } else {
+                            // Restaurar el emissive base (0.15 normal, 0.4 en FALLA final) guardado al construir
+                            const base = u.userData.stateBand.userData?.baseEmissive;
+                            u.userData.stateBand.material.emissiveIntensity = base != null ? base : 0.15;
                         }
                     });
                     // Fan rotation
@@ -4030,14 +4106,36 @@
                             u.userData.fan.rotation.y += u.userData.spinSpeed;
                         }
                     });
-                    // Persianas (dampers) de CASIBA: abren/cierran según estado + full en door_open
+                    // Persianas (dampers) de CASIBA: abren/cierran según estado + full en door_open + atenuadas si filtro sucio
                     presGroup.children.forEach(pg => {
                         if (!pg.userData?.damperBlades) return;
-                        const target = isDoorOpen ? (Math.PI/2 * 0.95) : pg.userData.damperBaseAngle;
+                        const uid = pg.userData.unitId;
+                        const dirtyFilter = faults[uid] === 'dirty_filter_pres';
+                        let target;
+                        if (isDoorOpen) {
+                            target = Math.PI/2 * 0.95;  // FULL siempre gana (evacuación)
+                        } else if (dirtyFilter) {
+                            // Filtro saturado → damper apenas se abre (caudal restringido)
+                            target = pg.userData.damperBaseAngle * 0.30;
+                        } else {
+                            target = pg.userData.damperBaseAngle;
+                        }
                         pg.userData.damperBlades.forEach(pivot => {
                             pivot.rotation.z += (target - pivot.rotation.z) * 0.08;
                         });
                     });
+
+                    // === Charco de agua (drain_blocked) — pulso suave para dar sensación húmeda ===
+                    const puddle = sceneObj.current.puddleGroup;
+                    if (puddle) {
+                        const isDrain = !!events.drain_blocked;
+                        puddle.visible = isDrain;
+                        if (isDrain) {
+                            // Ripple sutil — escala oscila levemente
+                            const ripple = 1 + 0.03 * Math.sin(t * 1.8);
+                            puddle.scale.set(ripple, 1, ripple);
+                        }
+                    }
                     // Aire visible — perimeter wisps siempre + door streams solo con door_open
                     sceneObj.current.perimeterWisps?.forEach(w => {
                         const cycle = (t * w.userData.speed + w.userData.phase) % 1;
@@ -4182,30 +4280,101 @@
                 const hvacInfo = []; // {wall, alongCoord, canon values..., idx}
 
                 // === Helper: sprite de alerta (triángulo rojo con !) para mostrar sobre equipos en falla ===
-                const makeAlertSprite = (unitId) => {
+                // === Texturas por tipo de falla — pre-generadas una vez, cacheadas y reutilizadas ===
+                // Cada sprite de alerta swap-ea su .map según el faultKey activo en cada unidad.
+                const _faultTexCache = {};
+                const _drawFaultCanvas = (faultKey, sevCol) => {
                     const c = document.createElement('canvas');
                     c.width = 128; c.height = 128;
                     const cx = c.getContext('2d');
-                    // Triángulo rojo con borde
-                    cx.fillStyle = '#dc2626';
+                    // Triángulo de fondo (color según severidad)
+                    cx.fillStyle = sevCol;
                     cx.strokeStyle = '#ffffff'; cx.lineWidth = 6; cx.lineJoin = 'round';
-                    cx.beginPath();
-                    cx.moveTo(64, 12);
-                    cx.lineTo(116, 108);
-                    cx.lineTo(12, 108);
-                    cx.closePath();
+                    cx.beginPath(); cx.moveTo(64, 10); cx.lineTo(118, 110); cx.lineTo(10, 110); cx.closePath();
                     cx.fill(); cx.stroke();
-                    // Exclamación blanca
-                    cx.fillStyle = '#ffffff';
-                    cx.font = 'bold 62px sans-serif';
-                    cx.textAlign = 'center'; cx.textBaseline = 'middle';
-                    cx.fillText('!', 64, 74);
+                    // Glifo específico por falla (blanco, dibujado a mano en canvas para no depender de svg externo)
+                    cx.strokeStyle = '#ffffff'; cx.fillStyle = '#ffffff';
+                    cx.lineWidth = 5; cx.lineCap = 'round'; cx.lineJoin = 'round';
+                    switch (faultKey) {
+                        case 'gas_leak':
+                            // Gota grande cayendo
+                            cx.beginPath();
+                            cx.moveTo(64, 44);
+                            cx.bezierCurveTo(44, 68, 44, 96, 64, 96);
+                            cx.bezierCurveTo(84, 96, 84, 68, 64, 44);
+                            cx.fill();
+                            break;
+                        case 'dirty_condenser':
+                            // Aspa/hélice — 3 líneas radiales desde el centro
+                            for (let i = 0; i < 3; i++) {
+                                const a = (i / 3) * Math.PI * 2 - Math.PI/2;
+                                cx.beginPath();
+                                cx.moveTo(64, 76);
+                                cx.lineTo(64 + Math.cos(a) * 22, 76 + Math.sin(a) * 22);
+                                cx.stroke();
+                            }
+                            cx.beginPath(); cx.arc(64, 76, 5, 0, Math.PI*2); cx.fill();
+                            break;
+                        case 'dirty_filter_hvac':
+                        case 'dirty_filter_pres':
+                            // Filtro sucio — grilla con líneas verticales + puntitos (suciedad)
+                            for (let i = 0; i < 3; i++) {
+                                cx.beginPath();
+                                cx.moveTo(48 + i * 16, 52);
+                                cx.lineTo(48 + i * 16, 96);
+                                cx.stroke();
+                            }
+                            cx.beginPath(); cx.arc(56, 70, 2, 0, Math.PI*2); cx.arc(72, 82, 2, 0, Math.PI*2); cx.arc(80, 62, 2, 0, Math.PI*2); cx.fill();
+                            break;
+                        case 'phase_loss':
+                            // Rayo (zigzag)
+                            cx.beginPath();
+                            cx.moveTo(74, 48);
+                            cx.lineTo(56, 74);
+                            cx.lineTo(68, 74);
+                            cx.lineTo(54, 102);
+                            cx.stroke();
+                            break;
+                        case 'fan_motor_burnt':
+                            // Ventilador con X (roto)
+                            cx.beginPath(); cx.arc(64, 78, 20, 0, Math.PI*2); cx.stroke();
+                            cx.beginPath(); cx.moveTo(52, 66); cx.lineTo(76, 90); cx.moveTo(76, 66); cx.lineTo(52, 90); cx.stroke();
+                            break;
+                        case 'cvtr_faulty':
+                            // Manómetro / onda irregular (presión pulsando)
+                            cx.beginPath();
+                            cx.moveTo(38, 84);
+                            cx.lineTo(50, 68); cx.lineTo(58, 92); cx.lineTo(70, 60); cx.lineTo(80, 88); cx.lineTo(90, 76);
+                            cx.stroke();
+                            break;
+                        default:
+                            // Fallback — exclamación clásica
+                            cx.font = 'bold 60px sans-serif';
+                            cx.textAlign = 'center'; cx.textBaseline = 'middle';
+                            cx.fillText('!', 64, 78);
+                    }
                     const tex = new THREE.CanvasTexture(c);
                     if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-                    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+                    return tex;
+                };
+                const getFaultTexture = (faultKey) => {
+                    if (_faultTexCache[faultKey]) return _faultTexCache[faultKey];
+                    const fault = FAULT_EFFECTS[faultKey];
+                    const sevCol = fault?.severity === 'crit' ? '#dc2626' : '#f59e0b';
+                    const tex = _drawFaultCanvas(faultKey, sevCol);
+                    _faultTexCache[faultKey] = tex;
+                    return tex;
+                };
+                // Textura genérica (! blanco sobre triángulo rojo) — se usa como default hasta que hay falla concreta.
+                const _defaultAlertTex = _drawFaultCanvas('_default', '#dc2626');
+                const makeAlertSprite = (unitId) => {
+                    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: _defaultAlertTex, transparent: true, depthTest: false
+                    }));
                     sprite.scale.set(0.7, 0.7, 1);
                     sprite.userData.unitId = unitId;
-                    sprite.renderOrder = 999;   // encima de todo
+                    sprite.userData.currentFault = null;   // último fault dibujado, para evitar swap innecesario
+                    sprite.renderOrder = 999;
                     return sprite;
                 };
 
@@ -4247,6 +4416,8 @@
                         new THREE.MeshStandardMaterial({ color, metalness: 0.3, roughness: 0.4, emissive: color, emissiveIntensity: u.state === 'FALLA' ? 0.4 : 0.15 })
                     );
                     stateBand.position.set(bodyX, y + unitH/2 - 0.12, z);
+                    // Guardo el emissive base para que el phase_loss blink pueda restaurarlo al terminar
+                    stateBand.userData.baseEmissive = u.state === 'FALLA' ? 0.4 : 0.15;
                     g.add(stateBand);
                     const fanFaceX = bodyX + outSign * (unitW/2 + 0.005);
                     const fanRadius = 0.355;  // Ø710mm real
@@ -4537,7 +4708,7 @@
                     retArrow.position.set(interiorX - outSign * 0.018, y - 0.95 + retHeight/2 + 0.08, z);
                     g.add(retArrow);
 
-                    g.userData = { fan, spinSpeed: spin };
+                    g.userData = { fan, spinSpeed: spin, stateBand, unitId: u.id };
                     // === Ícono de ALERTA flotando (visible solo con activeFaults[u.id]) ===
                     const alertSprite = makeAlertSprite(u.id);
                     alertSprite.position.set(bodyX, y + unitH/2 + 0.6, z);
@@ -4787,7 +4958,7 @@
                     damperBlades.forEach(pv => { pv.rotation.z = damperBaseAngle; });
 
                     // No hay fan axial visible en CASIBA (ventilador centrífugo interno). La señal de marcha es el LED + banda.
-                    g.userData = { fan: null, spinSpeed: 0, damperBlades, damperBaseAngle };
+                    g.userData = { fan: null, spinSpeed: 0, damperBlades, damperBaseAngle, unitId: u.id };
                     // Ícono de alerta sobre el presurizador (visible solo con falla)
                     const alertSprite = makeAlertSprite(u.id);
                     alertSprite.position.set(bodyX, y + unitH/2 + 0.5, z);
