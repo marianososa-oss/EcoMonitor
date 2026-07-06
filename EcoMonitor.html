@@ -2343,7 +2343,9 @@
         const _getIconNodes = (name) => {
             if (_iconCache[name] !== undefined) return _iconCache[name];
             const lu = window.lucide;
-            if (!lu || !lu.icons) { _iconCache[name] = null; return null; }
+            // Si lucide todavía no cargó, NO cacheamos null — que reintente en el próximo render
+            // (evita quedarse con íconos ciegos permanentes si el orden de load fue asincrónico).
+            if (!lu || !lu.icons) return null;
             // Lucide UMD: los íconos viven en lu.icons con clave PascalCase.
             const key = kebabToPascal(name);
             const raw = lu.icons[key] || lu.icons[name] || null;
@@ -3497,7 +3499,7 @@
                 );
                 puddleMain.rotation.x = -Math.PI/2;
                 puddleMain.scale.set(1.3, 1, 1);   // elipse (más largo en X)
-                puddleMain.position.set(0.2, puddleFloorY, 2.8);   // sur del shelter, cerca del pasillo
+                puddleMain.position.set(0.2, puddleFloorY, 1.5);   // centro-pasillo, lejos del footprint de los VFDs (z=+3.45)
                 puddleMain.receiveShadow = true;
                 puddleGroup.add(puddleMain);
                 // Charco secundario — más chico, adyacente al principal (para look de derrame)
@@ -3511,7 +3513,7 @@
                     })
                 );
                 puddleSmall.rotation.x = -Math.PI/2;
-                puddleSmall.position.set(-0.75, puddleFloorY, 3.15);
+                puddleSmall.position.set(-0.75, puddleFloorY, 1.9);
                 puddleGroup.add(puddleSmall);
                 // Reflejo brillante en el centro (highlight)
                 const puddleHighlight = new THREE.Mesh(
@@ -3521,7 +3523,7 @@
                     })
                 );
                 puddleHighlight.rotation.x = -Math.PI/2;
-                puddleHighlight.position.set(0.35, puddleFloorY + 0.001, 2.7);
+                puddleHighlight.position.set(0.35, puddleFloorY + 0.001, 1.4);
                 puddleGroup.add(puddleHighlight);
                 puddleGroup.visible = false;   // oculto por default
                 scene.add(puddleGroup);
@@ -3854,12 +3856,14 @@
 
                 // === PAQUETES DE DATOS (cubitos subiendo Master → Cloud en loop) ===
                 const dataPackets = [];
-                const packetMat = new THREE.MeshStandardMaterial({
+                const packetMatTemplate = new THREE.MeshStandardMaterial({
                     color: '#9ab63b', emissive: '#4f7725', emissiveIntensity: 0.6,
                     metalness: 0.3, roughness: 0.4
                 });
                 for (let i = 0; i < 6; i++) {
-                    const pkt = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.10), packetMat);
+                    // .clone() por paquete: el animate loop escribe .emissiveIntensity per-paquete;
+                    // compartir el material haría que solo el último iterado quede visible.
+                    const pkt = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.10), packetMatTemplate.clone());
                     pkt.userData.phase = i / 6;
                     pkt.position.copy(masterOutputPos);
                     scene.add(pkt);
@@ -3867,6 +3871,96 @@
                 }
                 // Compat alias — algunas referencias antiguas usan wifiRings; queda vacío para no romper.
                 const wifiRings = [];
+
+                // === Helpers de textura por tipo de falla — creados UNA vez en el init useEffect ===
+                // Antes vivían dentro del rebuild useEffect (closure incorrecto), lo que hacía que animate
+                // no viera getFaultTexture y tirara ReferenceError silencioso en cada frame.
+                // Además cada rebuild reasignaba CanvasTextures → leak. Al vivir acá se crea una sola vez.
+                const _faultTexCache = {};
+                const _drawFaultCanvas = (faultKey, sevCol) => {
+                    const c = document.createElement('canvas');
+                    c.width = 128; c.height = 128;
+                    const cx = c.getContext('2d');
+                    cx.fillStyle = sevCol;
+                    cx.strokeStyle = '#ffffff'; cx.lineWidth = 6; cx.lineJoin = 'round';
+                    cx.beginPath(); cx.moveTo(64, 10); cx.lineTo(118, 110); cx.lineTo(10, 110); cx.closePath();
+                    cx.fill(); cx.stroke();
+                    cx.strokeStyle = '#ffffff'; cx.fillStyle = '#ffffff';
+                    cx.lineWidth = 5; cx.lineCap = 'round'; cx.lineJoin = 'round';
+                    switch (faultKey) {
+                        case 'gas_leak':
+                            cx.beginPath();
+                            cx.moveTo(64, 44);
+                            cx.bezierCurveTo(44, 68, 44, 96, 64, 96);
+                            cx.bezierCurveTo(84, 96, 84, 68, 64, 44);
+                            cx.fill();
+                            break;
+                        case 'dirty_condenser':
+                            for (let i = 0; i < 3; i++) {
+                                const a = (i / 3) * Math.PI * 2 - Math.PI/2;
+                                cx.beginPath();
+                                cx.moveTo(64, 76);
+                                cx.lineTo(64 + Math.cos(a) * 22, 76 + Math.sin(a) * 22);
+                                cx.stroke();
+                            }
+                            cx.beginPath(); cx.arc(64, 76, 5, 0, Math.PI*2); cx.fill();
+                            break;
+                        case 'dirty_filter_hvac':
+                        case 'dirty_filter_pres':
+                            for (let i = 0; i < 3; i++) {
+                                cx.beginPath();
+                                cx.moveTo(48 + i * 16, 52);
+                                cx.lineTo(48 + i * 16, 96);
+                                cx.stroke();
+                            }
+                            cx.beginPath(); cx.arc(56, 70, 2, 0, Math.PI*2); cx.arc(72, 82, 2, 0, Math.PI*2); cx.arc(80, 62, 2, 0, Math.PI*2); cx.fill();
+                            break;
+                        case 'phase_loss':
+                            cx.beginPath();
+                            cx.moveTo(74, 48);
+                            cx.lineTo(56, 74);
+                            cx.lineTo(68, 74);
+                            cx.lineTo(54, 102);
+                            cx.stroke();
+                            break;
+                        case 'fan_motor_burnt':
+                            cx.beginPath(); cx.arc(64, 78, 20, 0, Math.PI*2); cx.stroke();
+                            cx.beginPath(); cx.moveTo(52, 66); cx.lineTo(76, 90); cx.moveTo(76, 66); cx.lineTo(52, 90); cx.stroke();
+                            break;
+                        case 'cvtr_faulty':
+                            cx.beginPath();
+                            cx.moveTo(38, 84);
+                            cx.lineTo(50, 68); cx.lineTo(58, 92); cx.lineTo(70, 60); cx.lineTo(80, 88); cx.lineTo(90, 76);
+                            cx.stroke();
+                            break;
+                        default:
+                            cx.font = 'bold 60px sans-serif';
+                            cx.textAlign = 'center'; cx.textBaseline = 'middle';
+                            cx.fillText('!', 64, 78);
+                    }
+                    const tex = new THREE.CanvasTexture(c);
+                    if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+                    return tex;
+                };
+                const getFaultTexture = (faultKey) => {
+                    if (_faultTexCache[faultKey]) return _faultTexCache[faultKey];
+                    const fault = FAULT_EFFECTS[faultKey];
+                    const sevCol = fault?.severity === 'crit' ? '#dc2626' : '#f59e0b';
+                    const tex = _drawFaultCanvas(faultKey, sevCol);
+                    _faultTexCache[faultKey] = tex;
+                    return tex;
+                };
+                const _defaultAlertTex = _drawFaultCanvas('_default', '#dc2626');
+                const makeAlertSprite = (unitId) => {
+                    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: _defaultAlertTex, transparent: true, depthTest: false
+                    }));
+                    sprite.scale.set(0.7, 0.7, 1);
+                    sprite.userData.unitId = unitId;
+                    sprite.userData.currentFault = null;
+                    sprite.renderOrder = 999;
+                    return sprite;
+                };
 
                 sceneObj.current = {
                     THREE, scene, camera, renderer,
@@ -3886,6 +3980,8 @@
                             R: emergencyGroup.getObjectByName('leafPivot_R')
                         }
                     },
+                    // Helpers de fault icons — expuestos para que buildHvac/PRES (rebuild useEffect) los use
+                    makeAlertSprite, getFaultTexture,
                     // faultIcons se leen de hvacInfo/presInfo via .alertSprite en el animate loop
                     faultIcons: {},
                     heatBanner,
@@ -4279,104 +4375,9 @@
                 const n = hvacUnits.length;
                 const hvacInfo = []; // {wall, alongCoord, canon values..., idx}
 
-                // === Helper: sprite de alerta (triángulo rojo con !) para mostrar sobre equipos en falla ===
-                // === Texturas por tipo de falla — pre-generadas una vez, cacheadas y reutilizadas ===
-                // Cada sprite de alerta swap-ea su .map según el faultKey activo en cada unidad.
-                const _faultTexCache = {};
-                const _drawFaultCanvas = (faultKey, sevCol) => {
-                    const c = document.createElement('canvas');
-                    c.width = 128; c.height = 128;
-                    const cx = c.getContext('2d');
-                    // Triángulo de fondo (color según severidad)
-                    cx.fillStyle = sevCol;
-                    cx.strokeStyle = '#ffffff'; cx.lineWidth = 6; cx.lineJoin = 'round';
-                    cx.beginPath(); cx.moveTo(64, 10); cx.lineTo(118, 110); cx.lineTo(10, 110); cx.closePath();
-                    cx.fill(); cx.stroke();
-                    // Glifo específico por falla (blanco, dibujado a mano en canvas para no depender de svg externo)
-                    cx.strokeStyle = '#ffffff'; cx.fillStyle = '#ffffff';
-                    cx.lineWidth = 5; cx.lineCap = 'round'; cx.lineJoin = 'round';
-                    switch (faultKey) {
-                        case 'gas_leak':
-                            // Gota grande cayendo
-                            cx.beginPath();
-                            cx.moveTo(64, 44);
-                            cx.bezierCurveTo(44, 68, 44, 96, 64, 96);
-                            cx.bezierCurveTo(84, 96, 84, 68, 64, 44);
-                            cx.fill();
-                            break;
-                        case 'dirty_condenser':
-                            // Aspa/hélice — 3 líneas radiales desde el centro
-                            for (let i = 0; i < 3; i++) {
-                                const a = (i / 3) * Math.PI * 2 - Math.PI/2;
-                                cx.beginPath();
-                                cx.moveTo(64, 76);
-                                cx.lineTo(64 + Math.cos(a) * 22, 76 + Math.sin(a) * 22);
-                                cx.stroke();
-                            }
-                            cx.beginPath(); cx.arc(64, 76, 5, 0, Math.PI*2); cx.fill();
-                            break;
-                        case 'dirty_filter_hvac':
-                        case 'dirty_filter_pres':
-                            // Filtro sucio — grilla con líneas verticales + puntitos (suciedad)
-                            for (let i = 0; i < 3; i++) {
-                                cx.beginPath();
-                                cx.moveTo(48 + i * 16, 52);
-                                cx.lineTo(48 + i * 16, 96);
-                                cx.stroke();
-                            }
-                            cx.beginPath(); cx.arc(56, 70, 2, 0, Math.PI*2); cx.arc(72, 82, 2, 0, Math.PI*2); cx.arc(80, 62, 2, 0, Math.PI*2); cx.fill();
-                            break;
-                        case 'phase_loss':
-                            // Rayo (zigzag)
-                            cx.beginPath();
-                            cx.moveTo(74, 48);
-                            cx.lineTo(56, 74);
-                            cx.lineTo(68, 74);
-                            cx.lineTo(54, 102);
-                            cx.stroke();
-                            break;
-                        case 'fan_motor_burnt':
-                            // Ventilador con X (roto)
-                            cx.beginPath(); cx.arc(64, 78, 20, 0, Math.PI*2); cx.stroke();
-                            cx.beginPath(); cx.moveTo(52, 66); cx.lineTo(76, 90); cx.moveTo(76, 66); cx.lineTo(52, 90); cx.stroke();
-                            break;
-                        case 'cvtr_faulty':
-                            // Manómetro / onda irregular (presión pulsando)
-                            cx.beginPath();
-                            cx.moveTo(38, 84);
-                            cx.lineTo(50, 68); cx.lineTo(58, 92); cx.lineTo(70, 60); cx.lineTo(80, 88); cx.lineTo(90, 76);
-                            cx.stroke();
-                            break;
-                        default:
-                            // Fallback — exclamación clásica
-                            cx.font = 'bold 60px sans-serif';
-                            cx.textAlign = 'center'; cx.textBaseline = 'middle';
-                            cx.fillText('!', 64, 78);
-                    }
-                    const tex = new THREE.CanvasTexture(c);
-                    if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-                    return tex;
-                };
-                const getFaultTexture = (faultKey) => {
-                    if (_faultTexCache[faultKey]) return _faultTexCache[faultKey];
-                    const fault = FAULT_EFFECTS[faultKey];
-                    const sevCol = fault?.severity === 'crit' ? '#dc2626' : '#f59e0b';
-                    const tex = _drawFaultCanvas(faultKey, sevCol);
-                    _faultTexCache[faultKey] = tex;
-                    return tex;
-                };
-                // Textura genérica (! blanco sobre triángulo rojo) — se usa como default hasta que hay falla concreta.
-                const _defaultAlertTex = _drawFaultCanvas('_default', '#dc2626');
-                const makeAlertSprite = (unitId) => {
-                    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-                        map: _defaultAlertTex, transparent: true, depthTest: false
-                    }));
-                    sprite.scale.set(0.7, 0.7, 1);
-                    sprite.userData.unitId = unitId;
-                    sprite.userData.currentFault = null;   // último fault dibujado, para evitar swap innecesario
-                    sprite.renderOrder = 999;
-                    return sprite;
-                };
+                // === makeAlertSprite / getFaultTexture viven ahora en el INIT useEffect (ver arriba).
+                //     Se leen de sceneObj.current para evitar el ReferenceError silencioso.
+                const makeAlertSprite = sceneObj.current?.makeAlertSprite || ((uid) => null);
 
                 const buildHvac = (idx, wall, alongCoord) => {
                     const u = hvacUnits[idx];
@@ -4775,6 +4776,8 @@
                         new THREE.MeshStandardMaterial({ color, metalness: 0.3, roughness: 0.4, emissive: color, emissiveIntensity: u.state === 'FALLA' ? 0.4 : 0.15 })
                     );
                     stateBand.position.set(bodyX, y + unitH/2 - 0.06, z);
+                    // Guardo el emissive base para consistencia con HVAC (aunque phase_loss no aplica a PRES)
+                    stateBand.userData.baseEmissive = u.state === 'FALLA' ? 0.4 : 0.15;
                     g.add(stateBand);
 
                     // === Puertas de acceso LATERALES (tono azul-charcoal más oscuro sobre el cuerpo) ===
@@ -4958,7 +4961,7 @@
                     damperBlades.forEach(pv => { pv.rotation.z = damperBaseAngle; });
 
                     // No hay fan axial visible en CASIBA (ventilador centrífugo interno). La señal de marcha es el LED + banda.
-                    g.userData = { fan: null, spinSpeed: 0, damperBlades, damperBaseAngle, unitId: u.id };
+                    g.userData = { fan: null, spinSpeed: 0, damperBlades, damperBaseAngle, unitId: u.id, stateBand };
                     // Ícono de alerta sobre el presurizador (visible solo con falla)
                     const alertSprite = makeAlertSprite(u.id);
                     alertSprite.position.set(bodyX, y + unitH/2 + 0.5, z);
