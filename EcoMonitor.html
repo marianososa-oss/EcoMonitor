@@ -2331,9 +2331,70 @@
             cloudGreen: '#9ab63b'
         };
 
-        const Icon = ({ name, className, size = 16, style }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
-            return <i data-lucide={name} className={className} style={{ ...style, width: size, height: size }}></i>;
+        // Icon: renderiza el SVG de lucide INLINE dentro del árbol de React.
+        // Antes usábamos <i data-lucide> + lucide.createIcons() en un useEffect, pero eso
+        // mutaba el DOM por fuera de React → cualquier re-render (ej. al inyectar una falla)
+        // llamaba insertBefore sobre nodos que ya no matcheaban con el virtual DOM y crasheaba
+        // con "NotFoundError: Failed to execute 'insertBefore' on 'Node'".
+        // Solución: leemos lucide.icons[PascalName] (que ya está cargado en window por el CDN)
+        // y lo convertimos a JSX. Así el ícono es parte del árbol de React y lucide no lo toca.
+        const _iconCache = {};
+        const kebabToPascal = (s) => String(s).split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('');
+        const _getIconNodes = (name) => {
+            if (_iconCache[name] !== undefined) return _iconCache[name];
+            const lu = window.lucide;
+            if (!lu || !lu.icons) { _iconCache[name] = null; return null; }
+            // Lucide UMD: los íconos viven en lu.icons con clave PascalCase.
+            const key = kebabToPascal(name);
+            const raw = lu.icons[key] || lu.icons[name] || null;
+            if (!raw) { _iconCache[name] = null; return null; }
+            // Distintas versiones del UMD:
+            //   - Array de tuplas: [['path', {d:...}], ['circle', {...}], ...]
+            //   - { toSvg, ..., default: [...] }  o  { nodes: [...] }
+            //   - Icon class con .nodes / .render
+            let nodes = null;
+            if (Array.isArray(raw)) nodes = raw;
+            else if (Array.isArray(raw.nodes)) nodes = raw.nodes;
+            else if (raw.default && Array.isArray(raw.default)) nodes = raw.default;
+            _iconCache[name] = nodes;
+            return nodes;
+        };
+        const Icon = ({ name, className = '', size = 16, style = {} }) => {
+            const nodes = _getIconNodes(name);
+            const commonProps = {
+                width:  size,
+                height: size,
+                viewBox: '0 0 24 24',
+                fill: 'none',
+                stroke: 'currentColor',
+                strokeWidth: 2,
+                strokeLinecap: 'round',
+                strokeLinejoin: 'round',
+                className,
+                style: { display: 'inline-block', flexShrink: 0, ...style }
+            };
+            if (!nodes || nodes.length === 0) {
+                // Fallback silencioso — placeholder invisible del mismo tamaño para no romper el layout
+                return <svg {...commonProps}/>;
+            }
+            return (
+                <svg {...commonProps}>
+                    {nodes.map((node, i) => {
+                        if (!Array.isArray(node)) return null;
+                        const [tag, attrs] = node;
+                        if (!tag || typeof tag !== 'string') return null;
+                        const props = { key: i };
+                        if (attrs && typeof attrs === 'object') {
+                            for (const k in attrs) {
+                                // Los atributos vienen en kebab-case; React quiere camelCase.
+                                const rk = k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+                                props[rk] = attrs[k];
+                            }
+                        }
+                        return React.createElement(tag, props);
+                    })}
+                </svg>
+            );
         };
 
         // ==================================================================================
