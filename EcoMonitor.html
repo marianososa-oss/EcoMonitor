@@ -3415,72 +3415,87 @@
                 emergencyGroup.position.set(2, 0, -5);
                 scene.add(emergencyGroup);
 
-                // === AIRE VISIBLE — wisps sutiles en cerramientos + chorros por las puertas al abrirse ===
-                // Ligero: pocos meshes, blending aditivo, fade in/out por partícula.
+                // === AIRE VISIBLE — sprites con textura de puff suave (no esferas duras) ===
+                // Antes eran spheres MeshBasic con look de "burbujas" opacas; ahora son sprites
+                // con gradiente radial → se leen como neblina/vapor de verdad + turbulencia + elongación.
                 const airGroup = new THREE.Group();
                 scene.add(airGroup);
-                const airMat = new THREE.MeshBasicMaterial({
-                    color: '#cfe8ff', transparent: true, opacity: 0.35,
+                // Textura de puff: gradiente radial blanco → transparente, borde suave
+                const _puffCanvas = document.createElement('canvas');
+                _puffCanvas.width = 128; _puffCanvas.height = 128;
+                const _pctx = _puffCanvas.getContext('2d');
+                const _pgrad = _pctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+                _pgrad.addColorStop(0.00, 'rgba(255,255,255,0.95)');
+                _pgrad.addColorStop(0.25, 'rgba(230,240,255,0.60)');
+                _pgrad.addColorStop(0.55, 'rgba(200,225,255,0.25)');
+                _pgrad.addColorStop(1.00, 'rgba(180,215,255,0.00)');
+                _pctx.fillStyle = _pgrad;
+                _pctx.fillRect(0, 0, 128, 128);
+                const puffTex = new THREE.CanvasTexture(_puffCanvas);
+                if (THREE.SRGBColorSpace) puffTex.colorSpace = THREE.SRGBColorSpace;
+                const _makePuff = () => new THREE.Sprite(new THREE.SpriteMaterial({
+                    map: puffTex, transparent: true, opacity: 0.35,
                     blending: THREE.AdditiveBlending, depthWrite: false
-                });
-                // Sprite geometry — pequeña esfera baja poly
-                const airGeo = new THREE.SphereGeometry(0.08, 8, 6);
-                // === Perimeter wisps — siempre visibles, muy sutiles (sala en sobrepresión +50 Pa) ===
+                }));
+
+                // === Perimeter wisps — sutiles, siempre visibles (sala en sobrepresión +50 Pa) ===
                 const perimeterWisps = [];
                 const wispOriginsPerimeter = [
-                    // Juntas de la puerta oeste (arriba/abajo del marco)
                     { origin: new THREE.Vector3(-roomW/2 - 0.05, 2.21 + 2.2 + 0.05, +2), dir: new THREE.Vector3(-1, 0.2, 0), len: 1.5, speed: 0.15 },
                     { origin: new THREE.Vector3(-roomW/2 - 0.05, 2.21 + 0.05,       +2), dir: new THREE.Vector3(-1,-0.2, 0), len: 1.5, speed: 0.14 },
-                    // Juntas de la puerta este (arriba/abajo)
                     { origin: new THREE.Vector3( roomW/2 + 0.05, 2.21 + 2.2 + 0.05, -2), dir: new THREE.Vector3( 1, 0.2, 0), len: 1.5, speed: 0.15 },
                     { origin: new THREE.Vector3( roomW/2 + 0.05, 2.21 + 0.05,       -2), dir: new THREE.Vector3( 1,-0.2, 0), len: 1.5, speed: 0.14 },
-                    // Juntas pared norte (2 puntos a lo largo)
                     { origin: new THREE.Vector3(-3, 2.21 + roomH * 0.5, -roomD/2 - 0.02), dir: new THREE.Vector3(0.05, 0.15, -1), len: 1.2, speed: 0.12 },
                     { origin: new THREE.Vector3( 3, 2.21 + roomH * 0.5, -roomD/2 - 0.02), dir: new THREE.Vector3(-0.05,0.15, -1), len: 1.2, speed: 0.13 },
-                    // Juntas pared sur
                     { origin: new THREE.Vector3(-3, 2.21 + roomH * 0.5,  roomD/2 + 0.02), dir: new THREE.Vector3(0.05, 0.15,  1), len: 1.2, speed: 0.11 },
                     { origin: new THREE.Vector3( 3, 2.21 + roomH * 0.5,  roomD/2 + 0.02), dir: new THREE.Vector3(-0.05,0.15,  1), len: 1.2, speed: 0.12 },
-                    // Juntas del techo (4 esquinas superiores)
                     { origin: new THREE.Vector3(-roomW/2 + 0.5, 2.21 + roomH - 0.05, -roomD/2 + 0.5), dir: new THREE.Vector3(-0.6, 0.5, -0.6), len: 1.4, speed: 0.10 },
                     { origin: new THREE.Vector3( roomW/2 - 0.5, 2.21 + roomH - 0.05, -roomD/2 + 0.5), dir: new THREE.Vector3( 0.6, 0.5, -0.6), len: 1.4, speed: 0.10 },
                     { origin: new THREE.Vector3(-roomW/2 + 0.5, 2.21 + roomH - 0.05,  roomD/2 - 0.5), dir: new THREE.Vector3(-0.6, 0.5,  0.6), len: 1.4, speed: 0.10 },
                     { origin: new THREE.Vector3( roomW/2 - 0.5, 2.21 + roomH - 0.05,  roomD/2 - 0.5), dir: new THREE.Vector3( 0.6, 0.5,  0.6), len: 1.4, speed: 0.10 }
                 ];
                 wispOriginsPerimeter.forEach((w, i) => {
-                    const mesh = new THREE.Mesh(airGeo, airMat.clone());
-                    mesh.userData = { ...w, phase: i / wispOriginsPerimeter.length, kind: 'perimeter' };
-                    mesh.userData.dir.normalize();
-                    airGroup.add(mesh);
-                    perimeterWisps.push(mesh);
+                    const s = _makePuff();
+                    s.userData = { ...w, phase: i / wispOriginsPerimeter.length, kind: 'perimeter' };
+                    s.userData.dir.normalize();
+                    airGroup.add(s);
+                    perimeterWisps.push(s);
                 });
-                // === Door streams — chorros por las puertas cuando door_open ===
+
+                // === Door streams — chorros densos con turbulencia por cada puerta ===
+                // Antes: 6 esferas duras alineadas → parecía "burbujas".
+                // Ahora: 14 sprites por puerta con jitter Y/Z, velocidades y tamaños distintos,
+                //        turbulencia perpendicular al flujo, y textura de puff suave.
                 const doorStreams = [];
-                const doorY_world = 2.21 + 1.1;   // altura media de la puerta
-                // Main door (oeste) — flow -X
-                for (let d = 0; d < 6; d++) {
-                    const stream = new THREE.Mesh(airGeo, airMat.clone());
-                    stream.userData = {
-                        origin: new THREE.Vector3(-roomW/2 - 0.05, doorY_world + (d - 2.5) * 0.35, +2),
-                        dir: new THREE.Vector3(-1, 0, 0),
-                        len: 2.5, speed: 0.55,
-                        phase: d / 6, kind: 'door'
+                const doorY_world = 2.21 + 1.1;
+                const _bldStream = (origin, dirX, phaseIdx, count) => {
+                    const s = _makePuff();
+                    // Jitter en Y (dispersión vertical dentro del vano) + Z (lateral pequeña)
+                    const yJit = ((phaseIdx / (count - 1)) - 0.5) * 1.9 + (Math.sin(phaseIdx * 3.7) * 0.15);
+                    const zJit = Math.sin(phaseIdx * 2.3) * 0.35 + Math.cos(phaseIdx * 1.7) * 0.20;
+                    s.userData = {
+                        origin: new THREE.Vector3(origin.x, doorY_world + yJit, origin.z + zJit),
+                        dir: new THREE.Vector3(dirX, 0.04, 0).normalize(),   // levísimo alza (aire caliente)
+                        len: 2.8 + (phaseIdx % 5) * 0.25,
+                        speed: 0.32 + (phaseIdx % 4) * 0.11,
+                        phase: (phaseIdx / count) + Math.sin(phaseIdx) * 0.05,
+                        turbAmp: 0.18 + (phaseIdx % 3) * 0.06,
+                        turbFreq: 2.2 + (phaseIdx % 4) * 0.5,
+                        baseScale: 0.55 + (phaseIdx % 3) * 0.35,
+                        kind: 'door'
                     };
-                    stream.visible = false;
-                    airGroup.add(stream);
-                    doorStreams.push(stream);
+                    s.visible = false;
+                    airGroup.add(s);
+                    doorStreams.push(s);
+                };
+                const DOOR_STREAM_COUNT = 14;
+                // Puerta principal (oeste) — flujo -X
+                for (let d = 0; d < DOOR_STREAM_COUNT; d++) {
+                    _bldStream(new THREE.Vector3(-roomW/2 - 0.05, 0, +2), -1, d, DOOR_STREAM_COUNT);
                 }
-                // Emergency door (este) — flow +X
-                for (let d = 0; d < 6; d++) {
-                    const stream = new THREE.Mesh(airGeo, airMat.clone());
-                    stream.userData = {
-                        origin: new THREE.Vector3(roomW/2 + 0.05, doorY_world + (d - 2.5) * 0.35, -2),
-                        dir: new THREE.Vector3(1, 0, 0),
-                        len: 2.5, speed: 0.55,
-                        phase: d / 6, kind: 'door'
-                    };
-                    stream.visible = false;
-                    airGroup.add(stream);
-                    doorStreams.push(stream);
+                // Puerta emergencia (este) — flujo +X
+                for (let d = 0; d < DOOR_STREAM_COUNT; d++) {
+                    _bldStream(new THREE.Vector3( roomW/2 + 0.05, 0, -2), +1, d, DOOR_STREAM_COUNT);
                 }
 
                 // === CHARCO DE AGUA en el piso — visible solo cuando globalEvents.drain_blocked ===
@@ -4236,23 +4251,34 @@
                     sceneObj.current.perimeterWisps?.forEach(w => {
                         const cycle = (t * w.userData.speed + w.userData.phase) % 1;
                         w.position.copy(w.userData.origin).addScaledVector(w.userData.dir, cycle * w.userData.len);
-                        // Fade in al salir, fade out al llegar al final
                         const fadeIn  = Math.min(1, cycle * 6);
                         const fadeOut = Math.min(1, (1 - cycle) * 3);
-                        w.material.opacity = 0.28 * Math.min(fadeIn, fadeOut);
-                        const sc = 0.6 + cycle * 1.4;   // se expande a medida que sale
-                        w.scale.setScalar(sc);
+                        w.material.opacity = 0.32 * Math.min(fadeIn, fadeOut);
+                        const sc = 0.35 + cycle * 0.9;
+                        w.scale.set(sc, sc, 1);
                     });
+                    // Door streams: turbulencia perpendicular + elongación en dir del flujo → look de chorro real
                     sceneObj.current.doorStreams?.forEach(s => {
                         s.visible = isDoorOpen;
                         if (!isDoorOpen) return;
-                        const cycle = (t * s.userData.speed + s.userData.phase) % 1;
-                        s.position.copy(s.userData.origin).addScaledVector(s.userData.dir, cycle * s.userData.len);
-                        const fadeIn  = Math.min(1, cycle * 5);
-                        const fadeOut = Math.min(1, (1 - cycle) * 2);
-                        s.material.opacity = 0.62 * Math.min(fadeIn, fadeOut);
-                        const sc = 0.7 + cycle * 2.2;
-                        s.scale.setScalar(sc);
+                        const u = s.userData;
+                        const cycle = (t * u.speed + u.phase) % 1;
+                        // Base: origen + dir * distancia
+                        const baseX = u.origin.x + u.dir.x * cycle * u.len;
+                        const baseY = u.origin.y + u.dir.y * cycle * u.len;
+                        const baseZ = u.origin.z + u.dir.z * cycle * u.len;
+                        // Turbulencia perpendicular al flujo (Y y Z para main door, Y y X para emergency)
+                        // Amplitud crece con cycle → el chorro se abre en abanico a medida que se aleja
+                        const wobbleY = Math.sin(cycle * u.turbFreq * Math.PI + t * 2 + u.phase * 7) * u.turbAmp * cycle;
+                        const wobbleZ = Math.cos(cycle * u.turbFreq * Math.PI + t * 1.5 + u.phase * 5) * u.turbAmp * cycle;
+                        s.position.set(baseX, baseY + wobbleY, baseZ + wobbleZ);
+                        // Fade: entra rápido, sale gradual
+                        const fadeIn  = Math.min(1, cycle * 4);
+                        const fadeOut = Math.min(1, (1 - cycle) * 2.2);
+                        s.material.opacity = 0.55 * Math.min(fadeIn, fadeOut);
+                        // Escala: se expande + leve elongación en el eje del flujo (elipse en dir del movimiento)
+                        const sc = u.baseScale * (0.5 + cycle * 1.9);
+                        s.scale.set(sc * (1 + cycle * 0.35), sc, 1);
                     });
                     // Paquetes de datos: cubitos que SUBEN del master a la cloud en loop
                     sceneObj.current.dataPackets?.forEach(pkt => {
