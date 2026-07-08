@@ -1311,7 +1311,7 @@
                                         class="w-5 h-5 text-eco-lightgreen mt-0.5 flex-shrink-0"></i>
                                     <p class="text-sm text-gray-300"><strong>Control PID activo:</strong> Lee sensores
                                         de presión diferencial SDP810 y regula la velocidad del presurizador para
-                                        mantener siempre <strong>+25Pa</strong> herméticos.</p>
+                                        mantener siempre <strong>+30 Pa</strong> herméticos.</p>
                                 </li>
                                 <li class="flex items-start gap-3">
                                     <i data-lucide="check-circle-2"
@@ -2410,7 +2410,7 @@
             setpoint_C: 23,
             histeresis_C: 2,
             hum_target_pct: 45,
-            pres_target_Pa: 50,            // presión diferencial objetivo (pliego típico)
+            pres_target_Pa: 30,            // presión diferencial objetivo del sistema (setpoint EcoMonitor)
             // Capacitancia térmica de la sala: 100 m³ de aire + paredes concreto + racks + slab
             // Air: ~120 kJ/K; Walls (5 ton × 880 J/kgK): 4400 kJ/K; Racks + equipment: ~500 kJ/K
             C_sala_kJK: 5000,              // ~14 min de constante de tiempo con 6 kW netos
@@ -2448,7 +2448,7 @@
 
             alarms: {
                 temp_warn_C: 28, temp_crit_C: 33,
-                pres_warn_Pa: 30, pres_crit_Pa: 15,
+                pres_warn_Pa: 20, pres_crit_Pa: 10,   // proporción respecto al target 30 Pa (67% / 33%)
                 hum_low_pct: 30, hum_high_pct: 60,
                 current_high_A: 18
             }
@@ -3438,7 +3438,7 @@
                     blending: THREE.AdditiveBlending, depthWrite: false
                 }));
 
-                // === Perimeter wisps — sutiles, siempre visibles (sala en sobrepresión +50 Pa) ===
+                // === Perimeter wisps — sutiles, siempre visibles (sala en sobrepresión +30 Pa) ===
                 const perimeterWisps = [];
                 const wispOriginsPerimeter = [
                     { origin: new THREE.Vector3(-roomW/2 - 0.05, 2.21 + 2.2 + 0.05, +2), dir: new THREE.Vector3(-1, 0.2, 0), len: 1.5, speed: 0.15 },
@@ -3543,20 +3543,21 @@
                 puddleGroup.visible = false;   // oculto por default
                 scene.add(puddleGroup);
 
-                // === VFDs (6 cabinets contra la pared del FONDO — pasillo central libre) ===
-                // En una sala eléctrica los equipos que disipan calor van pegados a la pared, nunca en el medio.
+                // === TABLEROS ELÉCTRICOS (VFDs) — DOS hileras ESPALDA CON ESPALDA al centro ===
+                // Antes iban pegados a las paredes largas y tapaban las rejillas interiores de los HVAC.
+                // Ahora las dos filas se apoyan una contra otra por sus caras traseras en z≈0, con las
+                // caras frontales (persianas + etiquetas naranjas) mirando a los pasillos norte/sur.
+                // Así las mochilas AM-010 y sus rejillas quedan bien visibles desde el pasillo.
                 const heatMeshes = [];
                 const heatWaves = [];
                 const eqW = 1.3, eqH = 2.0, eqD = 0.9;
-                const vfdBackZ  = -roomD/2 + eqD/2 + 0.10;  // pared FONDO (norte)
-                const vfdFrontZ =  roomD/2 - eqD/2 - 0.10;  // pared FRENTE (sur) — hilera espejada
-                // DOS hileras contiguas (6 + 6), una contra cada pared larga.
-                // NOTA: espejado SOLO visual — la simulación térmica sigue usando Q_LOAD del slider,
-                // no la cantidad de VFDs dibujados.
+                const vfdRowGap = 0.05;                            // huequito visible entre backs
+                const vfdRowN_Z = -eqD/2 - vfdRowGap/2;            // fila NORTE — fronts miran a -Z
+                const vfdRowS_Z =  eqD/2 + vfdRowGap/2;            // fila SUR   — fronts miran a +Z
                 const vfdXs = [-eqW * 2.5, -eqW * 1.5, -eqW * 0.5, eqW * 0.5, eqW * 1.5, eqW * 2.5];
                 const vfdPositions = [
-                    ...vfdXs.map(x => ({ x, z: vfdBackZ  })),
-                    ...vfdXs.map(x => ({ x, z: vfdFrontZ }))
+                    ...vfdXs.map(x => ({ x, z: vfdRowN_Z })),
+                    ...vfdXs.map(x => ({ x, z: vfdRowS_Z }))
                 ];
                 vfdPositions.forEach((pos, i) => {
                     const x = pos.x, z = pos.z;
@@ -3585,14 +3586,15 @@
                             scene.add(vent);
                         });
                     }
-                    // Etiqueta naranja (advertencia calor) — cara MIRANDO al pasillo central
-                    const facesCenter = z > 0 ? -1 : 1;  // z>0 (pared sur): cara mira a -Z; z<0 (fondo): mira a +Z
+                    // Etiqueta naranja (advertencia calor) — cara MIRANDO al pasillo (afuera del centro)
+                    // Con VFDs espalda-con-espalda: fila sur (z>0) muestra label a +Z, fila norte (z<0) a -Z.
+                    const facesOutward = z > 0 ? 1 : -1;
                     const label = new THREE.Mesh(
                         new THREE.PlaneGeometry(0.55, 0.2),
                         new THREE.MeshBasicMaterial({ color: '#f97316' })
                     );
-                    label.position.set(x, y + eqH/2 - 0.3, z + facesCenter * (eqD/2 + 0.006));
-                    if (facesCenter < 0) label.rotation.y = Math.PI;  // dar vuelta la cara si mira -Z
+                    label.position.set(x, y + eqH/2 - 0.3, z + facesOutward * (eqD/2 + 0.006));
+                    if (facesOutward < 0) label.rotation.y = Math.PI;
                     scene.add(label);
                     // Halo muy sutil sobre el equipo (apenas un brillo cálido, NO una bola que pulsa)
                     const heat = new THREE.Mesh(
@@ -5733,10 +5735,10 @@
                             <button onClick={() => setSceneTheme('night')} className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'night' ? 'bg-indigo-400 text-slate-900': 'text-slate-400 hover:text-white'}`}>Noc</button>
                         </div>
 
-                        <div className="w-px h-6 bg-slate-800 mx-1"></div>
+                        <div className="hidden md:block w-px h-6 bg-slate-800 mx-1"></div>
 
-                        {/* Parámetros compactos */}
-                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="HVAC instalados">
+                        {/* Parámetros compactos — ocultos en mobile (demasiado angosto para tantos selects) */}
+                        <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="HVAC instalados">
                             <Icon name="snowflake" size={11} className="text-eco-lightgreen" />
                             <select value={hvacTotal} onChange={handleTotalChange} className="bg-transparent text-[10px] text-white font-mono font-bold outline-none cursor-pointer">
                                 {Array.from({ length: 8 }, (_, i) => i + 1).map(n => (
@@ -5744,7 +5746,7 @@
                                 ))}
                             </select>
                         </div>
-                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Presurizadores">
+                        <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Presurizadores">
                             <Icon name="fan" size={11} className="text-eco-lightblue" />
                             <select value={presTotal} onChange={(e) => setPresTotal(parseInt(e.target.value))} className="bg-transparent text-[10px] text-white font-mono font-bold outline-none cursor-pointer">
                                 <option value={0} className="bg-slate-950">0 PRES</option>
@@ -5752,7 +5754,7 @@
                                 <option value={2} className="bg-slate-950">2 PRES</option>
                             </select>
                         </div>
-                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Suplentes">
+                        <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Suplentes">
                             <Icon name="shield" size={11} className="text-slate-400" />
                             <select value={hvacBackup} onChange={(e) => setHvacBackup(parseInt(e.target.value))} className="bg-transparent text-[10px] text-white font-mono font-bold outline-none cursor-pointer">
                                 {Array.from({ length: Math.floor(hvacTotal / 2) + 1 }, (_, i) => i).map(n => (
@@ -5760,7 +5762,7 @@
                                 ))}
                             </select>
                         </div>
-                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Ciclo rotación">
+                        <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Ciclo rotación">
                             <Icon name="refresh-cw" size={11} className="text-slate-400" />
                             <select value={rotationPeriod} onChange={(e) => setRotationPeriod(e.target.value)} className="bg-transparent text-[10px] text-white font-mono font-bold outline-none cursor-pointer">
                                 <option value="day"   className="bg-slate-950">24 h</option>
@@ -5769,36 +5771,36 @@
                             </select>
                         </div>
                         <button onClick={() => setOverloadEnabled(!overloadEnabled)}
-                            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider ${overloadEnabled ? 'bg-amber-500/15 border-amber-500/50 text-amber-300' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                            className={`hidden md:flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider ${overloadEnabled ? 'bg-amber-500/15 border-amber-500/50 text-amber-300' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
                             title="Protocolo de apoyo automático">
                             <Icon name="zap" size={11} /> Apoyo {overloadEnabled ? 'ON' : 'OFF'}
                         </button>
 
-                        {/* Sliders inline compactos */}
-                        <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Temperatura exterior">
+                        {/* Sliders inline compactos — ocultos en mobile */}
+                        <div className="hidden md:flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Temperatura exterior">
                             <Icon name="thermometer-sun" size={11} className="text-amber-400" />
                             <input type="range" min="-5" max="42" step="1" value={tExt} onChange={(e) => setTExt(parseInt(e.target.value))} className="sim-input-range" style={{ width: '70px' }}/>
                             <span className="text-[10px] font-mono text-white font-bold w-9 text-right">{tExt}°C</span>
                         </div>
-                        <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Carga térmica VDF">
+                        <div className="hidden md:flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1" title="Carga térmica VDF">
                             <Icon name="zap" size={11} className="text-eco-lightgreen" />
                             <input type="range" min="60" max="140" step="5" value={Q_LOAD} onChange={(e) => setQ_LOAD(parseInt(e.target.value))} className="sim-input-range" style={{ width: '70px' }}/>
                             <span className="text-[10px] font-mono text-white font-bold w-12 text-right">{Q_LOAD}kW</span>
                         </div>
 
-                        {/* Ejecución */}
+                        {/* Ejecución — ocultos en mobile (no hay espacio; el usuario puede pausar/reanudar) */}
                         <button onClick={advanceTime}
-                            className="px-2 py-1.5 bg-eco-green/15 hover:bg-eco-green/25 text-eco-lightgreen border border-eco-lightgreen/40 text-[10px] font-bold rounded-lg flex items-center gap-1 uppercase tracking-wider"
+                            className="hidden md:flex px-2 py-1.5 bg-eco-green/15 hover:bg-eco-green/25 text-eco-lightgreen border border-eco-lightgreen/40 text-[10px] font-bold rounded-lg items-center gap-1 uppercase tracking-wider"
                             title="Avanzar tiempo simulado">
                             <Icon name="fast-forward" size={11} /> Avanzar
                         </button>
                         <button onClick={triggerOverload} disabled={!overloadEnabled || isOverloadActive || standbyCount === 0}
-                            className="px-2 py-1.5 bg-slate-950 hover:bg-amber-500/15 border border-slate-800 hover:border-amber-400/50 disabled:opacity-30 text-slate-400 hover:text-amber-300 text-[10px] font-bold rounded-lg flex items-center gap-1 uppercase tracking-wider"
+                            className="hidden md:flex px-2 py-1.5 bg-slate-950 hover:bg-amber-500/15 border border-slate-800 hover:border-amber-400/50 disabled:opacity-30 text-slate-400 hover:text-amber-300 text-[10px] font-bold rounded-lg items-center gap-1 uppercase tracking-wider"
                             title="Forzar apoyo manual">
                             <Icon name="alert-triangle" size={11} /> Apoyo
                         </button>
                         <button onClick={reset}
-                            className="px-2 py-1.5 bg-slate-950 hover:bg-red-950/30 border border-slate-800 hover:border-red-900 text-slate-500 hover:text-red-300 text-[10px] font-bold rounded-lg uppercase tracking-wider"
+                            className="hidden md:inline-block px-2 py-1.5 bg-slate-950 hover:bg-red-950/30 border border-slate-800 hover:border-red-900 text-slate-500 hover:text-red-300 text-[10px] font-bold rounded-lg uppercase tracking-wider"
                             title="Reset simulación">Reset</button>
 
                         {/* Espaciador flexible + botón ⚠ Fallas + HUD toggle (el panel de fallas está en la fila de abajo) */}
@@ -5851,7 +5853,7 @@
                         {/* ═══════ PANEL DE FALLAS FLOTANTE — top-left, sobre la esquina de la escena ═══════ */}
                         {faultsMenuOpen && (
                             <div className="absolute top-3 left-3 rounded-xl shadow-2xl bg-slate-950/95 border border-slate-700 p-2 sim-no-scroll overflow-y-auto"
-                                 style={{ zIndex: 15, width: '340px', maxHeight: 'calc(100% - 24px)' }}>
+                                 style={{ zIndex: 15, width: 'min(340px, calc(100vw - 24px))', maxHeight: 'calc(100% - 24px)' }}>
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5"><Icon name="siren" size={12}/> Inyección de fallas</span>
                                     <button onClick={normalizeAll} className="px-2 py-1 rounded bg-eco-lightgreen/15 border border-eco-lightgreen/40 text-eco-lightgreen text-[9px] font-bold uppercase hover:bg-eco-lightgreen/25 flex items-center gap-1">
