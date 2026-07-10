@@ -5169,18 +5169,41 @@
                     const sideOffset = 0.48;   // borde rejilla 0.425 + 5.5 cm — drop bien pegado al costado del tablero
                     const blueMat = new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.5 });
 
-                    // ---- Troncal continuo ----
+                    // ---- Troncal continuo con TERMINUS en el ultimo tablero ----
+                    // El troncal NO sigue de largo hasta una esquina despues del ultimo esclavo:
+                    // termina en el punto de attach del ULTIMO tablero de la ultima pared con equipos.
+                    // Orden de recorrido: master → NW → norte(s) → NE → este(s) → SE → sur(es) → terminus.
                     const trunkPts = [masterOutputPos.clone()];
                     trunkPts.push(new THREE.Vector3(wallX_west, cableY, masterOutputPos.z));
-                    if (northEs.length > 0 || eastEs.length > 0) {
+
+                    // Attach coord del ultimo tablero de cada pared (usa mismo sideOffset que el T-tap)
+                    const _lastWp = (arr, wall) => {
+                        const e = arr[arr.length - 1];
+                        return canonicalToWorld(wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
+                    };
+                    const lastNorthAttachX = northEs.length > 0 ? _lastWp(northEs, 'north').x - sideOffset : null;
+                    const lastEastAttachZ  = eastEs.length  > 0 ? _lastWp(eastEs,  'east' ).z + sideOffset : null;
+                    const lastSouthAttachX = southEs.length > 0 ? _lastWp(southEs, 'south').x + sideOffset : null;
+
+                    // Ultima pared con esclavos = donde termina el troncal
+                    const terminalWall = southEs.length > 0 ? 'south'
+                                       : eastEs.length  > 0 ? 'east'
+                                       : northEs.length > 0 ? 'north'
+                                       : null;
+
+                    if (terminalWall) {
                         trunkPts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));   // NO
-                        trunkPts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));   // NE
-                    }
-                    if (eastEs.length > 0 || southEs.length > 0) {
-                        trunkPts.push(new THREE.Vector3(wallX_east, cableY, wallZ_south));   // SE
-                    }
-                    if (southEs.length > 0) {
-                        trunkPts.push(new THREE.Vector3(wallX_west, cableY, wallZ_south));   // SO
+                        if (terminalWall === 'north') {
+                            trunkPts.push(new THREE.Vector3(lastNorthAttachX, cableY, wallZ_north));  // termina en ultimo tablero norte
+                        } else {
+                            trunkPts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));         // NE
+                            if (terminalWall === 'east') {
+                                trunkPts.push(new THREE.Vector3(wallX_east, cableY, lastEastAttachZ)); // termina en ultimo tablero este
+                            } else {
+                                trunkPts.push(new THREE.Vector3(wallX_east, cableY, wallZ_south));    // SE
+                                trunkPts.push(new THREE.Vector3(lastSouthAttachX, cableY, wallZ_south)); // termina en ultimo tablero sur
+                            }
+                        }
                     }
                     if (trunkPts.length >= 2) {
                         const trunkCurve = new THREE.CatmullRomCurve3(trunkPts, false, 'catmullrom', 0.0);
