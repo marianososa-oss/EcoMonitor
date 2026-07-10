@@ -5147,50 +5147,82 @@
                         cableGroup.add(trunkTube);
                     }
 
-                    // ---- Derivación T-tap por tablero ----
-                    // 3 waypoints: (attach en troncal) → (bajo la rejilla, mismo X/Z) → (techo del panel)
-                    // "Izquierdo desde el pasillo" por pared:
-                    //   norte: -X   ·   este: +Z   ·   sur: +X
-                    const buildStub = (attach, elbow, panelTop) => {
-                        const stubCurve = new THREE.CatmullRomCurve3([attach, elbow, panelTop], false, 'catmullrom', 0.5);
+                    // ---- Derivación T-tap por tablero — ENTRA POR EL COSTADO del gabinete ----
+                    // 4 waypoints: attach en troncal → drop vertical al costado de la rejilla →
+                    // elbow horizontal cerca del tablero → entra 3 cm DENTRO de la cara lateral.
+                    // "Izquierdo desde el pasillo" por pared: norte -X · este +Z · sur +X.
+                    // Face-side entry ⇒ el caño no queda flotando arriba del panel, se lee que
+                    // se clava en el costado como una acometida real.
+                    const glandMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.7, roughness: 0.35 });
+                    const buildStub = (attach, drop, elbow, entryFace, insideEntry, glandPos, glandAxis) => {
+                        // CatmullRom con 4 puntos → curva suave con L bien marcada
+                        const stubCurve = new THREE.CatmullRomCurve3(
+                            [attach, drop, elbow, insideEntry], false, 'catmullrom', 0.45
+                        );
                         const stub = new THREE.Mesh(
-                            new THREE.TubeGeometry(stubCurve, 40, 0.030, 8, false),
+                            new THREE.TubeGeometry(stubCurve, 48, 0.030, 8, false),
                             blueMat
                         );
                         stub.castShadow = true;
                         cableGroup.add(stub);
-                        // T-fitting: cajita chica donde el stub se conecta al troncal
+                        // T-fitting en el attach al troncal
                         const tap = new THREE.Mesh(
                             new THREE.BoxGeometry(0.06, 0.06, 0.06),
                             new THREE.MeshStandardMaterial({ color: '#1e40af', metalness: 0.4, roughness: 0.6 })
                         );
                         tap.position.copy(attach);
                         cableGroup.add(tap);
+                        // Prensacables (gland) sobre la cara lateral del tablero — hace de "acometida"
+                        // Es un cilindro corto orientado según el eje de entrada.
+                        const gland = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.045, 0.05, 0.055, 14),
+                            glandMat
+                        );
+                        gland.position.copy(glandPos);
+                        // Cilindro nativo tiene eje Y; rotamos según glandAxis ('x' o 'z')
+                        if (glandAxis === 'x') gland.rotation.z = Math.PI/2;
+                        else if (glandAxis === 'z') gland.rotation.x = Math.PI/2;
+                        cableGroup.add(gland);
                     };
+
+                    // entryY: cerca del top del tablero pero DENTRO de la cara lateral (no arriba).
+                    // pos.y + escH/2 = top del panel; nos ubicamos 12 cm por debajo del borde superior
+                    // así el caño entra "por el hombro" del gabinete.
+                    const entryOffsetTop = 0.12;
+                    const insideBite     = 0.03;   // cuánto se mete el caño dentro del gabinete (3 cm)
 
                     northEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        const panelTop = wp.y + escH/2 + 0.05;
-                        const attach   = new THREE.Vector3(wp.x - sideOffset, cableY,   wallZ_north);
-                        const elbow    = new THREE.Vector3(wp.x - sideOffset, panelTop, wallZ_north);
-                        const connect  = new THREE.Vector3(wp.x,              panelTop, wallZ_north);
-                        buildStub(attach, elbow, connect);
+                        const entryY   = wp.y + escH/2 - entryOffsetTop;
+                        const sideX    = wp.x - escW/2;                             // cara lateral izquierda del tablero
+                        const attach   = new THREE.Vector3(wp.x - sideOffset, cableY, wallZ_north);
+                        const drop     = new THREE.Vector3(wp.x - sideOffset, entryY + 0.10, wallZ_north);
+                        const elbow    = new THREE.Vector3(sideX - 0.06,      entryY, wallZ_north);
+                        const insideEntry = new THREE.Vector3(sideX + insideBite, entryY, wallZ_north);
+                        const glandPos = new THREE.Vector3(sideX - 0.015, entryY, wallZ_north);
+                        buildStub(attach, drop, elbow, null, insideEntry, glandPos, 'x');
                     });
                     eastEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        const panelTop = wp.y + escH/2 + 0.05;
-                        const attach   = new THREE.Vector3(wallX_east, cableY,   wp.z + sideOffset);
-                        const elbow    = new THREE.Vector3(wallX_east, panelTop, wp.z + sideOffset);
-                        const connect  = new THREE.Vector3(wallX_east, panelTop, wp.z);
-                        buildStub(attach, elbow, connect);
+                        const entryY   = wp.y + escH/2 - entryOffsetTop;
+                        const sideZ    = wp.z + escW/2;                             // cara lateral +Z del tablero
+                        const attach   = new THREE.Vector3(wallX_east, cableY, wp.z + sideOffset);
+                        const drop     = new THREE.Vector3(wallX_east, entryY + 0.10, wp.z + sideOffset);
+                        const elbow    = new THREE.Vector3(wallX_east, entryY, sideZ + 0.06);
+                        const insideEntry = new THREE.Vector3(wallX_east, entryY, sideZ - insideBite);
+                        const glandPos = new THREE.Vector3(wallX_east, entryY, sideZ + 0.015);
+                        buildStub(attach, drop, elbow, null, insideEntry, glandPos, 'z');
                     });
                     southEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        const panelTop = wp.y + escH/2 + 0.05;
-                        const attach   = new THREE.Vector3(wp.x + sideOffset, cableY,   wallZ_south);
-                        const elbow    = new THREE.Vector3(wp.x + sideOffset, panelTop, wallZ_south);
-                        const connect  = new THREE.Vector3(wp.x,              panelTop, wallZ_south);
-                        buildStub(attach, elbow, connect);
+                        const entryY   = wp.y + escH/2 - entryOffsetTop;
+                        const sideX    = wp.x + escW/2;                             // cara lateral derecha del tablero (mirando desde el pasillo sur)
+                        const attach   = new THREE.Vector3(wp.x + sideOffset, cableY, wallZ_south);
+                        const drop     = new THREE.Vector3(wp.x + sideOffset, entryY + 0.10, wallZ_south);
+                        const elbow    = new THREE.Vector3(sideX + 0.06,      entryY, wallZ_south);
+                        const insideEntry = new THREE.Vector3(sideX - insideBite, entryY, wallZ_south);
+                        const glandPos = new THREE.Vector3(sideX + 0.015, entryY, wallZ_south);
+                        buildStub(attach, drop, elbow, null, insideEntry, glandPos, 'x');
                     });
                 }
 
