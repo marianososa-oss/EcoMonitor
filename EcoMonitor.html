@@ -4670,72 +4670,47 @@
                     }
 
                     // === REJILLAS INTERIORES (en la pared del shelter, alineadas con el HVAC) ===
-                    const interiorX = wallX + (-outSign) * 0.025;  // 2.5cm hacia el interior de la pared
+                    // Louvers ahora son BoxGeometry (barras sólidas), no LineSegments — así no pixelan
+                    // ni se pierden con la distancia / rotación.
+                    const interiorX = wallX + (-outSign) * 0.025;
                     const grilleColor = '#d4d4d8';
                     const grilleLineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.7 });
-                    // Rejilla de INYECCIÓN (arriba — sale aire frío hacia la sala)
-                    const injHeight = 0.45, injWidth = 0.85;
-                    const inj = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.025, injHeight, injWidth),
-                        new THREE.MeshLambertMaterial({ color: grilleColor })
-                    );
-                    inj.position.set(interiorX, y + 0.95, z);
-                    g.add(inj);
-                    const injEds = new THREE.LineSegments(
-                        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.025, injHeight, injWidth)),
-                        grilleLineMat
-                    );
-                    injEds.position.copy(inj.position); g.add(injEds);
-                    // Louvers horizontales (8 líneas en la cara interior)
-                    for (let lou = 0; lou < 8; lou++) {
-                        const louLine = new THREE.LineSegments(
-                            new THREE.BufferGeometry().setFromPoints([
-                                new THREE.Vector3(interiorX - outSign * 0.014, y + 0.95 - injHeight/2 + 0.04 + lou * (injHeight - 0.08) / 7, z - injWidth/2 + 0.03),
-                                new THREE.Vector3(interiorX - outSign * 0.014, y + 0.95 - injHeight/2 + 0.04 + lou * (injHeight - 0.08) / 7, z + injWidth/2 - 0.03)
-                            ]),
+                    const louverBarMat = new THREE.MeshStandardMaterial({ color: '#4a4a52', metalness: 0.55, roughness: 0.5 });
+                    const buildInteriorGrille = (yCenter, gHeight, gWidth, arrowColor, arrowDown) => {
+                        // Fondo (marco de la rejilla)
+                        const body = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.025, gHeight, gWidth),
+                            new THREE.MeshLambertMaterial({ color: grilleColor })
+                        );
+                        body.position.set(interiorX, yCenter, z);
+                        g.add(body);
+                        const eds = new THREE.LineSegments(
+                            new THREE.EdgesGeometry(new THREE.BoxGeometry(0.025, gHeight, gWidth)),
                             grilleLineMat
                         );
-                        g.add(louLine);
-                    }
-                    // Indicador "↓ INY" (flecha pequeña hacia abajo)
-                    const injArrow = new THREE.Mesh(
-                        new THREE.ConeGeometry(0.04, 0.07, 4),
-                        new THREE.MeshBasicMaterial({ color: TH_COLOR.cable })
-                    );
-                    injArrow.position.set(interiorX - outSign * 0.018, y + 0.95 - injHeight/2 - 0.08, z);
-                    injArrow.rotation.x = Math.PI;
-                    g.add(injArrow);
-
-                    // Rejilla de RETORNO (abajo — aire de la sala vuelve al HVAC)
-                    const retHeight = 0.45, retWidth = 0.85;
-                    const ret = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.025, retHeight, retWidth),
-                        new THREE.MeshLambertMaterial({ color: grilleColor })
-                    );
-                    ret.position.set(interiorX, y - 0.95, z);
-                    g.add(ret);
-                    const retEds = new THREE.LineSegments(
-                        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.025, retHeight, retWidth)),
-                        grilleLineMat
-                    );
-                    retEds.position.copy(ret.position); g.add(retEds);
-                    for (let lou = 0; lou < 8; lou++) {
-                        const louLine = new THREE.LineSegments(
-                            new THREE.BufferGeometry().setFromPoints([
-                                new THREE.Vector3(interiorX - outSign * 0.014, y - 0.95 - retHeight/2 + 0.04 + lou * (retHeight - 0.08) / 7, z - retWidth/2 + 0.03),
-                                new THREE.Vector3(interiorX - outSign * 0.014, y - 0.95 - retHeight/2 + 0.04 + lou * (retHeight - 0.08) / 7, z + retWidth/2 - 0.03)
-                            ]),
-                            grilleLineMat
+                        eds.position.copy(body.position); g.add(eds);
+                        // 8 barras horizontales sólidas — sobreviven al zoom out y a la rotación
+                        for (let lou = 0; lou < 8; lou++) {
+                            const yLou = yCenter - gHeight/2 + 0.04 + lou * (gHeight - 0.08) / 7;
+                            const bar = new THREE.Mesh(
+                                new THREE.BoxGeometry(0.010, 0.014, gWidth - 0.06),
+                                louverBarMat
+                            );
+                            bar.position.set(interiorX - outSign * 0.014, yLou, z);
+                            g.add(bar);
+                        }
+                        // Flecha indicadora ↓ INY / ↑ RET
+                        const arrow = new THREE.Mesh(
+                            new THREE.ConeGeometry(0.04, 0.07, 6),
+                            new THREE.MeshBasicMaterial({ color: arrowColor })
                         );
-                        g.add(louLine);
-                    }
-                    // Indicador "↑ RET"
-                    const retArrow = new THREE.Mesh(
-                        new THREE.ConeGeometry(0.04, 0.07, 4),
-                        new THREE.MeshBasicMaterial({ color: TH_COLOR.heat })
-                    );
-                    retArrow.position.set(interiorX - outSign * 0.018, y - 0.95 + retHeight/2 + 0.08, z);
-                    g.add(retArrow);
+                        const arrowY = arrowDown ? yCenter - gHeight/2 - 0.08 : yCenter + gHeight/2 + 0.08;
+                        arrow.position.set(interiorX - outSign * 0.018, arrowY, z);
+                        if (arrowDown) arrow.rotation.x = Math.PI;
+                        g.add(arrow);
+                    };
+                    buildInteriorGrille(y + 0.95, 0.45, 0.85, TH_COLOR.cable, true);   // INYECCIÓN (arriba, flecha ↓)
+                    buildInteriorGrille(y - 0.95, 0.45, 0.85, TH_COLOR.heat,  false);  // RETORNO   (abajo, flecha ↑)
 
                     g.userData = { fan, spinSpeed: spin, stateBand, unitId: u.id };
                     // === Ícono de ALERTA flotando (visible solo con activeFaults[u.id]) ===
@@ -5041,14 +5016,49 @@
                     );
                     led.position.set(pos.x + (-outSign) * (escD/2 + 0.008), pos.y + escH/3, pos.z + escW/3);
                     g.add(led);
-                    // Placa ID
-                    const idPlate = new THREE.Mesh(
-                        new THREE.PlaneGeometry(escW * 0.6, 0.08),
-                        new THREE.MeshBasicMaterial({ color: '#1f1f26' })
-                    );
-                    idPlate.position.set(pos.x + (-outSign) * (escD/2 + 0.006), pos.y + escH/3 - 0.12, pos.z);
-                    idPlate.rotation.y = outSign === -1 ? Math.PI/2 : -Math.PI/2;
-                    g.add(idPlate);
+                    // (Placa negra "ID" del tablero removida — no llevaba pantalla en los tableros reales)
+
+                    // === CODOS ROJO + VERDE — cables de control y sensores entrando en la pared ===
+                    // Salen desde la parte de abajo del esclavo, bajan verticalmente y hacen 90°
+                    // hacia la pared. El rojo lleva los cables de control (orden a los equipos)
+                    // y el verde los cables de sensores. Aplica a HVAC y a PRES.
+                    const conduitRadius   = 0.028;
+                    const conduitRedMat   = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
+                    const conduitGreenMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
+                    const escBottomY = pos.y - escH/2;
+                    const floorY     = 2.21;
+                    const yElbow     = (escBottomY + floorY) / 2;              // media altura entre esclavo y piso
+                    const wallXCanon = info.wallX;                             // pared en canónico (+roomW/2)
+                    const _addElbow = (colorMat, zOffset) => {
+                        // Tramo vertical: baja desde el borde inferior del esclavo hasta el codo
+                        const vLen = Math.max(0.02, escBottomY - yElbow);
+                        const vert = new THREE.Mesh(
+                            new THREE.CylinderGeometry(conduitRadius, conduitRadius, vLen, 10),
+                            colorMat
+                        );
+                        vert.position.set(interiorX, escBottomY - vLen/2, pos.z + zOffset);
+                        g.add(vert);
+                        // Esfera en el codo — suaviza la junta
+                        const corner = new THREE.Mesh(
+                            new THREE.SphereGeometry(conduitRadius * 1.05, 12, 8),
+                            colorMat
+                        );
+                        corner.position.set(interiorX, yElbow, pos.z + zOffset);
+                        g.add(corner);
+                        // Tramo horizontal: entra en la pared (canónicamente en dirección +X con outSign=+1)
+                        const hEndX = wallXCanon + outSign * 0.04;             // entra ~4 cm en la pared
+                        const hLen  = Math.abs(hEndX - interiorX);
+                        const horiz = new THREE.Mesh(
+                            new THREE.CylinderGeometry(conduitRadius, conduitRadius, hLen, 10),
+                            colorMat
+                        );
+                        horiz.rotation.z = Math.PI/2;
+                        horiz.position.set((interiorX + hEndX) / 2, yElbow, pos.z + zOffset);
+                        g.add(horiz);
+                    };
+                    _addElbow(conduitRedMat,   -0.10);   // ROJO — cables de control
+                    _addElbow(conduitGreenMat, +0.10);   // VERDE — cables de sensores
+
                     // ADD al groupRef del equipo → hereda rotación
                     info.groupRef.add(g);
                     esclavoData.push({
@@ -5098,59 +5108,74 @@
                     if (northEs.length > 0) {
                         pts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));   // esquina NO
                     }
-                    // Norte: pin Z al wall interior, X varía con cada esclavo
+                    // === Descenso RODEANDO la rejilla interior superior ===
+                    // La rejilla de INYECCIÓN vive en (wp.x, wp.y+0.95, wall_perp - 0.095). Si el cable
+                    // bajara directo por wallZ, cruzaría visualmente el rectángulo de la rejilla. Ahora
+                    // en los waypoints de descenso agregamos un offset perpendicular (más adentro del
+                    // shelter) al pasar la altura de la rejilla → curva suave que la rodea.
+                    const grilleOffset = 0.32;
+                    const grilleClearZ_north = wallZ_north + grilleOffset;
+                    const grilleClearZ_south = wallZ_south - grilleOffset;
+                    const grilleClearX_east  = wallX_east  - grilleOffset;
+
+                    // Norte
                     northEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_north));  // top de la pared en X
-                        pts.push(new THREE.Vector3(wp.x, wp.y + escH/2 + 0.05,  wallZ_north));  // baja al esclavo
-                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_north));  // vuelve al techo
+                        const grilleY = wp.y + 0.95;   // Y del centro de la rejilla superior del HVAC
+                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_north));       // techo, sobre la pared
+                        pts.push(new THREE.Vector3(wp.x, grilleY + 0.20,        grilleClearZ_north)); // sale hacia el pasillo por ARRIBA de la rejilla
+                        pts.push(new THREE.Vector3(wp.x, grilleY - 0.20,        grilleClearZ_north)); // sigue bajando por el costado del pasillo
+                        pts.push(new THREE.Vector3(wp.x, wp.y + escH/2 + 0.05,  wallZ_north));       // se acerca a la pared y conecta al esclavo
+                        pts.push(new THREE.Vector3(wp.x, grilleY - 0.20,        grilleClearZ_north)); // arranca de vuelta hacia el pasillo
+                        pts.push(new THREE.Vector3(wp.x, grilleY + 0.20,        grilleClearZ_north));
+                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_north));       // vuelve al techo
                     });
                     // Transición NE → Este si aplica
                     if (northEs.length > 0 && eastEs.length > 0) {
-                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));   // esquina NE
+                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));
                     } else if (eastEs.length > 0) {
-                        // No hay norte: viene directo desde master (pared oeste) → cruza norte para llegar al este
                         pts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));
                         pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));
                     }
-                    // Este: pin X al wall interior, Z varía
+                    // Este
                     eastEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        pts.push(new THREE.Vector3(wallX_east, cableY,                wp.z));
-                        pts.push(new THREE.Vector3(wallX_east, wp.y + escH/2 + 0.05,  wp.z));
-                        pts.push(new THREE.Vector3(wallX_east, cableY,                wp.z));
+                        const grilleY = wp.y + 0.95;
+                        pts.push(new THREE.Vector3(wallX_east,        cableY,                wp.z));
+                        pts.push(new THREE.Vector3(grilleClearX_east, grilleY + 0.20,        wp.z));
+                        pts.push(new THREE.Vector3(grilleClearX_east, grilleY - 0.20,        wp.z));
+                        pts.push(new THREE.Vector3(wallX_east,        wp.y + escH/2 + 0.05,  wp.z));
+                        pts.push(new THREE.Vector3(grilleClearX_east, grilleY - 0.20,        wp.z));
+                        pts.push(new THREE.Vector3(grilleClearX_east, grilleY + 0.20,        wp.z));
+                        pts.push(new THREE.Vector3(wallX_east,        cableY,                wp.z));
                     });
-                    // Transición SE → Sur si aplica
+                    // Transición SE → Sur
                     if (eastEs.length > 0 && southEs.length > 0) {
-                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_south));   // esquina SE
+                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_south));
                     }
-                    // Sur: pin Z al wall interior
+                    // Sur
                     southEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
+                        const grilleY = wp.y + 0.95;
                         pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_south));
+                        pts.push(new THREE.Vector3(wp.x, grilleY + 0.20,        grilleClearZ_south));
+                        pts.push(new THREE.Vector3(wp.x, grilleY - 0.20,        grilleClearZ_south));
                         pts.push(new THREE.Vector3(wp.x, wp.y + escH/2 + 0.05,  wallZ_south));
+                        pts.push(new THREE.Vector3(wp.x, grilleY - 0.20,        grilleClearZ_south));
+                        pts.push(new THREE.Vector3(wp.x, grilleY + 0.20,        grilleClearZ_south));
                         pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_south));
                     });
 
                     if (pts.length >= 2) {
-                        const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
+                        // Cable AZUL — único, centrado a la altura cableY (antes había un rojo paralelo, se removió)
+                        const cableCurve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
                         const segments = Math.max(64, pts.length * 8);
-                        // Cable AZUL — un poco más alto
-                        const blueCurve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(p.x, p.y + 0.025, p.z)), false, 'catmullrom', 0.0);
                         const blueTube = new THREE.Mesh(
-                            new THREE.TubeGeometry(blueCurve, segments, 0.028, 8, false),
+                            new THREE.TubeGeometry(cableCurve, segments, 0.030, 8, false),
                             new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.5 })
                         );
                         blueTube.castShadow = true;
                         cableGroup.add(blueTube);
-                        // Cable ROJO — un poco más bajo (paralelo)
-                        const redCurve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(p.x, p.y - 0.025, p.z)), false, 'catmullrom', 0.0);
-                        const redTube = new THREE.Mesh(
-                            new THREE.TubeGeometry(redCurve, segments, 0.028, 8, false),
-                            new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.2, roughness: 0.5 })
-                        );
-                        redTube.castShadow = true;
-                        cableGroup.add(redTube);
                     }
                 }
 
@@ -5225,8 +5250,7 @@
                         <span className="inline-flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', background: TH_COLOR.heat, borderRadius: '50%' }}></span>VFD calor</span>
                     </div>
                     <div className="absolute bottom-3 right-4 z-10 text-[10px] font-mono pointer-events-none flex flex-col gap-1 items-end" style={{ color: TH_COLOR.master }}>
-                        <span style={{ color: '#dc2626' }}><span style={{ display: 'inline-block', width: '20px', height: '2px', background: '#dc2626', marginRight: '6px', verticalAlign: 'middle' }}></span>RS-485 A (rojo)</span>
-                        <span style={{ color: '#2563eb' }}><span style={{ display: 'inline-block', width: '20px', height: '2px', background: '#2563eb', marginRight: '6px', verticalAlign: 'middle' }}></span>RS-485 B (azul)</span>
+                        <span style={{ color: '#2563eb' }}><span style={{ display: 'inline-block', width: '20px', height: '2px', background: '#2563eb', marginRight: '6px', verticalAlign: 'middle' }}></span>RS-485 (Modbus)</span>
                     </div>
                 </div>
             );
