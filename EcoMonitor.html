@@ -5018,10 +5018,10 @@
                     g.add(led);
                     // (Placa negra "ID" del tablero removida — no llevaba pantalla en los tableros reales)
 
-                    // === CODOS ROJO + VERDE — cables de control y sensores entrando en la pared ===
-                    // Salen desde la parte de abajo del esclavo, bajan verticalmente y hacen 90°
-                    // hacia la pared. El rojo lleva los cables de control (orden a los equipos)
-                    // y el verde los cables de sensores. Aplica a HVAC y a PRES.
+                    // === CODOS ROJO + VERDE — formato L visible desde adentro ===
+                    // Salen del borde inferior del tablero por la CARA INTERIOR (no por el centro,
+                    // así son visibles y no quedan enterrados en el cuerpo del tablero) y hacen 90°
+                    // hacia la pared. Rojo = cables de control · Verde = cables de sensores.
                     const conduitRadius   = 0.028;
                     const conduitRedMat   = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
                     const conduitGreenMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
@@ -5029,32 +5029,44 @@
                     const floorY     = 2.21;
                     const yElbow     = (escBottomY + floorY) / 2;              // media altura entre esclavo y piso
                     const wallXCanon = info.wallX;                             // pared en canónico (+roomW/2)
+                    // pipeX: pegado a la cara INTERIOR del tablero (interior = lado del pasillo)
+                    // interiorX es el centro; escD/2 llega a la cara interior; sumamos radio + gap
+                    // para que el tubo apoye sobre la cara sin clippear.
+                    const pipeX      = interiorX - outSign * (escD/2 + conduitRadius + 0.005);
                     const _addElbow = (colorMat, zOffset) => {
-                        // Tramo vertical: baja desde el borde inferior del esclavo hasta el codo
+                        // Vertical: desde bordo inferior del tablero (cara interior) hasta yElbow
                         const vLen = Math.max(0.02, escBottomY - yElbow);
                         const vert = new THREE.Mesh(
                             new THREE.CylinderGeometry(conduitRadius, conduitRadius, vLen, 10),
                             colorMat
                         );
-                        vert.position.set(interiorX, escBottomY - vLen/2, pos.z + zOffset);
+                        vert.position.set(pipeX, escBottomY - vLen/2, pos.z + zOffset);
                         g.add(vert);
-                        // Esfera en el codo — suaviza la junta
+                        // Esfera en el codo — suaviza la L
                         const corner = new THREE.Mesh(
-                            new THREE.SphereGeometry(conduitRadius * 1.05, 12, 8),
+                            new THREE.SphereGeometry(conduitRadius * 1.15, 12, 8),
                             colorMat
                         );
-                        corner.position.set(interiorX, yElbow, pos.z + zOffset);
+                        corner.position.set(pipeX, yElbow, pos.z + zOffset);
                         g.add(corner);
-                        // Tramo horizontal: entra en la pared (canónicamente en dirección +X con outSign=+1)
+                        // Horizontal: desde pipeX hasta la pared. Distancia larga y clara → L visible.
                         const hEndX = wallXCanon + outSign * 0.04;             // entra ~4 cm en la pared
-                        const hLen  = Math.abs(hEndX - interiorX);
+                        const hLen  = Math.abs(hEndX - pipeX);
                         const horiz = new THREE.Mesh(
                             new THREE.CylinderGeometry(conduitRadius, conduitRadius, hLen, 10),
                             colorMat
                         );
                         horiz.rotation.z = Math.PI/2;
-                        horiz.position.set((interiorX + hEndX) / 2, yElbow, pos.z + zOffset);
+                        horiz.position.set((pipeX + hEndX) / 2, yElbow, pos.z + zOffset);
                         g.add(horiz);
+                        // Tapita donde entra a la pared
+                        const wallCap = new THREE.Mesh(
+                            new THREE.CylinderGeometry(conduitRadius * 1.3, conduitRadius * 1.3, 0.015, 12),
+                            new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.4 })
+                        );
+                        wallCap.rotation.z = Math.PI/2;
+                        wallCap.position.set(wallXCanon + outSign * 0.01, yElbow, pos.z + zOffset);
+                        g.add(wallCap);
                     };
                     _addElbow(conduitRedMat,   -0.10);   // ROJO — cables de control
                     _addElbow(conduitGreenMat, +0.10);   // VERDE — cables de sensores
@@ -5108,27 +5120,24 @@
                     if (northEs.length > 0) {
                         pts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));   // esquina NO
                     }
-                    // === Descenso RODEANDO la rejilla interior superior ===
-                    // La rejilla de INYECCIÓN vive en (wp.x, wp.y+0.95, wall_perp - 0.095). Si el cable
-                    // bajara directo por wallZ, cruzaría visualmente el rectángulo de la rejilla. Ahora
-                    // en los waypoints de descenso agregamos un offset perpendicular (más adentro del
-                    // shelter) al pasar la altura de la rejilla → curva suave que la rodea.
-                    const grilleOffset = 0.32;
-                    const grilleClearZ_north = wallZ_north + grilleOffset;
-                    const grilleClearZ_south = wallZ_south - grilleOffset;
-                    const grilleClearX_east  = wallX_east  - grilleOffset;
+                    // === Bypass LATERAL de la rejilla — "por el costado" ===
+                    // La rejilla interior superior mide gWidth=0.85 en el eje canónico Z, que en el
+                    // mundo se traduce a ±0.425 desde el centro del tablero en X (norte/sur) o en Z
+                    // (este). En lugar de saltar HACIA EL PASILLO por arriba/abajo, ahora el cable
+                    // se corre LATERALMENTE sobre la misma pared: baja pegado a la pared por un
+                    // costado de la rejilla, entra por el techo del tablero, y sube por el otro
+                    // costado. Toda la trayectoria queda sobre el plano de la pared.
+                    const sideOffset = 0.55;   // borde de la rejilla (0.425) + margen ~12 cm
 
-                    // Norte
+                    // Norte — cable viaja en +X mundo
                     northEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        const grilleY = wp.y + 0.95;   // Y del centro de la rejilla superior del HVAC
-                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_north));       // techo, sobre la pared
-                        pts.push(new THREE.Vector3(wp.x, grilleY + 0.20,        grilleClearZ_north)); // sale hacia el pasillo por ARRIBA de la rejilla
-                        pts.push(new THREE.Vector3(wp.x, grilleY - 0.20,        grilleClearZ_north)); // sigue bajando por el costado del pasillo
-                        pts.push(new THREE.Vector3(wp.x, wp.y + escH/2 + 0.05,  wallZ_north));       // se acerca a la pared y conecta al esclavo
-                        pts.push(new THREE.Vector3(wp.x, grilleY - 0.20,        grilleClearZ_north)); // arranca de vuelta hacia el pasillo
-                        pts.push(new THREE.Vector3(wp.x, grilleY + 0.20,        grilleClearZ_north));
-                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_north));       // vuelve al techo
+                        const panelTop = wp.y + escH/2 + 0.05;
+                        pts.push(new THREE.Vector3(wp.x - sideOffset, cableY,   wallZ_north));  // entra por el costado izquierdo
+                        pts.push(new THREE.Vector3(wp.x - sideOffset, panelTop, wallZ_north));  // baja pegado a la pared
+                        pts.push(new THREE.Vector3(wp.x,              panelTop, wallZ_north));  // se desliza al centro y conecta al tablero
+                        pts.push(new THREE.Vector3(wp.x + sideOffset, panelTop, wallZ_north));  // sigue hacia el costado derecho
+                        pts.push(new THREE.Vector3(wp.x + sideOffset, cableY,   wallZ_north));  // sube y vuelve a la cornisa
                     });
                     // Transición NE → Este si aplica
                     if (northEs.length > 0 && eastEs.length > 0) {
@@ -5137,33 +5146,29 @@
                         pts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));
                         pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));
                     }
-                    // Este
+                    // Este — cable viaja en -Z mundo (canónico Z ↑ ⇒ mundo Z ↓)
                     eastEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        const grilleY = wp.y + 0.95;
-                        pts.push(new THREE.Vector3(wallX_east,        cableY,                wp.z));
-                        pts.push(new THREE.Vector3(grilleClearX_east, grilleY + 0.20,        wp.z));
-                        pts.push(new THREE.Vector3(grilleClearX_east, grilleY - 0.20,        wp.z));
-                        pts.push(new THREE.Vector3(wallX_east,        wp.y + escH/2 + 0.05,  wp.z));
-                        pts.push(new THREE.Vector3(grilleClearX_east, grilleY - 0.20,        wp.z));
-                        pts.push(new THREE.Vector3(grilleClearX_east, grilleY + 0.20,        wp.z));
-                        pts.push(new THREE.Vector3(wallX_east,        cableY,                wp.z));
+                        const panelTop = wp.y + escH/2 + 0.05;
+                        pts.push(new THREE.Vector3(wallX_east, cableY,   wp.z + sideOffset));   // entra por el costado +Z
+                        pts.push(new THREE.Vector3(wallX_east, panelTop, wp.z + sideOffset));   // baja pegado a la pared
+                        pts.push(new THREE.Vector3(wallX_east, panelTop, wp.z));                // conecta al tablero
+                        pts.push(new THREE.Vector3(wallX_east, panelTop, wp.z - sideOffset));   // sigue hacia -Z
+                        pts.push(new THREE.Vector3(wallX_east, cableY,   wp.z - sideOffset));   // sube y sigue
                     });
                     // Transición SE → Sur
                     if (eastEs.length > 0 && southEs.length > 0) {
                         pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_south));
                     }
-                    // Sur
+                    // Sur — cable viaja en -X mundo (canónico Z ↑ ⇒ mundo X ↓)
                     southEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        const grilleY = wp.y + 0.95;
-                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_south));
-                        pts.push(new THREE.Vector3(wp.x, grilleY + 0.20,        grilleClearZ_south));
-                        pts.push(new THREE.Vector3(wp.x, grilleY - 0.20,        grilleClearZ_south));
-                        pts.push(new THREE.Vector3(wp.x, wp.y + escH/2 + 0.05,  wallZ_south));
-                        pts.push(new THREE.Vector3(wp.x, grilleY - 0.20,        grilleClearZ_south));
-                        pts.push(new THREE.Vector3(wp.x, grilleY + 0.20,        grilleClearZ_south));
-                        pts.push(new THREE.Vector3(wp.x, cableY,                wallZ_south));
+                        const panelTop = wp.y + escH/2 + 0.05;
+                        pts.push(new THREE.Vector3(wp.x + sideOffset, cableY,   wallZ_south));  // entra por el costado +X
+                        pts.push(new THREE.Vector3(wp.x + sideOffset, panelTop, wallZ_south));  // baja pegado
+                        pts.push(new THREE.Vector3(wp.x,              panelTop, wallZ_south));  // conecta
+                        pts.push(new THREE.Vector3(wp.x - sideOffset, panelTop, wallZ_south));  // sigue a -X
+                        pts.push(new THREE.Vector3(wp.x - sideOffset, cableY,   wallZ_south));  // sube
                     });
 
                     if (pts.length >= 2) {
