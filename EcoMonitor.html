@@ -5026,13 +5026,15 @@
                     const conduitRedMat   = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
                     const conduitGreenMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
                     const escBottomY = pos.y - escH/2;
-                    const floorY     = 2.21;
-                    const yElbow     = (escBottomY + floorY) / 2;              // media altura entre esclavo y piso
+                    // yElbow ARRIBA de la rejilla RET (que vive en y-0.95, top a y-0.725).
+                    // Panel bottom a y-0.3 → dejamos 15 cm de bajada y clavamos el codo a y-0.45,
+                    // que queda 27.5 cm por encima del borde superior de la RET grille.
+                    const yElbow     = escBottomY - 0.15;
                     const wallXCanon = info.wallX;                             // pared en canónico (+roomW/2)
-                    // pipeX: pegado a la cara INTERIOR del tablero (interior = lado del pasillo)
-                    // interiorX es el centro; escD/2 llega a la cara interior; sumamos radio + gap
-                    // para que el tubo apoye sobre la cara sin clippear.
-                    const pipeX      = interiorX - outSign * (escD/2 + conduitRadius + 0.005);
+                    // pipeX: DEBAJO del tablero, no en su cara interior. Genuinamente sale por la
+                    // cara inferior del gabinete (interiorX es el centro del cuerpo → vertical
+                    // apoyado en el centro del panel bottom, como un knockout real).
+                    const pipeX      = interiorX;
                     const _addElbow = (colorMat, zOffset) => {
                         // Vertical: desde bordo inferior del tablero (cara interior) hasta yElbow
                         const vLen = Math.max(0.02, escBottomY - yElbow);
