@@ -5192,74 +5192,73 @@
                         cableGroup.add(trunkTube);
                     }
 
-                    // ---- Derivación T-tap por tablero — L compacta pegada al hombro del gabinete ----
-                    // Bajada VERTICAL directa desde el troncal hasta justo arriba del tablero, luego
-                    // curva 90° corta y ENTRA por el hombro del costado (top-left interior). Sin
-                    // tramo horizontal largo colgando — se lee como un caño clavado en la esquina.
-                    const glandMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.7, roughness: 0.35 });
-                    const buildStub = (waypoints, glandPos, glandAxis, attach) => {
+                    // ---- Derivación T-tap por tablero — CORTA en el borde superior de la rejilla ----
+                    // El cable baja MUY poco desde el troncal, apenas por debajo del techo, y
+                    // termina en una cajita de junction sobre la pared a la altura del BORDE
+                    // SUPERIOR de la rejilla INJ. Se lee: "el cable entra a la pared en ese
+                    // punto y sigue internamente hasta el tablero". Los caños plateados de sensores
+                    // ya visibles se encargan del vínculo visual entre tablero y rejilla.
+                    const junctionMat = new THREE.MeshStandardMaterial({ color: '#1e3a8a', metalness: 0.5, roughness: 0.55 });
+                    const buildStub = (waypoints, endpoint, endpointAxis, attach) => {
                         const stubCurve = new THREE.CatmullRomCurve3(waypoints, false, 'catmullrom', 0.5);
                         const stub = new THREE.Mesh(
-                            new THREE.TubeGeometry(stubCurve, 40, 0.030, 8, false),
+                            new THREE.TubeGeometry(stubCurve, 24, 0.030, 8, false),
                             blueMat
                         );
                         stub.castShadow = true;
                         cableGroup.add(stub);
-                        // T-fitting sobre el troncal
+                        // T-fitting sobre el troncal (arriba)
                         const tap = new THREE.Mesh(
                             new THREE.BoxGeometry(0.06, 0.06, 0.06),
-                            new THREE.MeshStandardMaterial({ color: '#1e40af', metalness: 0.4, roughness: 0.6 })
+                            junctionMat
                         );
                         tap.position.copy(attach);
                         cableGroup.add(tap);
-                        // Prensacables (gland) sobre la cara lateral, en el hombro
-                        const gland = new THREE.Mesh(
-                            new THREE.CylinderGeometry(0.045, 0.05, 0.055, 14),
-                            glandMat
+                        // Junction box al FINAL del stub — el cable termina aquí y "entra a la pared"
+                        const junction = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.10, 0.09, 0.07),
+                            junctionMat
                         );
-                        gland.position.copy(glandPos);
-                        if (glandAxis === 'x') gland.rotation.z = Math.PI/2;
-                        else if (glandAxis === 'z') gland.rotation.x = Math.PI/2;
-                        cableGroup.add(gland);
+                        junction.position.copy(endpoint);
+                        cableGroup.add(junction);
+                        // Tornillos decorativos (4 esferitas) en la tapa de la caja
+                        const screwMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.9, roughness: 0.3 });
+                        [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([sx, sy]) => {
+                            const s = new THREE.Mesh(new THREE.SphereGeometry(0.008, 6, 4), screwMat);
+                            s.position.set(endpoint.x + sx * 0.035, endpoint.y + sy * 0.03, endpoint.z);
+                            cableGroup.add(s);
+                        });
                     };
 
-                    // Entry en el HOMBRO — 5 cm por debajo del techo del panel, en la cara lateral.
-                    const shoulderDrop = 0.05;   // qué tan abajo del techo entra el caño
-                    const insideBite   = 0.04;   // cuánto se mete dentro del gabinete
-
+                    // Cut Y: borde superior de la rejilla INJ del HVAC. INJ centrada en y+0.95,
+                    // altura 0.45 ⇒ top = y + 1.175. Cortamos el cable ahí.
+                    // Para PRES no hay INJ; usamos un cut fijo a la misma cota.
                     northEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        const escTopY = wp.y + escH/2;
-                        const shoulderY = escTopY - shoulderDrop;
-                        const sideX     = wp.x - escW/2;
-                        // 3 waypoints: (1) troncal → (2) justo arriba del tablero en el mismo X del drop → (3) DENTRO del hombro
-                        const attach = new THREE.Vector3(wp.x - sideOffset, cableY,        wallZ_north);
-                        const knee   = new THREE.Vector3(wp.x - sideOffset, escTopY + 0.06, wallZ_north);
-                        const inside = new THREE.Vector3(sideX + insideBite, shoulderY,     wallZ_north);
-                        const gland  = new THREE.Vector3(sideX - 0.015,      shoulderY,     wallZ_north);
-                        buildStub([attach, knee, inside], gland, 'x', attach);
+                        const cutY   = wp.y + 1.175;
+                        const attach = new THREE.Vector3(wp.x - sideOffset, cableY, wallZ_north);
+                        const midY   = (cableY + cutY) / 2;
+                        const mid    = new THREE.Vector3(wp.x - sideOffset, midY,  wallZ_north);
+                        const endpt  = new THREE.Vector3(wp.x - sideOffset, cutY,  wallZ_north);
+                        buildStub([attach, mid, endpt], endpt, 'z', attach);
                     });
                     eastEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        const escTopY = wp.y + escH/2;
-                        const shoulderY = escTopY - shoulderDrop;
-                        const sideZ     = wp.z + escW/2;
-                        const attach = new THREE.Vector3(wallX_east, cableY,         wp.z + sideOffset);
-                        const knee   = new THREE.Vector3(wallX_east, escTopY + 0.06, wp.z + sideOffset);
-                        const inside = new THREE.Vector3(wallX_east, shoulderY,      sideZ - insideBite);
-                        const gland  = new THREE.Vector3(wallX_east, shoulderY,      sideZ + 0.015);
-                        buildStub([attach, knee, inside], gland, 'z', attach);
+                        const cutY   = wp.y + 1.175;
+                        const attach = new THREE.Vector3(wallX_east, cableY, wp.z + sideOffset);
+                        const midY   = (cableY + cutY) / 2;
+                        const mid    = new THREE.Vector3(wallX_east, midY,  wp.z + sideOffset);
+                        const endpt  = new THREE.Vector3(wallX_east, cutY,  wp.z + sideOffset);
+                        buildStub([attach, mid, endpt], endpt, 'x', attach);
                     });
                     southEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
-                        const escTopY = wp.y + escH/2;
-                        const shoulderY = escTopY - shoulderDrop;
-                        const sideX     = wp.x + escW/2;
-                        const attach = new THREE.Vector3(wp.x + sideOffset, cableY,        wallZ_south);
-                        const knee   = new THREE.Vector3(wp.x + sideOffset, escTopY + 0.06, wallZ_south);
-                        const inside = new THREE.Vector3(sideX - insideBite, shoulderY,     wallZ_south);
-                        const gland  = new THREE.Vector3(sideX + 0.015,      shoulderY,     wallZ_south);
-                        buildStub([attach, knee, inside], gland, 'x', attach);
+                        const cutY   = wp.y + 1.175;
+                        const attach = new THREE.Vector3(wp.x + sideOffset, cableY, wallZ_south);
+                        const midY   = (cableY + cutY) / 2;
+                        const mid    = new THREE.Vector3(wp.x + sideOffset, midY,  wallZ_south);
+                        const endpt  = new THREE.Vector3(wp.x + sideOffset, cutY,  wallZ_south);
+                        buildStub([attach, mid, endpt], endpt, 'z', attach);
                     });
                 }
 
