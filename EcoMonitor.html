@@ -5073,6 +5073,51 @@
                     _addElbow(conduitRedMat,   -0.10);   // ROJO — cables de control
                     _addElbow(conduitGreenMat, +0.10);   // VERDE — cables de sensores
 
+                    // === CAÑOS DE SENSORES (plateados) — solo HVAC ===
+                    // Conectan el tablero con las dos rejillas interiores (INJ arriba, RET abajo).
+                    // Cada caño lleva los cables de los sensores instalados en el flujo de aire
+                    // de cada rejilla (temperatura, humedad, presión diferencial).
+                    // Grilles: INJ centro=y+0.95, RET centro=y-0.95, ambas de 0.45 m de alto →
+                    // INJ bottom=y+0.725, RET top=y-0.725. Tablero top/bottom=y±0.3.
+                    // Gap simétrico de 42.5 cm arriba y abajo → largo del caño.
+                    if (type === 'HVAC') {
+                        const sensorRadius = 0.032;
+                        const sensorMat = new THREE.MeshStandardMaterial({
+                            color: '#cbd5e1', metalness: 0.88, roughness: 0.22   // acero galvanizado / cromado
+                        });
+                        const flangeMat = new THREE.MeshStandardMaterial({
+                            color: '#475569', metalness: 0.7, roughness: 0.4
+                        });
+                        const sensorPipeX = interiorX - outSign * 0.005;   // alineado con la cara interior del gabinete
+                        const escTop = pos.y + escH/2, escBot = pos.y - escH/2;
+                        const injBottomY = pos.y + 0.725;
+                        const retTopY    = pos.y - 0.725;
+
+                        const _sensorPipe = (yStart, yEnd) => {
+                            const len = Math.abs(yEnd - yStart);
+                            const midY = (yStart + yEnd) / 2;
+                            // Tubo principal
+                            const pipe = new THREE.Mesh(
+                                new THREE.CylinderGeometry(sensorRadius, sensorRadius, len, 14),
+                                sensorMat
+                            );
+                            pipe.position.set(sensorPipeX, midY, pos.z);
+                            pipe.castShadow = true;
+                            g.add(pipe);
+                            // Bridas/flanges en ambas puntas — hacen de acople al tablero y a la rejilla
+                            [yStart, yEnd].forEach(y => {
+                                const flange = new THREE.Mesh(
+                                    new THREE.CylinderGeometry(sensorRadius * 1.4, sensorRadius * 1.4, 0.025, 16),
+                                    flangeMat
+                                );
+                                flange.position.set(sensorPipeX, y, pos.z);
+                                g.add(flange);
+                            });
+                        };
+                        _sensorPipe(escTop, injBottomY);   // tablero top ↑ INJ grille bottom
+                        _sensorPipe(escBot, retTopY);      // tablero bottom ↓ RET grille top
+                    }
+
                     // ADD al groupRef del equipo → hereda rotación
                     info.groupRef.add(g);
                     esclavoData.push({
@@ -5121,7 +5166,7 @@
                     // baja pegado a la pared por el costado IZQUIERDO de la rejilla (visto desde
                     // el pasillo), y curva bajo la rejilla para entrar por el techo del gabinete.
                     // Se implementa como: 1 tubo troncal + N tubos-derivación independientes.
-                    const sideOffset = 0.55;   // ~12 cm por fuera del borde de la rejilla (0.425)
+                    const sideOffset = 0.48;   // borde rejilla 0.425 + 5.5 cm — drop bien pegado al costado del tablero
                     const blueMat = new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.5 });
 
                     // ---- Troncal continuo ----
