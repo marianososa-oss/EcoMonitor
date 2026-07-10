@@ -5115,75 +5115,83 @@
                     const wallZ_south =  roomD/2 - cableOffset;
                     const wallX_west  = -roomW/2 + cableOffset;
 
-                    const pts = [masterOutputPos.clone()];
-                    // Sube del master a la altura de la esquina pared-techo (aún en la pared oeste)
-                    pts.push(new THREE.Vector3(wallX_west, cableY, masterOutputPos.z));
-                    // A lo largo de la pared oeste hasta la esquina NO (si hay norte esclavos)
-                    if (northEs.length > 0) {
-                        pts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));   // esquina NO
-                    }
-                    // === Bypass LATERAL de la rejilla — "por el costado" ===
-                    // La rejilla interior superior mide gWidth=0.85 en el eje canónico Z, que en el
-                    // mundo se traduce a ±0.425 desde el centro del tablero en X (norte/sur) o en Z
-                    // (este). En lugar de saltar HACIA EL PASILLO por arriba/abajo, ahora el cable
-                    // se corre LATERALMENTE sobre la misma pared: baja pegado a la pared por un
-                    // costado de la rejilla, entra por el techo del tablero, y sube por el otro
-                    // costado. Toda la trayectoria queda sobre el plano de la pared.
-                    const sideOffset = 0.55;   // borde de la rejilla (0.425) + margen ~12 cm
+                    // === Ruteo estilo bandeja + T-tap ===
+                    // Basado en el sketch del cliente: el CABLE TRONCAL corre continuo por la
+                    // cornisa (sin interrumpirse). En cada tablero SALE UNA DERIVACIÓN ÚNICA que
+                    // baja pegado a la pared por el costado IZQUIERDO de la rejilla (visto desde
+                    // el pasillo), y curva bajo la rejilla para entrar por el techo del gabinete.
+                    // Se implementa como: 1 tubo troncal + N tubos-derivación independientes.
+                    const sideOffset = 0.55;   // ~12 cm por fuera del borde de la rejilla (0.425)
+                    const blueMat = new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.5 });
 
-                    // Norte — cable viaja en +X mundo
+                    // ---- Troncal continuo ----
+                    const trunkPts = [masterOutputPos.clone()];
+                    trunkPts.push(new THREE.Vector3(wallX_west, cableY, masterOutputPos.z));
+                    if (northEs.length > 0 || eastEs.length > 0) {
+                        trunkPts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));   // NO
+                        trunkPts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));   // NE
+                    }
+                    if (eastEs.length > 0 || southEs.length > 0) {
+                        trunkPts.push(new THREE.Vector3(wallX_east, cableY, wallZ_south));   // SE
+                    }
+                    if (southEs.length > 0) {
+                        trunkPts.push(new THREE.Vector3(wallX_west, cableY, wallZ_south));   // SO
+                    }
+                    if (trunkPts.length >= 2) {
+                        const trunkCurve = new THREE.CatmullRomCurve3(trunkPts, false, 'catmullrom', 0.0);
+                        const trunkTube = new THREE.Mesh(
+                            new THREE.TubeGeometry(trunkCurve, Math.max(64, trunkPts.length * 8), 0.030, 8, false),
+                            blueMat
+                        );
+                        trunkTube.castShadow = true;
+                        cableGroup.add(trunkTube);
+                    }
+
+                    // ---- Derivación T-tap por tablero ----
+                    // 3 waypoints: (attach en troncal) → (bajo la rejilla, mismo X/Z) → (techo del panel)
+                    // "Izquierdo desde el pasillo" por pared:
+                    //   norte: -X   ·   este: +Z   ·   sur: +X
+                    const buildStub = (attach, elbow, panelTop) => {
+                        const stubCurve = new THREE.CatmullRomCurve3([attach, elbow, panelTop], false, 'catmullrom', 0.5);
+                        const stub = new THREE.Mesh(
+                            new THREE.TubeGeometry(stubCurve, 40, 0.030, 8, false),
+                            blueMat
+                        );
+                        stub.castShadow = true;
+                        cableGroup.add(stub);
+                        // T-fitting: cajita chica donde el stub se conecta al troncal
+                        const tap = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.06, 0.06, 0.06),
+                            new THREE.MeshStandardMaterial({ color: '#1e40af', metalness: 0.4, roughness: 0.6 })
+                        );
+                        tap.position.copy(attach);
+                        cableGroup.add(tap);
+                    };
+
                     northEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
                         const panelTop = wp.y + escH/2 + 0.05;
-                        pts.push(new THREE.Vector3(wp.x - sideOffset, cableY,   wallZ_north));  // entra por el costado izquierdo
-                        pts.push(new THREE.Vector3(wp.x - sideOffset, panelTop, wallZ_north));  // baja pegado a la pared
-                        pts.push(new THREE.Vector3(wp.x,              panelTop, wallZ_north));  // se desliza al centro y conecta al tablero
-                        pts.push(new THREE.Vector3(wp.x + sideOffset, panelTop, wallZ_north));  // sigue hacia el costado derecho
-                        pts.push(new THREE.Vector3(wp.x + sideOffset, cableY,   wallZ_north));  // sube y vuelve a la cornisa
+                        const attach   = new THREE.Vector3(wp.x - sideOffset, cableY,   wallZ_north);
+                        const elbow    = new THREE.Vector3(wp.x - sideOffset, panelTop, wallZ_north);
+                        const connect  = new THREE.Vector3(wp.x,              panelTop, wallZ_north);
+                        buildStub(attach, elbow, connect);
                     });
-                    // Transición NE → Este si aplica
-                    if (northEs.length > 0 && eastEs.length > 0) {
-                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));
-                    } else if (eastEs.length > 0) {
-                        pts.push(new THREE.Vector3(wallX_west, cableY, wallZ_north));
-                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_north));
-                    }
-                    // Este — cable viaja en -Z mundo (canónico Z ↑ ⇒ mundo Z ↓)
                     eastEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
                         const panelTop = wp.y + escH/2 + 0.05;
-                        pts.push(new THREE.Vector3(wallX_east, cableY,   wp.z + sideOffset));   // entra por el costado +Z
-                        pts.push(new THREE.Vector3(wallX_east, panelTop, wp.z + sideOffset));   // baja pegado a la pared
-                        pts.push(new THREE.Vector3(wallX_east, panelTop, wp.z));                // conecta al tablero
-                        pts.push(new THREE.Vector3(wallX_east, panelTop, wp.z - sideOffset));   // sigue hacia -Z
-                        pts.push(new THREE.Vector3(wallX_east, cableY,   wp.z - sideOffset));   // sube y sigue
+                        const attach   = new THREE.Vector3(wallX_east, cableY,   wp.z + sideOffset);
+                        const elbow    = new THREE.Vector3(wallX_east, panelTop, wp.z + sideOffset);
+                        const connect  = new THREE.Vector3(wallX_east, panelTop, wp.z);
+                        buildStub(attach, elbow, connect);
                     });
-                    // Transición SE → Sur
-                    if (eastEs.length > 0 && southEs.length > 0) {
-                        pts.push(new THREE.Vector3(wallX_east, cableY, wallZ_south));
-                    }
-                    // Sur — cable viaja en -X mundo (canónico Z ↑ ⇒ mundo X ↓)
                     southEs.forEach(e => {
                         const wp = canonicalToWorld(e.wall, e.pos_canonical.x, e.pos_canonical.y, e.pos_canonical.z);
                         const panelTop = wp.y + escH/2 + 0.05;
-                        pts.push(new THREE.Vector3(wp.x + sideOffset, cableY,   wallZ_south));  // entra por el costado +X
-                        pts.push(new THREE.Vector3(wp.x + sideOffset, panelTop, wallZ_south));  // baja pegado
-                        pts.push(new THREE.Vector3(wp.x,              panelTop, wallZ_south));  // conecta
-                        pts.push(new THREE.Vector3(wp.x - sideOffset, panelTop, wallZ_south));  // sigue a -X
-                        pts.push(new THREE.Vector3(wp.x - sideOffset, cableY,   wallZ_south));  // sube
+                        const attach   = new THREE.Vector3(wp.x + sideOffset, cableY,   wallZ_south);
+                        const elbow    = new THREE.Vector3(wp.x + sideOffset, panelTop, wallZ_south);
+                        const connect  = new THREE.Vector3(wp.x,              panelTop, wallZ_south);
+                        buildStub(attach, elbow, connect);
                     });
-
-                    if (pts.length >= 2) {
-                        // Cable AZUL — único, centrado a la altura cableY (antes había un rojo paralelo, se removió)
-                        const cableCurve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
-                        const segments = Math.max(64, pts.length * 8);
-                        const blueTube = new THREE.Mesh(
-                            new THREE.TubeGeometry(cableCurve, segments, 0.030, 8, false),
-                            new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.5 })
-                        );
-                        blueTube.castShadow = true;
-                        cableGroup.add(blueTube);
-                    }
                 }
 
                 // Habilitar sombras en los grupos dinámicos
