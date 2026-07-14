@@ -5866,6 +5866,10 @@
                             <button onClick={() => setSceneTheme('day')}   className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'day'   ? 'bg-amber-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Día</button>
                             <button onClick={() => setSceneTheme('night')} className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'night' ? 'bg-indigo-400 text-slate-900': 'text-slate-400 hover:text-white'}`}>Noc</button>
                         </div>
+                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex" title="Topologia de cableado">
+                            <button onClick={() => setTopologyMode('ecomonitor')}   className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${topologyMode === 'ecomonitor'   ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>EcoMonitor</button>
+                            <button onClick={() => setTopologyMode('centralizado')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${topologyMode === 'centralizado' ? 'bg-amber-400 text-slate-900'      : 'text-slate-400 hover:text-white'}`}>Central</button>
+                        </div>
 
                         <div className="hidden md:block w-px h-6 bg-slate-800 mx-1"></div>
 
