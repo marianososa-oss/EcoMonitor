@@ -2619,7 +2619,7 @@
         };
 
         // ===== Sala3D : Three.js shelter Neuquén con tableros Maestro+Esclavos =====
-        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible, sceneTheme, hmiValues, activeFaults, globalEvents }) => {
+        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible, sceneTheme, hmiValues, activeFaults, globalEvents, topologyMode, onCableMeters }) => {
             const containerRef = useRef(null);
             const canvasRef    = useRef(null);
             const sceneObj     = useRef(null);
@@ -3622,6 +3622,8 @@
                 const presGroup = new THREE.Group(); scene.add(presGroup);
                 const esclavoGroup = new THREE.Group(); scene.add(esclavoGroup);
                 const cableGroup = new THREE.Group(); scene.add(cableGroup);
+                const centralizedGroup = new THREE.Group(); scene.add(centralizedGroup);
+                centralizedGroup.visible = false;   // se muestra solo en modo Central
 
                 // === MAESTRO (montado en pared interior IZQUIERDA, con pantalla) ===
                 const mW = 0.35, mH = 1.7, mD = 0.9;  // depth ancha (largo en Z)
@@ -3981,7 +3983,7 @@
 
                 sceneObj.current = {
                     THREE, scene, camera, renderer,
-                    hvacGroup, presGroup, esclavoGroup, cableGroup,
+                    hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup,
                     heatMeshes, heatWaves, wifiRings, dataPackets, wallMeshes,
                     perimeterWisps, doorStreams, puddleGroup,
                     masterOutputPos, cloudPos,
@@ -4347,7 +4349,7 @@
             useEffect(() => {
                 const obj = sceneObj.current;
                 if (!obj) return;
-                const { THREE, hvacGroup, presGroup, esclavoGroup, cableGroup, roomW, roomD, roomH, masterOutputPos } = obj;
+                const { THREE, hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, roomW, roomD, roomH, masterOutputPos } = obj;
                 const lineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line });
 
                 const clearGroup = (g) => {
@@ -4364,6 +4366,7 @@
                 clearGroup(presGroup);
                 clearGroup(esclavoGroup);
                 clearGroup(cableGroup);
+                clearGroup(centralizedGroup);
 
                 const colorByState = (state) => state === 'TITULAR' ? TH_COLOR.titular
                                               : state === 'APOYO'   ? TH_COLOR.apoyo
@@ -5123,8 +5126,9 @@
                     esclavoData.push({
                         pos_canonical: pos,
                         equipPos_canonical: info.canon_equipPos.clone(),
-                        wall: info.wall, seq,
-                        parentGroup: info.groupRef
+                        wall: info.wall, seq, type,
+                        parentGroup: info.groupRef,
+                        assembly: g   // Group con todo el tablero (body + gozne + LED + elbows + sensor pipes)
                     });
                 };
 
@@ -5144,8 +5148,11 @@
                     }
                     return new THREE.Vector3(cx, cy, cz);
                 };
+                // Metros de troncal EcoMonitor — se calcula dentro del bloque if pero se usa despues
+                let ecomonitorTrunkMeters = 0;
+                const cableYCornisa = roomH * 0.92 + 2.21;
                 if (esclavoData.length > 0) {
-                    const cableY = roomH * 0.92 + 2.21;
+                    const cableY = cableYCornisa;
                     // Orden PERIMETRAL sin cruces
                     const byCanonZ = (a, b) => a.pos_canonical.z - b.pos_canonical.z;
                     const northEs = esclavoData.filter(e => e.wall === 'north').sort(byCanonZ);
@@ -5213,6 +5220,9 @@
                         );
                         trunkTube.castShadow = true;
                         cableGroup.add(trunkTube);
+                        for (let i = 1; i < trunkPts.length; i++) {
+                            ecomonitorTrunkMeters += trunkPts[i].distanceTo(trunkPts[i-1]);
+                        }
                     }
 
                     // ---- Derivación T-tap por tablero — L compacta pegada al hombro del gabinete ----
@@ -5286,8 +5296,106 @@
                     });
                 }
 
+                // === TOPOLOGÍA CENTRALIZADA (comparación argumental EcoMonitor vs Central) ===
+                // Cada equipo recibe su PROPIO cable individual que nace en el master, recorre la
+                // pared perimetral, y baja al equipo via cajita de paso. Los cables forman un
+                // BUNDLE que se AFINA visualmente en cada equipo (uno se desprende).
+                const _c_wallZ_north = -roomD/2 + 0.12;
+                const _c_wallZ_south =  roomD/2 - 0.12;
+                const _c_wallX_east  =  roomW/2 - 0.12;
+                const _c_wallX_west  = -roomW/2 + 0.12;
+                const _c_cableRadius = 0.024;
+                const _c_bundleGap   = 0.052;
+                let   centralizadoTotalMeters = 0;
+
+                const _wallOrder = { north: 0, east: 1, south: 2 };
+                const allEquip = [];
+                hvacInfo.forEach((h, i) => allEquip.push({
+                    wall: h.wall, canon_z: h.canon_z, canon_bodyX: h.canon_bodyX,
+                    y: h.y, unitH: 2.50, type: 'HVAC', id: 'HVAC-' + (i+1)
+                }));
+                presInfo.forEach((p, i) => allEquip.push({
+                    wall: p.wall, canon_z: p.canon_z, canon_bodyX: p.canon_bodyX,
+                    y: p.y, unitH: 1.72, type: 'PRES', id: 'PRES-' + (i+1)
+                }));
+                allEquip.sort(function(a, b) {
+                    var oa = _wallOrder[a.wall]; if (oa === undefined) oa = 9;
+                    var ob = _wallOrder[b.wall]; if (ob === undefined) ob = 9;
+                    if (a.wall !== b.wall) return oa - ob;
+                    return a.canon_z - b.canon_z;
+                });
+
+                const _c_Ncent = allEquip.length;
+                if (_c_Ncent > 0) {
+                    const _c_blueMat = new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.5 });
+                    const _c_cajitaMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
+                    allEquip.forEach((eq, idx) => {
+                        const yOff = (idx - (_c_Ncent - 1) / 2) * _c_bundleGap;
+                        const bundleY = cableYCornisa + yOff;
+                        // canonicalToWorld inline (est.: eq.canon_bodyX perpendicular a la pared)
+                        let wpX, wpZ;
+                        if (eq.wall === 'north') { wpX = eq.canon_z; wpZ = -eq.canon_bodyX + (roomW/2 - roomD/2); }
+                        else if (eq.wall === 'south') { wpX = -eq.canon_z; wpZ = eq.canon_bodyX - (roomW/2 - roomD/2); }
+                        else { wpX = eq.canon_bodyX; wpZ = eq.canon_z; }   // east
+                        let dropPt;
+                        if (eq.wall === 'north')      dropPt = new THREE.Vector3(wpX, bundleY, _c_wallZ_north);
+                        else if (eq.wall === 'south') dropPt = new THREE.Vector3(wpX, bundleY, _c_wallZ_south);
+                        else                          dropPt = new THREE.Vector3(_c_wallX_east, bundleY, wpZ);
+                        const pts = [
+                            masterOutputPos.clone(),
+                            new THREE.Vector3(_c_wallX_west, bundleY, masterOutputPos.z),
+                            new THREE.Vector3(_c_wallX_west, bundleY, _c_wallZ_north)
+                        ];
+                        if (eq.wall === 'north') {
+                            pts.push(dropPt);
+                        } else {
+                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, _c_wallZ_north));
+                            if (eq.wall === 'east') pts.push(dropPt);
+                            else { pts.push(new THREE.Vector3(_c_wallX_east, bundleY, _c_wallZ_south)); pts.push(dropPt); }
+                        }
+                        const cajitaY = eq.y + eq.unitH/2 - 0.15;
+                        pts.push(new THREE.Vector3(dropPt.x, cajitaY + 0.05, dropPt.z));
+                        pts.push(new THREE.Vector3(dropPt.x, cajitaY, dropPt.z));
+
+                        const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
+                        const tube = new THREE.Mesh(
+                            new THREE.TubeGeometry(curve, Math.max(96, pts.length * 20), _c_cableRadius, 8, false),
+                            _c_blueMat
+                        );
+                        tube.castShadow = true;
+                        centralizedGroup.add(tube);
+                        const cajita = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.11, 0.09), _c_cajitaMat);
+                        cajita.position.set(dropPt.x, cajitaY, dropPt.z);
+                        centralizedGroup.add(cajita);
+                        centralizadoTotalMeters += curve.getLength();
+                    });
+                }
+
+                // === MEDIR CABLE ECOMONITOR (tubos visibles) ===
+                let ecomonitorTotalMeters = ecomonitorTrunkMeters;
+                esclavoData.forEach(e => {
+                    let escTopY = e.pos_canonical.y + 0.30;   // escH/2 = 0.30
+                    const stubDrop = cableYCornisa - (escTopY - 0.05);
+                    const stubL = 0.22;
+                    ecomonitorTotalMeters += stubDrop + stubL;
+                    ecomonitorTotalMeters += 2 * 0.22;   // elbows rojo + verde
+                    if (e.type === 'HVAC') ecomonitorTotalMeters += 2 * 0.425;   // sensor pipes
+                });
+
+                // Guardar refs para el toggle useEffect
+                obj.esclavoAssemblies = esclavoData.map(e => e.assembly);
+
+                // Reportar metros al padre (Simulador) para que actualice el HUD
+                const _meters = {
+                    ecomonitor: Math.round(ecomonitorTotalMeters * 10) / 10,
+                    centralizado: Math.round(centralizadoTotalMeters * 10) / 10
+                };
+                if (typeof onCableMeters === 'function') {
+                    try { onCableMeters(_meters); } catch (err) { console.warn('onCableMeters failed', err); }
+                }
+
                 // Habilitar sombras en los grupos dinámicos
-                [hvacGroup, presGroup, esclavoGroup, cableGroup].forEach(g => {
+                [hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup].forEach(g => {
                     g.traverse(o => {
                         if (o.isMesh && o.material && o.material.type === 'MeshLambertMaterial') {
                             o.castShadow = true;
@@ -5334,6 +5442,16 @@
                 obj.setSceneThemeOverride(sceneTheme || 'auto');
             }, [sceneTheme]);
 
+            // Topología: alterna visibilidad entre EcoMonitor (troncal + esclavos) y Centralizado (N cables individuales)
+            useEffect(() => {
+                const obj = sceneObj.current;
+                if (!obj) return;
+                const isEco = topologyMode !== 'centralizado';
+                if (obj.cableGroup)        obj.cableGroup.visible = isEco;
+                if (obj.centralizedGroup)  obj.centralizedGroup.visible = !isEco;
+                if (obj.esclavoAssemblies) obj.esclavoAssemblies.forEach(a => { if (a) a.visible = isEco; });
+            }, [topologyMode, hvacUnits, presUnits]);
+
 
             // HMI del Master viva — redibuja el canvas texture cuando cambian los valores
             useEffect(() => {
@@ -5374,6 +5492,7 @@
             const [interiorVisible, setInteriorVisible] = useState(true); // ver interior vs exterior cerrado
             const [sceneTheme, setSceneTheme]     = useState('auto'); // 'auto' | 'day' | 'night' — tema de la escena 3D
             const [topologyMode, setTopologyMode] = useState('ecomonitor');
+            const [cableMeters, setCableMeters]   = useState(null);   // { ecomonitor, centralizado } — se llena via callback desde Sala3D
             // Layout — priorizar sala 3D:
             const [panelCollapsed, setPanelCollapsed] = useState(false);   // ocultar HUD flotante para ver la sala completa
             const [trendsOpen, setTrendsOpen]         = useState(false);   // tendencias dentro del HUD, colapsable
@@ -5867,10 +5986,21 @@
                             <button onClick={() => setSceneTheme('day')}   className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'day'   ? 'bg-amber-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Día</button>
                             <button onClick={() => setSceneTheme('night')} className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'night' ? 'bg-indigo-400 text-slate-900': 'text-slate-400 hover:text-white'}`}>Noc</button>
                         </div>
-                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex" title="Topologia de cableado">
-                            <button onClick={() => { setTopologyMode('ecomonitor'); const o = sceneObj.current; if (o && o.cableGroup) o.cableGroup.visible = true; }}   className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${topologyMode === 'ecomonitor'   ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>EcoMonitor</button>
-                            <button onClick={() => { setTopologyMode('centralizado'); const o = sceneObj.current; if (o && o.cableGroup) o.cableGroup.visible = false; }} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${topologyMode === 'centralizado' ? 'bg-amber-400 text-slate-900'      : 'text-slate-400 hover:text-white'}`}>Central</button>
+                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex" title="Topología de cableado — comparación argumental">
+                            <button onClick={() => setTopologyMode('ecomonitor')}   className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${topologyMode === 'ecomonitor'   ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>EcoMonitor</button>
+                            <button onClick={() => setTopologyMode('centralizado')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${topologyMode === 'centralizado' ? 'bg-amber-400 text-slate-900'      : 'text-slate-400 hover:text-white'}`}>Central</button>
                         </div>
+                        {cableMeters && cableMeters.ecomonitor > 0 && (
+                            <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${topologyMode === 'ecomonitor' ? 'border-eco-lightgreen' : 'border-amber-400'}`} title="Metros lineales de cable visible en la escena">
+                                <span className="text-[9px] font-bold text-slate-500 uppercase">Cable</span>
+                                <span className="text-sm font-mono font-bold text-white">{(topologyMode === 'ecomonitor' ? cableMeters.ecomonitor : cableMeters.centralizado).toFixed(1)}<span className="text-[9px] text-slate-400 ml-0.5">m</span></span>
+                                {topologyMode === 'ecomonitor' && cableMeters.centralizado > 0 && (
+                                    <span className="text-[10px] font-bold text-eco-lightgreen ml-1" title="Ahorro respecto al modo Centralizado">
+                                        −{Math.round((1 - cableMeters.ecomonitor / cableMeters.centralizado) * 100)}%
+                                    </span>
+                                )}
+                            </div>
+                        )}
 
                         <div className="hidden md:block w-px h-6 bg-slate-800 mx-1"></div>
 
@@ -5976,6 +6106,8 @@
                                 sceneTheme={sceneTheme}
                                 activeFaults={activeFaults}
                                 globalEvents={globalEvents}
+                                topologyMode={topologyMode}
+                                onCableMeters={setCableMeters}
                                 hmiValues={{
                                     salaTemp:  telemetry.salaTemp,
                                     humidity:  telemetry.salaHumidity,
