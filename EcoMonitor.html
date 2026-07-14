@@ -5315,7 +5315,10 @@
                 // Ordenar según recorrido perimetral desde master (norte→este→sur, luego canon_z asc)
                 const wallOrder = { north: 0, east: 1, south: 2 };
                 allEquip.sort((a, b) => {
-                    if (a.wall !== b.wall) return (wallOrder[a.wall] ?? 9) - (wallOrder[b.wall] ?? 9);
+                    const oa = wallOrder[a.wall]; const ob = wallOrder[b.wall];
+                    const va = (oa === undefined) ? 9 : oa;
+                    const vb = (ob === undefined) ? 9 : ob;
+                    if (a.wall !== b.wall) return va - vb;
                     return a.canon_z - b.canon_z;
                 });
                 const Ncent = allEquip.length;
