@@ -5362,43 +5362,66 @@
                     const _c_blueMat = new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.5 });
                     const _c_cajitaMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
 
+                    // sideOffset: cuánto se corre el cable a un costado para rodear la rejilla.
+                    // Rejilla ancho gWidth=0.85 → medio ancho 0.425 + margen ~7 cm.
+                    const _c_sideOffset = 0.50;
+                    // Cajita compartida por CADA EQUIPO (a media altura entre las 2 rejillas,
+                    // donde estaría el tablero esclavo). Se genera una sola por equipo aunque haya
+                    // varios cables — todos los cables convergen a la misma cajita.
+                    const _cajitasCreadas = new Set();
+
                     const _buildCable = (eq, idx, groupSize, sideKey) => {
-                        // Y offset dentro del bundle para diferenciar cables adyacentes
+                        // Y offset dentro del bundle
                         const yOff = (idx - (groupSize - 1) / 2) * _c_bundleGap;
                         const bundleY = cableYCornisa + yOff;
 
-                        // Punto de salida del master (por el costado)
+                        // Punto de salida del master (costado)
                         const startZ = (sideKey === 'north') ? _c_masterZ_northFace : _c_masterZ_southFace;
                         const startPt = new THREE.Vector3(_c_masterX_out, _c_masterY_out, startZ);
 
-                        // Punto de bajada final al equipo
-                        let dropPt;
-                        if (eq.wall === 'north')      dropPt = new THREE.Vector3(eq.wpX, bundleY, _c_wallZ_north);
-                        else if (eq.wall === 'south') dropPt = new THREE.Vector3(eq.wpX, bundleY, _c_wallZ_south);
-                        else                          dropPt = new THREE.Vector3(_c_wallX_east, bundleY, eq.wpZ);
+                        // Dirección lateral para rodear la rejilla (misma convención que EcoMonitor)
+                        // norte: -X · sur: +X · este: +Z (izquierda desde el pasillo)
+                        let bypassDir_x = 0, bypassDir_z = 0;
+                        if (eq.wall === 'north')      bypassDir_x = -1;
+                        else if (eq.wall === 'south') bypassDir_x = +1;
+                        else                          bypassDir_z = +1;
 
-                        // Trayectoria: master(costado) → sube a cornisa → recorre perímetro
+                        // Punto lateral sobre la pared (offset al costado de la rejilla) a la altura del bundle
+                        let bypassBundlePt, bypassMidPt, midPt;
+                        // midPt = a media altura entre rejillas (INJ y RET) — el CENTRO del equipo (eq.y),
+                        // en la cara de la pared. Ahí se conecta la cajita de paso.
+                        if (eq.wall === 'north') {
+                            bypassBundlePt = new THREE.Vector3(eq.wpX + bypassDir_x * _c_sideOffset, bundleY, _c_wallZ_north);
+                            bypassMidPt    = new THREE.Vector3(eq.wpX + bypassDir_x * _c_sideOffset, eq.y,   _c_wallZ_north);
+                            midPt          = new THREE.Vector3(eq.wpX,                              eq.y,   _c_wallZ_north);
+                        } else if (eq.wall === 'south') {
+                            bypassBundlePt = new THREE.Vector3(eq.wpX + bypassDir_x * _c_sideOffset, bundleY, _c_wallZ_south);
+                            bypassMidPt    = new THREE.Vector3(eq.wpX + bypassDir_x * _c_sideOffset, eq.y,   _c_wallZ_south);
+                            midPt          = new THREE.Vector3(eq.wpX,                              eq.y,   _c_wallZ_south);
+                        } else {   // east
+                            bypassBundlePt = new THREE.Vector3(_c_wallX_east, bundleY, eq.wpZ + bypassDir_z * _c_sideOffset);
+                            bypassMidPt    = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ + bypassDir_z * _c_sideOffset);
+                            midPt          = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ);
+                        }
+
+                        // Trayectoria completa: master(costado) → sube al bundle → corre por pared oeste
+                        // hasta esquina → corre por pared del equipo → RODEA la rejilla por el costado
+                        // → baja a media altura entre rejillas → entra a la cajita de paso
+                        const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
                         const pts = [];
                         pts.push(startPt);
-                        // Sube por el costado del master hasta la altura del bundle
                         pts.push(new THREE.Vector3(_c_masterX_out - 0.2, bundleY, startZ));
-                        // Alcanza la pared oeste (cornisa) al costado del master
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, startZ));
-                        // Corner correspondiente (NW o SW)
-                        const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, cornerZ));
-                        // Va al equipo
-                        if (eq.wall === 'north' || eq.wall === 'south') {
-                            pts.push(dropPt);
-                        } else {
-                            // east wall — llega a la esquina NE o SE primero
+                        if (eq.wall === 'east') {
                             pts.push(new THREE.Vector3(_c_wallX_east, bundleY, cornerZ));
-                            pts.push(dropPt);
                         }
-                        // Baja del bundle a la cajita de paso
-                        const cajitaY = eq.y + eq.unitH/2 - 0.15;
-                        pts.push(new THREE.Vector3(dropPt.x, cajitaY + 0.05, dropPt.z));
-                        pts.push(new THREE.Vector3(dropPt.x, cajitaY, dropPt.z));
+                        // Llega al COSTADO de la rejilla (bypass lateral)
+                        pts.push(bypassBundlePt);
+                        // Baja pegado a la pared, POR AFUERA del ancho de la rejilla
+                        pts.push(bypassMidPt);
+                        // Cruza a la posición del equipo, a media altura (entre rejillas)
+                        pts.push(midPt);
 
                         const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
                         const tube = new THREE.Mesh(
@@ -5407,9 +5430,14 @@
                         );
                         tube.castShadow = true;
                         centralizedGroup.add(tube);
-                        const cajita = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.11, 0.09), _c_cajitaMat);
-                        cajita.position.set(dropPt.x, cajitaY, dropPt.z);
-                        centralizedGroup.add(cajita);
+
+                        // Cajita de paso compartida por equipo — solo la agregamos una vez
+                        if (!_cajitasCreadas.has(eq.id)) {
+                            _cajitasCreadas.add(eq.id);
+                            const cajita = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.11), _c_cajitaMat);
+                            cajita.position.copy(midPt);
+                            centralizedGroup.add(cajita);
+                        }
                         centralizadoTotalMeters += curve.getLength();
                     };
 
