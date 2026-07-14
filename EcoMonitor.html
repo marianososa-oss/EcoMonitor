@@ -5297,62 +5297,105 @@
                 }
 
                 // === TOPOLOGÍA CENTRALIZADA (comparación argumental EcoMonitor vs Central) ===
-                // Cada equipo recibe su PROPIO cable individual que nace en el master, recorre la
-                // pared perimetral, y baja al equipo via cajita de paso. Los cables forman un
-                // BUNDLE que se AFINA visualmente en cada equipo (uno se desprende).
+                // Cada equipo tiene su PROPIO cable individual que sale del master POR EL LADO
+                // que le corresponde según dónde esté ubicado:
+                //  - Equipos en pared NORTE + mitad norte del ESTE  → cables por el lado IZQUIERDO
+                //    del master (cara -Z, hacia la pared norte)
+                //  - Equipos en pared SUR + mitad sur del ESTE      → cables por el lado DERECHO
+                //    del master (cara +Z, hacia la pared sur)
+                // Cada cable recorre el perímetro hasta el equipo y baja via cajita de paso.
                 const _c_wallZ_north = -roomD/2 + 0.12;
                 const _c_wallZ_south =  roomD/2 - 0.12;
                 const _c_wallX_east  =  roomW/2 - 0.12;
                 const _c_wallX_west  = -roomW/2 + 0.12;
                 const _c_cableRadius = 0.024;
-                const _c_bundleGap   = 0.052;
+                const _c_bundleGap   = 0.048;
                 let   centralizadoTotalMeters = 0;
 
-                const _wallOrder = { north: 0, east: 1, south: 2 };
+                // Anchor points en los COSTADOS del master (master está en pared oeste, Z=0, mD=0.9)
+                // - Lado NORTE del master (cara -Z, hacia pared norte)
+                // - Lado SUR  del master (cara +Z, hacia pared sur)
+                const _c_masterX_out = -roomW/2 + 0.35 + 0.02;     // apenas más adentro que la cara este del master
+                const _c_masterY_out = 2.21 + 0.9 + 1.7 - 0.20;    // ~15 cm bajo el techo del master
+                const _c_masterZ_northFace = -0.45 - 0.02;         // -mD/2 - clearance
+                const _c_masterZ_southFace =  0.45 + 0.02;         // +mD/2 + clearance
+
+                // Clasificar cada equipo: sale por lado NORTE o SUR del master
                 const allEquip = [];
-                hvacInfo.forEach((h, i) => allEquip.push({
-                    wall: h.wall, canon_z: h.canon_z, canon_bodyX: h.canon_bodyX,
-                    y: h.y, unitH: 2.50, type: 'HVAC', id: 'HVAC-' + (i+1)
-                }));
-                presInfo.forEach((p, i) => allEquip.push({
-                    wall: p.wall, canon_z: p.canon_z, canon_bodyX: p.canon_bodyX,
-                    y: p.y, unitH: 1.72, type: 'PRES', id: 'PRES-' + (i+1)
-                }));
-                allEquip.sort(function(a, b) {
-                    var oa = _wallOrder[a.wall]; if (oa === undefined) oa = 9;
-                    var ob = _wallOrder[b.wall]; if (ob === undefined) ob = 9;
-                    if (a.wall !== b.wall) return oa - ob;
-                    return a.canon_z - b.canon_z;
+                const _pushEquip = (h, type, unitH, i) => {
+                    // canonicalToWorld inline
+                    let wpX, wpZ;
+                    if (h.wall === 'north')      { wpX =  h.canon_z; wpZ = -h.canon_bodyX + (roomW/2 - roomD/2); }
+                    else if (h.wall === 'south') { wpX = -h.canon_z; wpZ =  h.canon_bodyX - (roomW/2 - roomD/2); }
+                    else                          { wpX =  h.canon_bodyX; wpZ = h.canon_z; }  // east
+                    // Side: NORTE del master si el equipo está en la mitad -Z, SUR si +Z
+                    const side = (wpZ < 0) ? 'north' : 'south';
+                    allEquip.push({
+                        wall: h.wall, wpX, wpZ, y: h.y, unitH, type,
+                        id: type + '-' + (i+1), side
+                    });
+                };
+                hvacInfo.forEach((h, i) => _pushEquip(h, 'HVAC', 2.50, i));
+                presInfo.forEach((p, i) => _pushEquip(p, 'PRES', 1.72, i));
+
+                // Separar en 2 grupos y ordenar por distancia perimetral desde master
+                const northSideEq = allEquip.filter(e => e.side === 'north');
+                const southSideEq = allEquip.filter(e => e.side === 'south');
+                // Norte: recorre desde master (-Z) → NW → norte → NE → este_norte
+                northSideEq.sort((a, b) => {
+                    // Ordenar por distancia perimetral (mientras más lejos del master, más grande)
+                    // Norte wall: menor wpX = más cerca del master (wpX = canon_z; equipos con canon_z bajo = cerca del west)
+                    // wait, canon_z is along the wall. For north wall, canonicalToWorld gives wpX = canon_z. Master at wallX_west.
+                    // Simplemente: ordenamos por wpX asc (norte wall) o wpZ (east wall)
+                    const orderA = a.wall === 'east' ? (roomD + Math.abs(a.wpZ)) : a.wpX;
+                    const orderB = b.wall === 'east' ? (roomD + Math.abs(b.wpZ)) : b.wpX;
+                    return orderA - orderB;
+                });
+                // Sur: recorre desde master (+Z) → SW → sur → SE → este_sur
+                southSideEq.sort((a, b) => {
+                    const orderA = a.wall === 'east' ? (roomD + Math.abs(a.wpZ)) : Math.abs(a.wpX);
+                    const orderB = b.wall === 'east' ? (roomD + Math.abs(b.wpZ)) : Math.abs(b.wpX);
+                    return orderA - orderB;
                 });
 
-                const _c_Ncent = allEquip.length;
-                if (_c_Ncent > 0) {
+                if (allEquip.length > 0) {
                     const _c_blueMat = new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.5 });
                     const _c_cajitaMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
-                    allEquip.forEach((eq, idx) => {
-                        const yOff = (idx - (_c_Ncent - 1) / 2) * _c_bundleGap;
+
+                    const _buildCable = (eq, idx, groupSize, sideKey) => {
+                        // Y offset dentro del bundle para diferenciar cables adyacentes
+                        const yOff = (idx - (groupSize - 1) / 2) * _c_bundleGap;
                         const bundleY = cableYCornisa + yOff;
-                        // canonicalToWorld inline (est.: eq.canon_bodyX perpendicular a la pared)
-                        let wpX, wpZ;
-                        if (eq.wall === 'north') { wpX = eq.canon_z; wpZ = -eq.canon_bodyX + (roomW/2 - roomD/2); }
-                        else if (eq.wall === 'south') { wpX = -eq.canon_z; wpZ = eq.canon_bodyX - (roomW/2 - roomD/2); }
-                        else { wpX = eq.canon_bodyX; wpZ = eq.canon_z; }   // east
+
+                        // Punto de salida del master (por el costado)
+                        const startZ = (sideKey === 'north') ? _c_masterZ_northFace : _c_masterZ_southFace;
+                        const startPt = new THREE.Vector3(_c_masterX_out, _c_masterY_out, startZ);
+
+                        // Punto de bajada final al equipo
                         let dropPt;
-                        if (eq.wall === 'north')      dropPt = new THREE.Vector3(wpX, bundleY, _c_wallZ_north);
-                        else if (eq.wall === 'south') dropPt = new THREE.Vector3(wpX, bundleY, _c_wallZ_south);
-                        else                          dropPt = new THREE.Vector3(_c_wallX_east, bundleY, wpZ);
-                        const pts = [
-                            masterOutputPos.clone(),
-                            new THREE.Vector3(_c_wallX_west, bundleY, masterOutputPos.z),
-                            new THREE.Vector3(_c_wallX_west, bundleY, _c_wallZ_north)
-                        ];
-                        if (eq.wall === 'north') {
+                        if (eq.wall === 'north')      dropPt = new THREE.Vector3(eq.wpX, bundleY, _c_wallZ_north);
+                        else if (eq.wall === 'south') dropPt = new THREE.Vector3(eq.wpX, bundleY, _c_wallZ_south);
+                        else                          dropPt = new THREE.Vector3(_c_wallX_east, bundleY, eq.wpZ);
+
+                        // Trayectoria: master(costado) → sube a cornisa → recorre perímetro
+                        const pts = [];
+                        pts.push(startPt);
+                        // Sube por el costado del master hasta la altura del bundle
+                        pts.push(new THREE.Vector3(_c_masterX_out - 0.2, bundleY, startZ));
+                        // Alcanza la pared oeste (cornisa) al costado del master
+                        pts.push(new THREE.Vector3(_c_wallX_west, bundleY, startZ));
+                        // Corner correspondiente (NW o SW)
+                        const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
+                        pts.push(new THREE.Vector3(_c_wallX_west, bundleY, cornerZ));
+                        // Va al equipo
+                        if (eq.wall === 'north' || eq.wall === 'south') {
                             pts.push(dropPt);
                         } else {
-                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, _c_wallZ_north));
-                            if (eq.wall === 'east') pts.push(dropPt);
-                            else { pts.push(new THREE.Vector3(_c_wallX_east, bundleY, _c_wallZ_south)); pts.push(dropPt); }
+                            // east wall — llega a la esquina NE o SE primero
+                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, cornerZ));
+                            pts.push(dropPt);
                         }
+                        // Baja del bundle a la cajita de paso
                         const cajitaY = eq.y + eq.unitH/2 - 0.15;
                         pts.push(new THREE.Vector3(dropPt.x, cajitaY + 0.05, dropPt.z));
                         pts.push(new THREE.Vector3(dropPt.x, cajitaY, dropPt.z));
@@ -5368,7 +5411,10 @@
                         cajita.position.set(dropPt.x, cajitaY, dropPt.z);
                         centralizedGroup.add(cajita);
                         centralizadoTotalMeters += curve.getLength();
-                    });
+                    };
+
+                    northSideEq.forEach((eq, idx) => _buildCable(eq, idx, northSideEq.length, 'north'));
+                    southSideEq.forEach((eq, idx) => _buildCable(eq, idx, southSideEq.length, 'south'));
                 }
 
                 // === MEDIR CABLE ECOMONITOR (tubos visibles) ===
