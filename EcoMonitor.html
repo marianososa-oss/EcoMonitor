@@ -5073,26 +5073,54 @@
                         wallCap.position.set(wallXCanon + outSign * 0.01, yElbow, pos.z + zOffset);
                         g.add(wallCap);
                     };
-                    _addElbow(conduitRedMat,   -0.10);   // ROJO — cables de control
-                    _addElbow(conduitGreenMat, +0.10);   // VERDE — cables de sensores
+                    _addElbow(conduitRedMat,   -0.10);   // ROJO — cables de control (tablero 1)
+                    _addElbow(conduitGreenMat, +0.10);   // VERDE — cables de sensores (tablero 1)
 
-                    // === CAJITA DE PASO — junction box donde terminan los elbows rojo/verde ===
-                    // A la par del tablero esclavo, sobre la pared, en el nivel yElbow. Es la caja
-                    // donde el cableado LOCAL (rojo control + verde sensores) hace transición al
-                    // field wiring que cruza la pared hacia el equipo del lado exterior.
-                    const passBox = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.06, 0.20, 0.32),   // fondo 6 cm, alto 20 cm, ancho 32 cm (cubre ambos elbows)
-                        new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 })
+                    // === CAJITA DE PASO 1 — junction box donde terminan los elbows del tablero 1 ===
+                    const passBoxMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
+                    const passBoxCoverMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.5, roughness: 0.4 });
+                    const _addPassBox = (zCenter) => {
+                        const box = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.20, 0.32), passBoxMat);
+                        box.position.set(wallXCanon + outSign * 0.03, yElbow, zCenter);
+                        g.add(box);
+                        const cover = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.16, 0.28), passBoxCoverMat);
+                        cover.position.set(wallXCanon + (-outSign) * 0.005, yElbow, zCenter);
+                        g.add(cover);
+                    };
+                    _addPassBox(pos.z);
+
+                    // === TABLERO 2 — segundo gabinete a la par del esclavo ===
+                    // Al lado del tablero 1, en la misma pared, offset escW+gap = 0.45 m en canónico Z.
+                    // Tiene su propio par de elbows rojo + verde y su propia cajita de paso.
+                    // Representa el gabinete de conexiones / borneras donde el field wiring se une
+                    // a los cables locales antes de ir a la pass-box y cruzar la pared.
+                    const tab2_zOff = escW + 0.05;   // 45 cm de separación (borde a borde)
+                    const tab2_z    = pos.z + tab2_zOff;
+                    const body2 = new THREE.Mesh(bGeo, new THREE.MeshLambertMaterial({ color: '#e2e8f0' }));
+                    body2.position.set(interiorX, info.y, tab2_z); g.add(body2);
+                    const eds2 = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
+                    eds2.position.set(interiorX, info.y, tab2_z); g.add(eds2);
+                    // Gozne del tablero 2 (idéntico al 1 pero desplazado en Z)
+                    const hinge2 = new THREE.LineSegments(
+                        new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(interiorX + (-outSign) * (escD/2 + 0.005), hingeY1, tab2_z - escW/2 + 0.04),
+                            new THREE.Vector3(interiorX + (-outSign) * (escD/2 + 0.005), hingeY2, tab2_z - escW/2 + 0.04)
+                        ]),
+                        new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.6 })
                     );
-                    passBox.position.set(wallXCanon + outSign * 0.03, yElbow, pos.z);
-                    g.add(passBox);
-                    // Tapa de la cajita (parche gris claro) — indica que es removible para acceder
-                    const passBoxCover = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.005, 0.16, 0.28),
-                        new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.5, roughness: 0.4 })
+                    g.add(hinge2);
+                    // LED del tablero 2 (mismo color, distinta z)
+                    const led2 = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 8, 6),
+                        new THREE.MeshBasicMaterial({ color: TH_COLOR.titular })
                     );
-                    passBoxCover.position.set(wallXCanon + (-outSign) * 0.005, yElbow, pos.z);
-                    g.add(passBoxCover);
+                    led2.position.set(interiorX + (-outSign) * (escD/2 + 0.008), info.y + escH/3, tab2_z + escW/3);
+                    g.add(led2);
+                    // Elbows rojo + verde del tablero 2 (con offset Z desplazado)
+                    _addElbow(conduitRedMat,   tab2_zOff - 0.10);   // ROJO — control (tablero 2)
+                    _addElbow(conduitGreenMat, tab2_zOff + 0.10);   // VERDE — sensores (tablero 2)
+                    // Cajita de paso 2 — a la altura yElbow, a la par del tablero 2, sobre la pared
+                    _addPassBox(tab2_z);
 
                     // === CAÑOS DE SENSORES (plateados) — solo HVAC ===
                     // Conectan el tablero con las dos rejillas interiores (INJ arriba, RET abajo).
@@ -6085,7 +6113,7 @@
                         {cableMeters && cableMeters.ecomonitor > 0 && (
                             <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${topologyMode === 'ecomonitor' ? 'border-eco-lightgreen' : 'border-amber-400'}`} title="Metros lineales de HILO (largo del caño × cantidad de hilos que lleva adentro — 30 hilos por equipo + 2 Modbus)">
                                 <span className="text-[9px] font-bold text-slate-500 uppercase">Cable</span>
-                                <span className="text-sm font-mono font-bold text-white">{(topologyMode === 'ecomonitor' ? cableMeters.ecomonitor : cableMeters.centralizado).toFixed(0)}<span className="text-[9px] text-slate-400 ml-0.5">m hilo</span></span>
+                                <span className="text-sm font-mono font-bold text-white">{(topologyMode === 'ecomonitor' ? cableMeters.ecomonitor : cableMeters.centralizado).toFixed(0)}<span className="text-[9px] text-slate-400 ml-0.5">m de cable</span></span>
                                 {topologyMode === 'ecomonitor' && cableMeters.centralizado > 0 && (
                                     <span className="text-[10px] font-bold text-eco-lightgreen ml-1" title="Ahorro respecto al modo Centralizado">
                                         −{Math.round((1 - cableMeters.ecomonitor / cableMeters.centralizado) * 100)}%
