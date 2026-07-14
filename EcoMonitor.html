@@ -5334,6 +5334,13 @@
                 obj.setSceneThemeOverride(sceneTheme || 'auto');
             }, [sceneTheme]);
 
+            // Topología: al elegir Central ocultamos el cable Modbus para dar la señal visual del cambio
+            useEffect(() => {
+                const obj = sceneObj.current;
+                if (!obj || !obj.cableGroup) return;
+                obj.cableGroup.visible = (topologyMode === 'ecomonitor');
+            }, [topologyMode]);
+
             // HMI del Master viva — redibuja el canvas texture cuando cambian los valores
             useEffect(() => {
                 const obj = sceneObj.current;
