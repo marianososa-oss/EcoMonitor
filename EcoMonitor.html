@@ -3622,6 +3622,7 @@
                 const presGroup = new THREE.Group(); scene.add(presGroup);
                 const esclavoGroup = new THREE.Group(); scene.add(esclavoGroup);
                 const cableGroup = new THREE.Group(); scene.add(cableGroup);
+                const centralizedGroup = new THREE.Group(); scene.add(centralizedGroup); centralizedGroup.visible = false;
 
                 // === MAESTRO (montado en pared interior IZQUIERDA, con pantalla) ===
                 const mW = 0.35, mH = 1.7, mD = 0.9;  // depth ancha (largo en Z)
@@ -3981,7 +3982,7 @@
 
                 sceneObj.current = {
                     THREE, scene, camera, renderer,
-                    hvacGroup, presGroup, esclavoGroup, cableGroup,
+                    hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup,
                     heatMeshes, heatWaves, wifiRings, dataPackets, wallMeshes,
                     perimeterWisps, doorStreams, puddleGroup,
                     masterOutputPos, cloudPos,
@@ -5334,6 +5335,18 @@
                 obj.setSceneThemeOverride(sceneTheme || 'auto');
             }, [sceneTheme]);
 
+            // Topología: EcoMonitor (default) vs Centralizado
+            // En modo Centralizado ocultamos los esclavos + su cableado — el cliente ve visualmente
+            // que sin esclavos el cable tiene que hacer todo el recorrido desde el master.
+            useEffect(() => {
+                const obj = sceneObj.current;
+                if (!obj) return;
+                const isEco = topologyMode === 'ecomonitor';
+                if (obj.cableGroup)       obj.cableGroup.visible = isEco;
+                if (obj.esclavoGroup)     obj.esclavoGroup.visible = isEco;
+                if (obj.centralizedGroup) obj.centralizedGroup.visible = !isEco;
+            }, [topologyMode]);
+
             // HMI del Master viva — redibuja el canvas texture cuando cambian los valores
             useEffect(() => {
                 const obj = sceneObj.current;
@@ -5372,6 +5385,7 @@
             const [view, setView]                 = useState('iso'); // 'iso' | 'top'
             const [interiorVisible, setInteriorVisible] = useState(true); // ver interior vs exterior cerrado
             const [sceneTheme, setSceneTheme]     = useState('auto'); // 'auto' | 'day' | 'night' — tema de la escena 3D
+            const [topologyMode, setTopologyMode] = useState('ecomonitor'); // 'ecomonitor' | 'centralizado'
             // Layout — priorizar sala 3D:
             const [panelCollapsed, setPanelCollapsed] = useState(false);   // ocultar HUD flotante para ver la sala completa
             const [trendsOpen, setTrendsOpen]         = useState(false);   // tendencias dentro del HUD, colapsable
@@ -5864,6 +5878,11 @@
                             <button onClick={() => setSceneTheme('auto')}  className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'auto'  ? 'bg-eco-blue text-white'      : 'text-slate-400 hover:text-white'}`}>Auto</button>
                             <button onClick={() => setSceneTheme('day')}   className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'day'   ? 'bg-amber-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Día</button>
                             <button onClick={() => setSceneTheme('night')} className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'night' ? 'bg-indigo-400 text-slate-900': 'text-slate-400 hover:text-white'}`}>Noc</button>
+                        </div>
+                        {/* TOPOLOGÍA — comparación argumental EcoMonitor vs Centralizado */}
+                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex" title="Comparar topología de cableado">
+                            <button onClick={() => setTopologyMode('ecomonitor')}   className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${topologyMode === 'ecomonitor'   ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>EcoMonitor</button>
+                            <button onClick={() => setTopologyMode('centralizado')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${topologyMode === 'centralizado' ? 'bg-amber-400 text-slate-900'      : 'text-slate-400 hover:text-white'}`}>Central</button>
                         </div>
 
                         <div className="hidden md:block w-px h-6 bg-slate-800 mx-1"></div>
