@@ -5076,6 +5076,24 @@
                     _addElbow(conduitRedMat,   -0.10);   // ROJO — cables de control
                     _addElbow(conduitGreenMat, +0.10);   // VERDE — cables de sensores
 
+                    // === CAJITA DE PASO — junction box donde terminan los elbows rojo/verde ===
+                    // A la par del tablero esclavo, sobre la pared, en el nivel yElbow. Es la caja
+                    // donde el cableado LOCAL (rojo control + verde sensores) hace transición al
+                    // field wiring que cruza la pared hacia el equipo del lado exterior.
+                    const passBox = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.06, 0.20, 0.32),   // fondo 6 cm, alto 20 cm, ancho 32 cm (cubre ambos elbows)
+                        new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 })
+                    );
+                    passBox.position.set(wallXCanon + outSign * 0.03, yElbow, pos.z);
+                    g.add(passBox);
+                    // Tapa de la cajita (parche gris claro) — indica que es removible para acceder
+                    const passBoxCover = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.005, 0.16, 0.28),
+                        new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.5, roughness: 0.4 })
+                    );
+                    passBoxCover.position.set(wallXCanon + (-outSign) * 0.005, yElbow, pos.z);
+                    g.add(passBoxCover);
+
                     // === CAÑOS DE SENSORES (plateados) — solo HVAC ===
                     // Conectan el tablero con las dos rejillas interiores (INJ arriba, RET abajo).
                     // Cada caño lleva los cables de los sensores instalados en el flujo de aire
@@ -5308,8 +5326,12 @@
                 const _c_wallZ_south =  roomD/2 - 0.12;
                 const _c_wallX_east  =  roomW/2 - 0.12;
                 const _c_wallX_west  = -roomW/2 + 0.12;
-                const _c_cableRadius = 0.024;
-                const _c_bundleGap   = 0.048;
+                const _c_cableRadius = 0.055;   // MUCHO más grueso — cada caño carga 30 hilos (sensores + control)
+                const _c_bundleGap   = 0.130;   // más separación entre cables adyacentes para que el bundle se lea bien
+                // Hilos por equipo en el cálculo de metros lineales de HILO
+                const _WIRES_PER_EQUIP   = 30;   // 30 hilos por equipo (sensores + control + fault relay + fan status + etc.)
+                const _WIRES_MODBUS_BUS  = 2;    // Modbus RS-485 A/B (compartido para todos los esclavos)
+                const _ECOMON_LOCAL_M    = 3.0;  // largo estimado de cableado LOCAL por equipo en EcoMonitor (elbows + cruce pared + entrada al equipo)
                 let   centralizadoTotalMeters = 0;
 
                 // Anchor points en los COSTADOS del master (master está en pared oeste, Z=0, mD=0.9)
@@ -5438,23 +5460,19 @@
                             cajita.position.copy(midPt);
                             centralizedGroup.add(cajita);
                         }
-                        centralizadoTotalMeters += curve.getLength();
+                        // Metros lineales de HILO: cada caño carga 30 hilos individuales
+                        centralizadoTotalMeters += curve.getLength() * _WIRES_PER_EQUIP;
                     };
 
                     northSideEq.forEach((eq, idx) => _buildCable(eq, idx, northSideEq.length, 'north'));
                     southSideEq.forEach((eq, idx) => _buildCable(eq, idx, southSideEq.length, 'south'));
                 }
 
-                // === MEDIR CABLE ECOMONITOR (tubos visibles) ===
-                let ecomonitorTotalMeters = ecomonitorTrunkMeters;
-                esclavoData.forEach(e => {
-                    let escTopY = e.pos_canonical.y + 0.30;   // escH/2 = 0.30
-                    const stubDrop = cableYCornisa - (escTopY - 0.05);
-                    const stubL = 0.22;
-                    ecomonitorTotalMeters += stubDrop + stubL;
-                    ecomonitorTotalMeters += 2 * 0.22;   // elbows rojo + verde
-                    if (e.type === 'HVAC') ecomonitorTotalMeters += 2 * 0.425;   // sensor pipes
-                });
+                // === MEDIR METROS DE HILO ECOMONITOR ===
+                // Troncal Modbus: solo 2 hilos (A/B) recorren TODO el troncal.
+                // Cada equipo tiene ~3 m de cableado LOCAL con 30 hilos (sensores + control).
+                let ecomonitorTotalMeters = ecomonitorTrunkMeters * _WIRES_MODBUS_BUS;
+                ecomonitorTotalMeters += esclavoData.length * _ECOMON_LOCAL_M * _WIRES_PER_EQUIP;
 
                 // Guardar refs para el toggle useEffect
                 obj.esclavoAssemblies = esclavoData.map(e => e.assembly);
@@ -6065,9 +6083,9 @@
                             <button onClick={() => setTopologyMode('centralizado')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${topologyMode === 'centralizado' ? 'bg-amber-400 text-slate-900'      : 'text-slate-400 hover:text-white'}`}>Central</button>
                         </div>
                         {cableMeters && cableMeters.ecomonitor > 0 && (
-                            <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${topologyMode === 'ecomonitor' ? 'border-eco-lightgreen' : 'border-amber-400'}`} title="Metros lineales de cable visible en la escena">
+                            <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${topologyMode === 'ecomonitor' ? 'border-eco-lightgreen' : 'border-amber-400'}`} title="Metros lineales de HILO (largo del caño × cantidad de hilos que lleva adentro — 30 hilos por equipo + 2 Modbus)">
                                 <span className="text-[9px] font-bold text-slate-500 uppercase">Cable</span>
-                                <span className="text-sm font-mono font-bold text-white">{(topologyMode === 'ecomonitor' ? cableMeters.ecomonitor : cableMeters.centralizado).toFixed(1)}<span className="text-[9px] text-slate-400 ml-0.5">m</span></span>
+                                <span className="text-sm font-mono font-bold text-white">{(topologyMode === 'ecomonitor' ? cableMeters.ecomonitor : cableMeters.centralizado).toFixed(0)}<span className="text-[9px] text-slate-400 ml-0.5">m hilo</span></span>
                                 {topologyMode === 'ecomonitor' && cableMeters.centralizado > 0 && (
                                     <span className="text-[10px] font-bold text-eco-lightgreen ml-1" title="Ahorro respecto al modo Centralizado">
                                         −{Math.round((1 - cableMeters.ecomonitor / cableMeters.centralizado) * 100)}%
