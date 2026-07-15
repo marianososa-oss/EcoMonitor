@@ -5355,7 +5355,12 @@
                 const _c_wallX_east  =  roomW/2 - 0.08;
                 const _c_wallX_west  = -roomW/2 + 0.08;
                 const _c_cableRadius = 0.055;   // MUCHO más grueso — cada caño carga 30 hilos (sensores + control)
-                const _c_bundleGap   = 0.130;   // más separación entre cables adyacentes para que el bundle se lea bien
+                const _c_bundleGap   = 0.08;    // separación vertical entre puntos de salida en el costado del tablero
+                // Cada cable sale a SU PROPIA altura en el costado del tablero (como puertos apilados)
+                const _computeYOff = (idx, groupSize) => {
+                    const raw = (idx - (groupSize - 1) / 2) * _c_bundleGap;
+                    return Math.max(-0.22, Math.min(0.22, raw));   // cap para que no supere el techo ni el piso del tablero
+                };
                 // Hilos por equipo en el cálculo de metros lineales de HILO
                 const _WIRES_PER_EQUIP   = 30;   // 30 hilos por equipo (sensores + control + fault relay + fan status + etc.)
                 const _WIRES_MODBUS_BUS  = 2;    // Modbus RS-485 A/B (compartido para todos los esclavos)
@@ -5420,13 +5425,14 @@
                     const _cajitasCreadas = new Set();
 
                     const _buildCable = (eq, idx, groupSize, sideKey) => {
-                        // Y offset dentro del bundle
-                        const yOff = (idx - (groupSize - 1) / 2) * _c_bundleGap;
+                        // Cada cable sale a SU PROPIA altura en el costado del tablero (yOff aplicado al startY)
+                        const yOff = _computeYOff(idx, groupSize);
                         const bundleY = cableYCornisa + yOff;
+                        const startY  = _c_masterY_out + yOff;
 
-                        // Punto de salida del master (costado)
+                        // Punto de salida del master (costado, altura propia del cable)
                         const startZ = (sideKey === 'north') ? _c_masterZ_northFace : _c_masterZ_southFace;
-                        const startPt = new THREE.Vector3(_c_masterX_out, _c_masterY_out, startZ);
+                        const startPt = new THREE.Vector3(_c_masterX_out, startY, startZ);
 
                         // Dirección lateral para rodear la rejilla (misma convención que EcoMonitor)
                         // norte: -X · sur: +X · este: +Z (izquierda desde el pasillo)
@@ -5459,8 +5465,8 @@
                         const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
                         const pts = [];
                         pts.push(startPt);
-                        // Route TOWARD the wall (X-wise) manteniendo el mismo Y
-                        pts.push(new THREE.Vector3(_c_wallX_west, _c_masterY_out, startZ));
+                        // Route TOWARD the wall (X-wise) manteniendo el mismo Y de salida
+                        pts.push(new THREE.Vector3(_c_wallX_west, startY, startZ));
                         // Sube al bundle (cornisa) PEGADO A LA PARED
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, startZ));
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, cornerZ));
@@ -5524,10 +5530,11 @@
                     const _caj2_offset = 0.35;   // separación entre caj1 (bundle azul) y caj2 (rojo/verde)
 
                     const _routeSecCable = (eq, colorMat, pairIdx, groupSize, sideKey) => {
-                        const yOff = (pairIdx - (groupSize - 1) / 2) * 0.032;
+                        const yOff = _computeYOff(pairIdx, groupSize);
                         const bundleY = cableYCornisa + yOff;
+                        const startY  = _sec_faceY + yOff;
                         const startZ = (sideKey === 'north') ? _sec_facePosZ_north : _sec_facePosZ_south;
-                        const startPt = new THREE.Vector3(_sec_X, _sec_faceY, startZ);
+                        const startPt = new THREE.Vector3(_sec_X, startY, startZ);
 
                         // Punto lateral OPUESTO al azul y punto de entrada a caj2
                         let bypassBundlePt, bypassMidPt, caj2Pt;
@@ -5548,8 +5555,8 @@
                         const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
                         const pts = [];
                         pts.push(startPt);
-                        // Route TOWARD the east wall (X-wise) — mismo Y de salida
-                        pts.push(new THREE.Vector3(_c_wallX_east, _sec_faceY, startZ));
+                        // Route TOWARD the east wall (X-wise) — mismo Y de salida (propio de este cable)
+                        pts.push(new THREE.Vector3(_c_wallX_east, startY, startZ));
                         // Sube al bundle (cornisa) PEGADO A LA PARED este
                         pts.push(new THREE.Vector3(_c_wallX_east, bundleY, startZ));
                         // Va a la esquina correspondiente
