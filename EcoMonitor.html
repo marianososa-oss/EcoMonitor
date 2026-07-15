@@ -3624,6 +3624,9 @@
                 const cableGroup = new THREE.Group(); scene.add(cableGroup);
                 const centralizedGroup = new THREE.Group(); scene.add(centralizedGroup);
                 centralizedGroup.visible = false;   // se muestra solo en modo Central
+                // Tablero SECUNDARIO — mismo tamaño que el maestro, en la pared ESTE (cruzado al maestro).
+                // De él sale un par rojo + verde por cada equipo hacia la cajita de paso.
+                const secondaryMasterGroup = new THREE.Group(); scene.add(secondaryMasterGroup);
 
                 // === MAESTRO (montado en pared interior IZQUIERDA, con pantalla) ===
                 const mW = 0.35, mH = 1.7, mD = 0.9;  // depth ancha (largo en Z)
@@ -3750,6 +3753,34 @@
                 scene.add(led3);
                 // Punto de salida del cable Modbus: ARRIBA del master (sale por el TOP)
                 const masterOutputPos = new THREE.Vector3(masterX + 0.1, masterY + mH/2 + 0.05, masterZ);
+
+                // === TABLERO SECUNDARIO en pared ESTE — cruzado al maestro ===
+                // Mismo tamaño que el maestro (mW × mH × mD), montado en la pared este a la misma
+                // altura y centrado en Z. Es un tablero de conexiones / borneras — de él salen
+                // pares rojo + verde (uno por cada equipo) hacia sus cajitas de paso.
+                const secondaryX = roomW/2 - mW/2 - 0.04;   // mirror del maestro
+                const secondaryY = masterY;
+                const secondaryZ = masterZ;
+                const secondaryBody = new THREE.Mesh(
+                    new THREE.BoxGeometry(mW, mH, mD),
+                    new THREE.MeshLambertMaterial({ color: '#cbd5e1' })   // gris claro para diferenciarlo del maestro
+                );
+                secondaryBody.position.set(secondaryX, secondaryY, secondaryZ);
+                secondaryMasterGroup.add(secondaryBody);
+                const secondaryEdges = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(new THREE.BoxGeometry(mW, mH, mD)), lineMat
+                );
+                secondaryEdges.position.set(secondaryX, secondaryY, secondaryZ);
+                secondaryMasterGroup.add(secondaryEdges);
+                // LED de estado (verde) — cara hacia el interior del shelter (-X)
+                const secondaryLed = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.04, 8, 6),
+                    new THREE.MeshBasicMaterial({ color: TH_COLOR.titular })
+                );
+                secondaryLed.position.set(secondaryX - mW/2 - 0.008, secondaryY + mH/2 - 0.15, secondaryZ);
+                secondaryMasterGroup.add(secondaryLed);
+                // Punto de salida de cables (rojo + verde por equipo) — sale POR ARRIBA
+                const secondaryOutputPos = new THREE.Vector3(secondaryX - 0.1, secondaryY + mH/2 + 0.05, secondaryZ);
 
                 // === Cloud (esferas puffy grandes, arriba a la izquierda del Master) ===
                 const cloudY = 8;
@@ -3983,7 +4014,7 @@
 
                 sceneObj.current = {
                     THREE, scene, camera, renderer,
-                    hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup,
+                    hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, secondaryMasterGroup, secondaryOutputPos,
                     heatMeshes, heatWaves, wifiRings, dataPackets, wallMeshes,
                     perimeterWisps, doorStreams, puddleGroup,
                     masterOutputPos, cloudPos,
@@ -5089,38 +5120,6 @@
                     };
                     _addPassBox(pos.z);
 
-                    // === TABLERO 2 — segundo gabinete a la par del esclavo ===
-                    // Al lado del tablero 1, en la misma pared, offset escW+gap = 0.45 m en canónico Z.
-                    // Tiene su propio par de elbows rojo + verde y su propia cajita de paso.
-                    // Representa el gabinete de conexiones / borneras donde el field wiring se une
-                    // a los cables locales antes de ir a la pass-box y cruzar la pared.
-                    const tab2_zOff = escW + 0.05;   // 45 cm de separación (borde a borde)
-                    const tab2_z    = pos.z + tab2_zOff;
-                    const body2 = new THREE.Mesh(bGeo, new THREE.MeshLambertMaterial({ color: '#e2e8f0' }));
-                    body2.position.set(interiorX, info.y, tab2_z); g.add(body2);
-                    const eds2 = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
-                    eds2.position.set(interiorX, info.y, tab2_z); g.add(eds2);
-                    // Gozne del tablero 2 (idéntico al 1 pero desplazado en Z)
-                    const hinge2 = new THREE.LineSegments(
-                        new THREE.BufferGeometry().setFromPoints([
-                            new THREE.Vector3(interiorX + (-outSign) * (escD/2 + 0.005), hingeY1, tab2_z - escW/2 + 0.04),
-                            new THREE.Vector3(interiorX + (-outSign) * (escD/2 + 0.005), hingeY2, tab2_z - escW/2 + 0.04)
-                        ]),
-                        new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.6 })
-                    );
-                    g.add(hinge2);
-                    // LED del tablero 2 (mismo color, distinta z)
-                    const led2 = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.03, 8, 6),
-                        new THREE.MeshBasicMaterial({ color: TH_COLOR.titular })
-                    );
-                    led2.position.set(interiorX + (-outSign) * (escD/2 + 0.008), info.y + escH/3, tab2_z + escW/3);
-                    g.add(led2);
-                    // Elbows rojo + verde del tablero 2 (con offset Z desplazado)
-                    _addElbow(conduitRedMat,   tab2_zOff - 0.10);   // ROJO — control (tablero 2)
-                    _addElbow(conduitGreenMat, tab2_zOff + 0.10);   // VERDE — sensores (tablero 2)
-                    // Cajita de paso 2 — a la altura yElbow, a la par del tablero 2, sobre la pared
-                    _addPassBox(tab2_z);
 
                     // === CAÑOS DE SENSORES (plateados) — solo HVAC ===
                     // Conectan el tablero con las dos rejillas interiores (INJ arriba, RET abajo).
@@ -5340,6 +5339,60 @@
                         const gland  = new THREE.Vector3(sideX + 0.015,      shoulderY,     wallZ_south);
                         buildStub([attach, knee, inside], gland, 'x', attach);
                     });
+
+                    // === CABLES ROJO + VERDE desde el TABLERO SECUNDARIO (pared este) ===
+                    // Un par (rojo control + verde sensores) por cada equipo, ruteados por la
+                    // cornisa desde el tablero secundario hasta la cajita de paso de cada esclavo.
+                    const _secOutput = obj.secondaryOutputPos;
+                    if (_secOutput) {
+                        const secRedMat   = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
+                        const secGreenMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
+                        const secRadius = 0.020;
+
+                        const _routeSecCable = (e, colorMat, zPairOffset) => {
+                            // Target: cajita de paso en la pared del equipo, a la altura yElbow
+                            const escTop = e.pos_canonical.y + escH/2;
+                            const yTarget = escTop - escH - 0.15;   // == y - escH/2 - 0.15 == yElbow
+                            let targetX, targetZ;
+                            if (e.wall === 'north')      { targetX = e.pos_canonical.z; targetZ = -roomD/2 + 0.15; }
+                            else if (e.wall === 'south') { targetX = -e.pos_canonical.z; targetZ = roomD/2 - 0.15; }
+                            else                          { targetX = roomW/2 - 0.15;   targetZ = e.pos_canonical.z; }  // east
+                            // Bundle vertical: cada cable tiene su Y offset ligero para no superponerse
+                            const bundleY = cableY + zPairOffset;
+
+                            const pts = [];
+                            pts.push(_secOutput.clone());
+                            // Sube por el costado del tablero secundario a la cornisa
+                            pts.push(new THREE.Vector3(_secOutput.x, bundleY, _secOutput.z + zPairOffset * 6));
+                            pts.push(new THREE.Vector3(wallX_east, bundleY, _secOutput.z + zPairOffset * 6));
+                            // Ruta perimetral según la pared del equipo
+                            if (e.wall === 'east') {
+                                pts.push(new THREE.Vector3(wallX_east, bundleY, e.pos_canonical.z));
+                            } else {
+                                // Va a NE o SE según wpZ del equipo
+                                const cornerZ = (targetZ < 0) ? wallZ_north : wallZ_south;
+                                pts.push(new THREE.Vector3(wallX_east, bundleY, cornerZ));
+                                pts.push(new THREE.Vector3(targetX,   bundleY, cornerZ));
+                            }
+                            // Baja al target (cajita de paso)
+                            pts.push(new THREE.Vector3(targetX, yTarget, targetZ));
+
+                            const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
+                            const tube = new THREE.Mesh(
+                                new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), secRadius, 8, false),
+                                colorMat
+                            );
+                            tube.castShadow = true;
+                            cableGroup.add(tube);
+                        };
+
+                        esclavoData.forEach((e, i) => {
+                            // Cada equipo tiene un par (rojo + verde) con offsets Y ligeros para bundle
+                            const baseOff = 0.03 * (i - (esclavoData.length - 1) / 2);
+                            _routeSecCable(e, secRedMat,   baseOff - 0.015);
+                            _routeSecCable(e, secGreenMat, baseOff + 0.015);
+                        });
+                    }
                 }
 
                 // === TOPOLOGÍA CENTRALIZADA (comparación argumental EcoMonitor vs Central) ===
@@ -5567,9 +5620,10 @@
                 const obj = sceneObj.current;
                 if (!obj) return;
                 const isEco = topologyMode !== 'centralizado';
-                if (obj.cableGroup)        obj.cableGroup.visible = isEco;
-                if (obj.centralizedGroup)  obj.centralizedGroup.visible = !isEco;
-                if (obj.esclavoAssemblies) obj.esclavoAssemblies.forEach(a => { if (a) a.visible = isEco; });
+                if (obj.cableGroup)          obj.cableGroup.visible = isEco;
+                if (obj.centralizedGroup)    obj.centralizedGroup.visible = !isEco;
+                if (obj.secondaryMasterGroup) obj.secondaryMasterGroup.visible = isEco;
+                if (obj.esclavoAssemblies)   obj.esclavoAssemblies.forEach(a => { if (a) a.visible = isEco; });
             }, [topologyMode, hvacUnits, presUnits]);
 
 
