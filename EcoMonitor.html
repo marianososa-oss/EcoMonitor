@@ -2835,42 +2835,8 @@
                     return s - Math.floor(s);
                 };
 
-                // === MATAS DE COIRÓN — tussock patagónico, tan/verde-amarillento ===
-                // Cono achatado con vértices desplazados hacia afuera → "penacho" en vez de cono liso.
-                const tuftColors = ['#8f8552', '#a09660', '#7a7148', '#96895a', '#b0a370', '#867844'].map(c => new THREE.Color(c));
-                for (let i = 0; i < 90; i++) {
-                    const angle = seedRand(i * 5 + 400) * Math.PI * 2;
-                    const dist = 8 + seedRand(i * 5 + 401) * 60;
-                    const x = Math.cos(angle) * dist;
-                    const z = Math.sin(angle) * dist;
-                    // Evitar zona del slab (radio ~7.5 desde origen)
-                    if (Math.abs(x) < 8 && Math.abs(z) < 6) continue;
-                    const h = 0.18 + seedRand(i * 5 + 402) * 0.22;   // altura 0.18–0.40 m
-                    const r = 0.14 + seedRand(i * 5 + 403) * 0.10;   // radio 0.14–0.24 m
-                    const tuftGeo = new THREE.ConeGeometry(r, h, 7, 1, true);
-                    // Deformar cada vértice hacia afuera para look de mata desprolija
-                    const tPosT = tuftGeo.attributes.position;
-                    for (let v = 0; v < tPosT.count; v++) {
-                        const dx = (seedRand(i * 20 + v * 3) - 0.5) * 0.06;
-                        const dy = (seedRand(i * 20 + v * 3 + 1) - 0.5) * 0.03;
-                        const dz = (seedRand(i * 20 + v * 3 + 2) - 0.5) * 0.06;
-                        tPosT.setXYZ(v, tPosT.getX(v) + dx, tPosT.getY(v) + dy, tPosT.getZ(v) + dz);
-                    }
-                    tuftGeo.computeVertexNormals();
-                    const tuft = new THREE.Mesh(
-                        tuftGeo,
-                        new THREE.MeshLambertMaterial({
-                            color: tuftColors[Math.floor(seedRand(i * 29) * tuftColors.length)],
-                            side: THREE.DoubleSide
-                        })
-                    );
-                    tuft.position.set(x, terrainHeightAt(x, z) + h * 0.45, z);
-                    tuft.rotation.y = seedRand(i * 31) * Math.PI * 2;
-                    tuft.rotation.z = (seedRand(i * 37) - 0.5) * 0.15;  // leve inclinación (viento)
-                    tuft.castShadow = true;
-                    tuft.receiveShadow = true;
-                    scene.add(tuft);
-                }
+                // (Matas de coirón removidas — se veían como triangulitos flotantes en vez de matas.
+                //  El terreno queda liso ahora, sin vegetación aleatoria.)
 
                 // (Montañas removidas por simplicidad — el horizonte ahora lo absorbe la fog del cielo)
 
