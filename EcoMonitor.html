@@ -5206,7 +5206,7 @@
 
                     // Cable PEGADO A LA PARED: horizontal siempre pinneado a la esquina pared-techo,
                     // bajadas verticales por la pared hasta cada esclavo. Cero diagonales por el aire.
-                    const cableOffset = 0.12;   // separación del cable respecto a la pared
+                    const cableOffset = 0.05;   // PEGADO A LA PARED — antes 0.12, ahora 5 cm interior
                     const wallZ_north = -roomD/2 + cableOffset;
                     const wallX_east  =  roomW/2 - cableOffset;
                     const wallZ_south =  roomD/2 - cableOffset;
@@ -5350,10 +5350,10 @@
                 //  - Equipos en pared SUR + mitad sur del ESTE      → cables por el lado DERECHO
                 //    del master (cara +Z, hacia la pared sur)
                 // Cada cable recorre el perímetro hasta el equipo y baja via cajita de paso.
-                const _c_wallZ_north = -roomD/2 + 0.12;
-                const _c_wallZ_south =  roomD/2 - 0.12;
-                const _c_wallX_east  =  roomW/2 - 0.12;
-                const _c_wallX_west  = -roomW/2 + 0.12;
+                const _c_wallZ_north = -roomD/2 + 0.08;   // PEGADO A LA PARED — 8 cm (bundle azul es gordo)
+                const _c_wallZ_south =  roomD/2 - 0.08;
+                const _c_wallX_east  =  roomW/2 - 0.08;
+                const _c_wallX_west  = -roomW/2 + 0.08;
                 const _c_cableRadius = 0.055;   // MUCHO más grueso — cada caño carga 30 hilos (sensores + control)
                 const _c_bundleGap   = 0.130;   // más separación entre cables adyacentes para que el bundle se lea bien
                 // Hilos por equipo en el cálculo de metros lineales de HILO
@@ -5453,16 +5453,15 @@
                             midPt          = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ);
                         }
 
-                        // Trayectoria: master (COSTADO a media altura) → sale HORIZONTAL → sube a cornisa
+                        // Trayectoria: master (COSTADO a media altura) → HACIA LA PARED → sube pegado a la pared
                         // → recorre pared oeste hasta esquina → pared del equipo → RODEA la rejilla
                         // → baja a media altura entre rejillas → entra a la cajita de paso
                         const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
                         const pts = [];
                         pts.push(startPt);
-                        // Sale HORIZONTALMENTE del costado (mismo Y de salida)
-                        pts.push(new THREE.Vector3(_c_masterX_out + 0.15, _c_masterY_out, startZ));
-                        // Sube al bundle (cornisa)
-                        pts.push(new THREE.Vector3(_c_masterX_out + 0.15, bundleY, startZ));
+                        // Route TOWARD the wall (X-wise) manteniendo el mismo Y
+                        pts.push(new THREE.Vector3(_c_wallX_west, _c_masterY_out, startZ));
+                        // Sube al bundle (cornisa) PEGADO A LA PARED
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, startZ));
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, cornerZ));
                         if (eq.wall === 'east') {
@@ -5549,10 +5548,9 @@
                         const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
                         const pts = [];
                         pts.push(startPt);
-                        // Sale HORIZONTALMENTE del costado del tablero secundario (mismo Y de salida)
-                        pts.push(new THREE.Vector3(_sec_X - 0.15, _sec_faceY, startZ));
-                        // Sube al bundle (cornisa)
-                        pts.push(new THREE.Vector3(_sec_X - 0.15, bundleY, startZ));
+                        // Route TOWARD the east wall (X-wise) — mismo Y de salida
+                        pts.push(new THREE.Vector3(_c_wallX_east, _sec_faceY, startZ));
+                        // Sube al bundle (cornisa) PEGADO A LA PARED este
                         pts.push(new THREE.Vector3(_c_wallX_east, bundleY, startZ));
                         // Va a la esquina correspondiente
                         if (eq.wall === 'east') {
