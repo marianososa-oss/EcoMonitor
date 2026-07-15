@@ -2828,65 +2828,12 @@
                 terrain.receiveShadow = true;
                 scene.add(terrain);
 
-                // === PIEDRAS realistas (icosahedron detail=1, más caras, formas variadas) ===
-                const rockColors = ['#8a7a5e', '#9a8a6e', '#7a6850', '#6e5e48', '#a59478', '#5e4f3a', '#7e6f55', '#615240'].map(c => new THREE.Color(c));
+                // (Piedras removidas — no quedaban bien visualmente. Se mantiene el seedRand helper
+                //  porque las matas de coirón y otros elementos abajo lo usan.)
                 const seedRand = (n) => {
                     const s = Math.sin(n * 9241.327) * 43758.5453;
                     return s - Math.floor(s);
                 };
-                // 280 piedras más realistas: detail=2, deformación elipsoidal + irregular,
-                // achatadas en eje vertical (las piedras reales no son esferas)
-                for (let i = 0; i < 280; i++) {
-                    const angle = seedRand(i * 3 + 1) * Math.PI * 2;
-                    const dist = 9 + seedRand(i * 3 + 2) * 90;
-                    const x = Math.cos(angle) * dist;
-                    const z = Math.sin(angle) * dist;
-                    // Tamaños: 50% chicas, 35% medianas, 15% grandes
-                    const sizeRoll = seedRand(i * 3 + 3);
-                    let size;
-                    if (sizeRoll < 0.5)      size = 0.08 + seedRand(i * 5) * 0.16;
-                    else if (sizeRoll < 0.85) size = 0.22 + seedRand(i * 5) * 0.32;
-                    else                     size = 0.50 + seedRand(i * 5) * 0.55;
-                    // Detail=2 → 320 caras, muy suave
-                    const geo = new THREE.IcosahedronGeometry(size, 2);
-                    // Ejes elipsoidales: más anchas que altas (piedra real)
-                    const scaleX = 0.85 + seedRand(i * 71) * 0.5;
-                    const scaleY = 0.55 + seedRand(i * 73) * 0.35;  // achatada
-                    const scaleZ = 0.85 + seedRand(i * 79) * 0.5;
-                    const rPos = geo.attributes.position;
-                    for (let v = 0; v < rPos.count; v++) {
-                        const sx = rPos.getX(v), sy = rPos.getY(v), sz = rPos.getZ(v);
-                        // Noise multi-frecuencia para superficie irregular pero suave
-                        const big   = (seedRand(i * 100 + v * 7) - 0.5) * 0.30;
-                        const med   = (seedRand(i * 200 + v * 11) - 0.5) * 0.18;
-                        const fine  = (seedRand(i * 300 + v * 17) - 0.5) * 0.08;
-                        const def   = big + med + fine;
-                        rPos.setXYZ(
-                            v,
-                            sx * scaleX * (1 + def),
-                            sy * scaleY * (1 + def * 0.6),
-                            sz * scaleZ * (1 + def * 0.85)
-                        );
-                    }
-                    geo.computeVertexNormals();
-                    const rock = new THREE.Mesh(
-                        geo,
-                        new THREE.MeshLambertMaterial({
-                            color: rockColors[Math.floor(seedRand(i * 23) * rockColors.length)],
-                            flatShading: false  // suave (las piedras desgastadas no son facetadas)
-                        })
-                    );
-                    // Pegada al terreno real (muestreado) — la mitad inferior queda enterrada
-                    rock.position.set(x, terrainHeightAt(x, z) + size * scaleY * 0.10, z);
-                    rock.rotation.set(
-                        seedRand(i * 13) * Math.PI * 2,
-                        seedRand(i * 17) * Math.PI * 2,
-                        seedRand(i * 19) * Math.PI * 2
-                    );
-                    rock.castShadow = true;
-                    rock.receiveShadow = true;
-                    scene.add(rock);
-                }
 
                 // === MATAS DE COIRÓN — tussock patagónico, tan/verde-amarillento ===
                 // Cono achatado con vértices desplazados hacia afuera → "penacho" en vez de cono liso.
