@@ -5518,21 +5518,35 @@
                     const _sec_facePosZ_south =  _sec_mD/2 + 0.02;
                     const _sec_faceY          = _sec_Y;   // MEDIA altura del cuerpo del tablero — salida por el costado, no arriba
 
+                    // OPUESTO al azul: el azul bypassa por -X (norte), +X (sur), +Z (este).
+                    // Los rojo/verde bypassan por el LADO CONTRARIO: +X (norte), -X (sur), -Z (este).
+                    // Y aterrizan en una cajita distinta (caj2), separada del azul.
+                    const _opp_offset = 0.50;   // mismo sideOffset del azul, aplicado al lado opuesto
+                    const _caj2_offset = 0.35;   // separación entre caj1 (bundle azul) y caj2 (rojo/verde)
+
                     const _routeSecCable = (eq, colorMat, pairIdx, groupSize, sideKey) => {
                         const yOff = (pairIdx - (groupSize - 1) / 2) * 0.032;
                         const bundleY = cableYCornisa + yOff;
                         const startZ = (sideKey === 'north') ? _sec_facePosZ_north : _sec_facePosZ_south;
                         const startPt = new THREE.Vector3(_sec_X, _sec_faceY, startZ);
 
-                        // Target: sobre la pared del equipo, a media altura entre rejillas
-                        let targetX, targetZ;
-                        if (eq.wall === 'north')      { targetX = eq.wpX; targetZ = _c_wallZ_north; }
-                        else if (eq.wall === 'south') { targetX = eq.wpX; targetZ = _c_wallZ_south; }
-                        else                          { targetX = _c_wallX_east; targetZ = eq.wpZ; }
-                        const yTarget = eq.y;
+                        // Punto lateral OPUESTO al azul y punto de entrada a caj2
+                        let bypassBundlePt, bypassMidPt, caj2Pt;
+                        if (eq.wall === 'north') {
+                            bypassBundlePt = new THREE.Vector3(eq.wpX + _opp_offset, bundleY, _c_wallZ_north);
+                            bypassMidPt    = new THREE.Vector3(eq.wpX + _opp_offset, eq.y,   _c_wallZ_north);
+                            caj2Pt         = new THREE.Vector3(eq.wpX + _caj2_offset, eq.y,  _c_wallZ_north);
+                        } else if (eq.wall === 'south') {
+                            bypassBundlePt = new THREE.Vector3(eq.wpX - _opp_offset, bundleY, _c_wallZ_south);
+                            bypassMidPt    = new THREE.Vector3(eq.wpX - _opp_offset, eq.y,   _c_wallZ_south);
+                            caj2Pt         = new THREE.Vector3(eq.wpX - _caj2_offset, eq.y,  _c_wallZ_south);
+                        } else {   // east
+                            bypassBundlePt = new THREE.Vector3(_c_wallX_east, bundleY, eq.wpZ - _opp_offset);
+                            bypassMidPt    = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ - _opp_offset);
+                            caj2Pt         = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ - _caj2_offset);
+                        }
 
                         const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
-
                         const pts = [];
                         pts.push(startPt);
                         // Sale HORIZONTALMENTE del costado del tablero secundario (mismo Y de salida)
@@ -5541,16 +5555,18 @@
                         pts.push(new THREE.Vector3(_sec_X - 0.15, bundleY, startZ));
                         pts.push(new THREE.Vector3(_c_wallX_east, bundleY, startZ));
                         // Va a la esquina correspondiente
-                        if (eq.wall !== 'east' || (sideKey === 'north' && eq.wpZ < 0) === false) {
-                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, cornerZ));
-                        }
-                        // Si es east wall, va directo por la pared este; si no, corre por norte/sur
                         if (eq.wall === 'east') {
-                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, eq.wpZ));
+                            // Directo por pared este: no hace corner, va al bypass Z
+                            // (bypassBundlePt ya tiene la Z opuesta al azul)
+                            pts.push(bypassBundlePt);
                         } else {
-                            pts.push(new THREE.Vector3(targetX, bundleY, cornerZ));
+                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, cornerZ));
+                            pts.push(bypassBundlePt);
                         }
-                        pts.push(new THREE.Vector3(targetX, yTarget, targetZ));
+                        // Baja pegado a la pared por el LADO OPUESTO al azul
+                        pts.push(bypassMidPt);
+                        // Entra a la caj2 (a 35 cm de la caj1 sobre la pared)
+                        pts.push(caj2Pt);
 
                         const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
                         const tube = new THREE.Mesh(
@@ -5573,12 +5589,12 @@
                         _routeSecCable(eq, _secRedMat,   i * 2,     _secSouthEq.length * 2, 'south');
                         _routeSecCable(eq, _secGreenMat, i * 2 + 1, _secSouthEq.length * 2, 'south');
                     });
-                    // Cajita de paso auxiliar por equipo (rojo + verde terminan ahí, al lado de la del bundle azul)
+                    // Cajita de paso 2 por equipo, ubicada en la POSICIÓN OPUESTA a la caj1 del azul
                     allEquip.forEach(eq => {
                         let cajX, cajZ;
-                        if (eq.wall === 'north')      { cajX = eq.wpX + 0.16; cajZ = _c_wallZ_north; }
-                        else if (eq.wall === 'south') { cajX = eq.wpX - 0.16; cajZ = _c_wallZ_south; }
-                        else                          { cajX = _c_wallX_east; cajZ = eq.wpZ + 0.16; }
+                        if (eq.wall === 'north')      { cajX = eq.wpX + _caj2_offset; cajZ = _c_wallZ_north; }
+                        else if (eq.wall === 'south') { cajX = eq.wpX - _caj2_offset; cajZ = _c_wallZ_south; }
+                        else                          { cajX = _c_wallX_east; cajZ = eq.wpZ - _caj2_offset; }
                         const caj2 = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.14, 0.08), _secCajitaMat);
                         caj2.position.set(cajX, eq.y, cajZ);
                         centralizedGroup.add(caj2);
