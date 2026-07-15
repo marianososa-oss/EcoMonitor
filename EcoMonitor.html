@@ -5340,59 +5340,6 @@
                         buildStub([attach, knee, inside], gland, 'x', attach);
                     });
 
-                    // === CABLES ROJO + VERDE desde el TABLERO SECUNDARIO (pared este) ===
-                    // Un par (rojo control + verde sensores) por cada equipo, ruteados por la
-                    // cornisa desde el tablero secundario hasta la cajita de paso de cada esclavo.
-                    const _secOutput = obj.secondaryOutputPos;
-                    if (_secOutput) {
-                        const secRedMat   = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
-                        const secGreenMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
-                        const secRadius = 0.020;
-
-                        const _routeSecCable = (e, colorMat, zPairOffset) => {
-                            // Target: cajita de paso en la pared del equipo, a la altura yElbow
-                            const escTop = e.pos_canonical.y + escH/2;
-                            const yTarget = escTop - escH - 0.15;   // == y - escH/2 - 0.15 == yElbow
-                            let targetX, targetZ;
-                            if (e.wall === 'north')      { targetX = e.pos_canonical.z; targetZ = -roomD/2 + 0.15; }
-                            else if (e.wall === 'south') { targetX = -e.pos_canonical.z; targetZ = roomD/2 - 0.15; }
-                            else                          { targetX = roomW/2 - 0.15;   targetZ = e.pos_canonical.z; }  // east
-                            // Bundle vertical: cada cable tiene su Y offset ligero para no superponerse
-                            const bundleY = cableY + zPairOffset;
-
-                            const pts = [];
-                            pts.push(_secOutput.clone());
-                            // Sube por el costado del tablero secundario a la cornisa
-                            pts.push(new THREE.Vector3(_secOutput.x, bundleY, _secOutput.z + zPairOffset * 6));
-                            pts.push(new THREE.Vector3(wallX_east, bundleY, _secOutput.z + zPairOffset * 6));
-                            // Ruta perimetral según la pared del equipo
-                            if (e.wall === 'east') {
-                                pts.push(new THREE.Vector3(wallX_east, bundleY, e.pos_canonical.z));
-                            } else {
-                                // Va a NE o SE según wpZ del equipo
-                                const cornerZ = (targetZ < 0) ? wallZ_north : wallZ_south;
-                                pts.push(new THREE.Vector3(wallX_east, bundleY, cornerZ));
-                                pts.push(new THREE.Vector3(targetX,   bundleY, cornerZ));
-                            }
-                            // Baja al target (cajita de paso)
-                            pts.push(new THREE.Vector3(targetX, yTarget, targetZ));
-
-                            const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
-                            const tube = new THREE.Mesh(
-                                new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), secRadius, 8, false),
-                                colorMat
-                            );
-                            tube.castShadow = true;
-                            cableGroup.add(tube);
-                        };
-
-                        esclavoData.forEach((e, i) => {
-                            // Cada equipo tiene un par (rojo + verde) con offsets Y ligeros para bundle
-                            const baseOff = 0.03 * (i - (esclavoData.length - 1) / 2);
-                            _routeSecCable(e, secRedMat,   baseOff - 0.015);
-                            _routeSecCable(e, secGreenMat, baseOff + 0.015);
-                        });
-                    }
                 }
 
                 // === TOPOLOGÍA CENTRALIZADA (comparación argumental EcoMonitor vs Central) ===
@@ -5547,6 +5494,66 @@
 
                     northSideEq.forEach((eq, idx) => _buildCable(eq, idx, northSideEq.length, 'north'));
                     southSideEq.forEach((eq, idx) => _buildCable(eq, idx, southSideEq.length, 'south'));
+
+                    // === CABLES ROJO + VERDE desde el TABLERO SECUNDARIO ===
+                    // En modo Central, además del bundle de 30 hilos que sale del master, hay un
+                    // TABLERO SECUNDARIO en la pared este (frente al master). De él sale un par
+                    // rojo (control) + verde (sensores) por CADA equipo, corriendo por la cornisa
+                    // hasta cada cajita de paso. Suma más metros al total centralizado.
+                    const _secRedMat   = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
+                    const _secGreenMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
+                    const _secOutput = obj.secondaryOutputPos;
+                    const _secCajitaMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
+                    if (_secOutput) {
+                        const _routeSecCable = (eq, colorMat, pairIdx, groupSize) => {
+                            const yOff = (pairIdx - (groupSize - 1) / 2) * 0.05;
+                            const bundleY = cableYCornisa + yOff;
+                            // Target: sobre la pared, a media altura entre rejillas (eq.y)
+                            let targetX, targetZ;
+                            if (eq.wall === 'north')      { targetX = eq.wpX; targetZ = _c_wallZ_north; }
+                            else if (eq.wall === 'south') { targetX = eq.wpX; targetZ = _c_wallZ_south; }
+                            else                          { targetX = _c_wallX_east; targetZ = eq.wpZ; }
+                            const yTarget = eq.y;   // media altura entre rejillas
+
+                            const pts = [];
+                            pts.push(_secOutput.clone());
+                            // Sube por el costado del tablero secundario a la cornisa
+                            pts.push(new THREE.Vector3(_secOutput.x - 0.15, bundleY, _secOutput.z));
+                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, _secOutput.z));
+                            // Ruta perimetral según pared del equipo
+                            if (eq.wall === 'east') {
+                                pts.push(new THREE.Vector3(_c_wallX_east, bundleY, eq.wpZ));
+                            } else {
+                                const cornerZ = (targetZ < 0) ? _c_wallZ_north : _c_wallZ_south;
+                                pts.push(new THREE.Vector3(_c_wallX_east, bundleY, cornerZ));
+                                pts.push(new THREE.Vector3(targetX,       bundleY, cornerZ));
+                            }
+                            // Baja al target (cajita de paso, entre rejillas)
+                            pts.push(new THREE.Vector3(targetX, yTarget, targetZ));
+
+                            const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
+                            const tube = new THREE.Mesh(
+                                new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.020, 8, false),
+                                colorMat
+                            );
+                            tube.castShadow = true;
+                            centralizedGroup.add(tube);
+                            centralizadoTotalMeters += curve.getLength();
+                        };
+
+                        allEquip.forEach((eq, i) => {
+                            _routeSecCable(eq, _secRedMat,   i * 2,     allEquip.length * 2);
+                            _routeSecCable(eq, _secGreenMat, i * 2 + 1, allEquip.length * 2);
+                            // Cajita secundaria de paso (a la par de la del bundle azul) — pegada a la de arriba
+                            let cajX, cajZ;
+                            if (eq.wall === 'north')      { cajX = eq.wpX + 0.16; cajZ = _c_wallZ_north; }
+                            else if (eq.wall === 'south') { cajX = eq.wpX - 0.16; cajZ = _c_wallZ_south; }
+                            else                          { cajX = _c_wallX_east; cajZ = eq.wpZ + 0.16; }
+                            const caj2 = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.14, 0.08), _secCajitaMat);
+                            caj2.position.set(cajX, eq.y, cajZ);
+                            centralizedGroup.add(caj2);
+                        });
+                    }
                 }
 
                 // === MEDIR METROS DE HILO ECOMONITOR ===
@@ -5615,15 +5622,15 @@
                 obj.setSceneThemeOverride(sceneTheme || 'auto');
             }, [sceneTheme]);
 
-            // Topología: alterna visibilidad entre EcoMonitor (troncal + esclavos) y Centralizado (N cables individuales)
+            // Topología: alterna visibilidad entre EcoMonitor (troncal + esclavos) y Centralizado (tablero secundario + N cables)
             useEffect(() => {
                 const obj = sceneObj.current;
                 if (!obj) return;
                 const isEco = topologyMode !== 'centralizado';
-                if (obj.cableGroup)          obj.cableGroup.visible = isEco;
-                if (obj.centralizedGroup)    obj.centralizedGroup.visible = !isEco;
-                if (obj.secondaryMasterGroup) obj.secondaryMasterGroup.visible = isEco;
-                if (obj.esclavoAssemblies)   obj.esclavoAssemblies.forEach(a => { if (a) a.visible = isEco; });
+                if (obj.cableGroup)           obj.cableGroup.visible = isEco;
+                if (obj.centralizedGroup)     obj.centralizedGroup.visible = !isEco;
+                if (obj.secondaryMasterGroup) obj.secondaryMasterGroup.visible = !isEco;   // en modo Central
+                if (obj.esclavoAssemblies)    obj.esclavoAssemblies.forEach(a => { if (a) a.visible = isEco; });
             }, [topologyMode, hvacUnits, presUnits]);
 
 
