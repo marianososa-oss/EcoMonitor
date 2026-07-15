@@ -3756,15 +3756,19 @@
                     new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 })
                 );
                 scene.add(screenFrame);
-                // LEDs status debajo de la pantalla
-                const ledMat = new THREE.MeshBasicMaterial({ color: TH_COLOR.titular });
-                const led1 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), ledMat);
+                // LEDs status debajo de la pantalla — con emissive para que BRILLEN (ACES tone mapping los infla como bloom)
+                const _mkLed = (color, intensity) => new THREE.MeshStandardMaterial({
+                    color, emissive: color, emissiveIntensity: intensity,
+                    metalness: 0, roughness: 0.35
+                });
+                const led1 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), _mkLed(TH_COLOR.titular, 2.2));
                 led1.position.set(masterX + mW/2 + 0.008, masterY - 0.55, masterZ - 0.18);
                 scene.add(led1);
-                const led2 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), new THREE.MeshBasicMaterial({ color: TH_COLOR.masterAccent }));
+                const led2 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), _mkLed(TH_COLOR.masterAccent, 2.2));
                 led2.position.set(masterX + mW/2 + 0.008, masterY - 0.55, masterZ + 0);
                 scene.add(led2);
-                const led3 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), new THREE.MeshBasicMaterial({ color: '#475569' }));
+                // led3 (gris apagado) — no emissive, es un LED "off"
+                const led3 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.2, roughness: 0.6 }));
                 led3.position.set(masterX + mW/2 + 0.008, masterY - 0.55, masterZ + 0.18);
                 scene.add(led3);
                 // Punto de salida del cable Modbus: ARRIBA del master (sale por el TOP)
@@ -3788,10 +3792,10 @@
                 );
                 secondaryEdges.position.set(secondaryX, secondaryY, secondaryZ);
                 secondaryMasterGroup.add(secondaryEdges);
-                // LED de estado (verde) — cara hacia el interior del shelter (-X)
+                // LED de estado (verde con emissive) — cara hacia el interior del shelter (-X)
                 const secondaryLed = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.04, 8, 6),
-                    new THREE.MeshBasicMaterial({ color: TH_COLOR.titular })
+                    new THREE.SphereGeometry(0.04, 12, 10),
+                    new THREE.MeshStandardMaterial({ color: TH_COLOR.titular, emissive: TH_COLOR.titular, emissiveIntensity: 2.2, metalness: 0, roughness: 0.35 })
                 );
                 secondaryLed.position.set(secondaryX - mW/2 - 0.008, secondaryY + mH/2 - 0.15, secondaryZ);
                 secondaryMasterGroup.add(secondaryLed);
@@ -5059,10 +5063,10 @@
                         new THREE.LineBasicMaterial({ color: TH_COLOR.line, transparent: true, opacity: 0.6 })
                     );
                     g.add(hinge);
-                    // LED
+                    // LED con emissive — brilla como diodo real
                     const led = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.03, 8, 6),
-                        new THREE.MeshBasicMaterial({ color: TH_COLOR.titular })
+                        new THREE.SphereGeometry(0.03, 12, 10),
+                        new THREE.MeshStandardMaterial({ color: TH_COLOR.titular, emissive: TH_COLOR.titular, emissiveIntensity: 2.0, metalness: 0, roughness: 0.35 })
                     );
                     led.position.set(pos.x + (-outSign) * (escD/2 + 0.008), pos.y + escH/3, pos.z + escW/3);
                     g.add(led);
