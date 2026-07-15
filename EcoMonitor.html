@@ -2619,7 +2619,7 @@
         };
 
         // ===== Sala3D : Three.js shelter Neuquén con tableros Maestro+Esclavos =====
-        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible, sceneTheme, hmiValues, activeFaults, globalEvents, topologyMode, onCableMeters }) => {
+        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible, sceneTheme, hmiValues, activeFaults, globalEvents, topologyMode, onCableMeters, cutDemoActive, cutTargetId }) => {
             const containerRef = useRef(null);
             const canvasRef    = useRef(null);
             const sceneObj     = useRef(null);
@@ -5697,6 +5697,34 @@
                 if (obj.esclavoAssemblies)    obj.esclavoAssemblies.forEach(a => { if (a) a.visible = isEco; });
             }, [topologyMode, hvacUnits, presUnits]);
 
+            // Demo de FALLA: pinta el equipo target de rojo cuando el corte está activo (solo Central)
+            useEffect(() => {
+                const obj = sceneObj.current;
+                if (!obj || !obj.hvacInfo) return;
+                const allInfo = (obj.hvacInfo || []).concat(obj.presInfo || []);
+                allInfo.forEach(info => {
+                    if (!info.groupRef) return;
+                    const infoUnitId = info.groupRef.userData && info.groupRef.userData.unitId;
+                    const isTarget = cutDemoActive && infoUnitId === cutTargetId;
+                    const showCentralCut = isTarget && topologyMode === 'centralizado';
+                    info.groupRef.traverse(o => {
+                        if (o.isMesh && o.material && o.material.type === 'MeshStandardMaterial' && o.material.emissive) {
+                            if (o.material._origEmissive === undefined) {
+                                o.material._origEmissive = o.material.emissive.getHex();
+                                o.material._origEmissiveIntensity = o.material.emissiveIntensity || 0;
+                            }
+                            if (showCentralCut) {
+                                o.material.emissive.setHex(0xdc2626);
+                                o.material.emissiveIntensity = 0.5;
+                            } else {
+                                o.material.emissive.setHex(o.material._origEmissive);
+                                o.material.emissiveIntensity = o.material._origEmissiveIntensity;
+                            }
+                        }
+                    });
+                });
+            }, [cutDemoActive, cutTargetId, topologyMode, hvacUnits, presUnits]);
+
 
             // HMI del Master viva — redibuja el canvas texture cuando cambian los valores
             useEffect(() => {
@@ -5714,6 +5742,32 @@
                     <div className="absolute top-3 right-4 z-10 text-[10px] font-mono pointer-events-none" style={{ color: '#475569' }}>
                         {interiorVisible ? 'INTERIOR VISIBLE' : 'EXTERIOR CERRADO'}
                     </div>
+                    {/* Banner comparativo cuando la demo de falla está activa */}
+                    {cutDemoActive && cutTargetId && (
+                        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 pointer-events-none" style={{ minWidth: 380, maxWidth: '85%' }}>
+                            {topologyMode === 'centralizado' ? (
+                                <div className="bg-rose-900/95 border border-rose-500 rounded-lg px-3 py-2 shadow-2xl backdrop-blur-sm">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-rose-400 text-xs font-bold uppercase animate-pulse">⚠ Sistema caído</span>
+                                        <span className="text-white text-[10px] font-mono">{cutTargetId}</span>
+                                    </div>
+                                    <p className="text-rose-100 text-[11px] leading-tight">
+                                        <b>{cutTargetId} FUERA DE OPERACIÓN.</b> Un corte en el bundle centralizado deja al equipo <b>sin comunicación</b>. Sin tablero local, cualquier daño en el cable — animal, herramienta, humedad — genera <b>parada total</b> hasta reparar. Downtime real.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="bg-emerald-900/95 border border-eco-lightgreen rounded-lg px-3 py-2 shadow-2xl backdrop-blur-sm">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-eco-lightgreen text-xs font-bold uppercase">✓ Corte contenido</span>
+                                        <span className="text-white text-[10px] font-mono">{cutTargetId}</span>
+                                    </div>
+                                    <p className="text-emerald-100 text-[11px] leading-tight">
+                                        <b>{cutTargetId} SIGUE OPERANDO.</b> El corte se aísla al bus Modbus, pero el <b>tablero esclavo local</b> mantiene la operación autónoma del equipo con la última configuración cargada. Sin downtime — se puede reparar el cable en horario planificado.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <div className="absolute bottom-3 left-4 z-10 flex flex-wrap gap-3 text-[10px] font-bold tracking-widest font-mono pointer-events-none" style={{ color: '#475569' }}>
                         <span className="inline-flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', background: TH_COLOR.titular, borderRadius: '2px' }}></span>TITULAR</span>
                         <span className="inline-flex items-center gap-1.5"><span style={{ width: '8px', height: '8px', background: TH_COLOR.suplente, borderRadius: '2px' }}></span>SUPLENTE</span>
@@ -6099,6 +6153,25 @@
                 if (hvacBackup > maxBackup) setHvacBackup(maxBackup);
             };
 
+            // Demo de FALLA — simula corte de cable para mostrar la diferencia entre topologías
+            const [cutDemoActive, setCutDemoActive] = useState(false);
+            const cutTargetId = hvacUnits.length > 0 ? hvacUnits[0].id : null;
+
+            // Presets de escenario típicos (para demos rápidas al cliente)
+            const SCENARIO_PRESETS = [
+                { key: 'small',    label: 'Site chico',       hvacs: 2, pres: 0, backup: 1, desc: 'Instalación básica — 2 HVAC redundantes' },
+                { key: 'standard', label: 'Site estándar',    hvacs: 4, pres: 1, backup: 1, desc: 'Configuración típica — 4 HVAC + 1 PRES' },
+                { key: 'datacenter', label: 'Datacenter',     hvacs: 6, pres: 2, backup: 2, desc: 'Alta densidad — 6 HVAC + 2 PRES para carga crítica' },
+                { key: 'mining',   label: 'Minería / crítico', hvacs: 8, pres: 2, backup: 3, desc: '8 HVAC con máxima redundancia + 2 PRES' }
+            ];
+            const [scenariosOpen, setScenariosOpen] = useState(false);
+            const applyScenarioPreset = (p) => {
+                setHvacTotal(p.hvacs);
+                setPresTotal(p.pres);
+                setHvacBackup(p.backup);
+                setScenariosOpen(false);
+            };
+
             const advanceTime = () => {
                 const addedHours = PERIOD_HOURS[rotationPeriod];
                 const newTime = simulationTime + addedHours;
@@ -6235,6 +6308,35 @@
                             <button onClick={() => setTopologyMode('ecomonitor')}   className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${topologyMode === 'ecomonitor'   ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>EcoMonitor</button>
                             <button onClick={() => setTopologyMode('centralizado')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${topologyMode === 'centralizado' ? 'bg-amber-400 text-slate-900'      : 'text-slate-400 hover:text-white'}`}>Central</button>
                         </div>
+                        {/* Preset de escenario — 1 click cambia HVAC + PRES + backup a una configuración típica */}
+                        <div className="relative">
+                            <button onClick={() => setScenariosOpen(v => !v)} className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase text-slate-300 hover:text-white hover:border-eco-lightgreen/50" title="Cargar configuración de shelter">
+                                <Icon name="layout-grid" size={11} /> Escenario
+                            </button>
+                            {scenariosOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setScenariosOpen(false)}></div>
+                                    <div className="absolute top-full left-0 mt-1 z-50 bg-slate-950 border border-slate-700 rounded-lg shadow-2xl w-64 p-1">
+                                        {SCENARIO_PRESETS.map(p => {
+                                            const isCurrent = hvacTotal === p.hvacs && presTotal === p.pres && hvacBackup === p.backup;
+                                            return (
+                                                <button
+                                                    key={p.key}
+                                                    onClick={() => applyScenarioPreset(p)}
+                                                    className={`w-full text-left px-2 py-1.5 rounded hover:bg-slate-800/70 transition-colors ${isCurrent ? 'bg-eco-lightgreen/15 border border-eco-lightgreen/40' : ''}`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className={`text-[11px] font-bold ${isCurrent ? 'text-eco-lightgreen' : 'text-white'}`}>{p.label}</span>
+                                                        <span className="text-[9px] font-mono text-slate-500">{p.hvacs}H · {p.pres}P</span>
+                                                    </div>
+                                                    <div className="text-[9px] text-slate-400 mt-0.5">{p.desc}</div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                         {cableMeters && cableMeters.ecomonitor > 0 && (
                             <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${topologyMode === 'ecomonitor' ? 'border-eco-lightgreen' : 'border-amber-400'}`} title="Metros lineales de HILO (largo del caño × cantidad de hilos que lleva adentro — 30 hilos por equipo + 2 Modbus)">
                                 <span className="text-[9px] font-bold text-slate-500 uppercase">Cable</span>
@@ -6246,6 +6348,15 @@
                                 )}
                             </div>
                         )}
+                        {/* Demo de falla — muestra cómo reacciona cada topología a un corte de cable */}
+                        <button
+                            onClick={() => setCutDemoActive(v => !v)}
+                            disabled={!cutTargetId}
+                            className={`border rounded-lg px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase transition-colors ${cutDemoActive ? 'bg-rose-600 border-rose-500 text-white animate-pulse' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-rose-500/50 hover:text-rose-300'}`}
+                            title="Simula un corte de cable en HVAC-1 para comparar la resiliencia entre EcoMonitor y Central"
+                        >
+                            <Icon name={cutDemoActive ? 'zap-off' : 'scissors'} size={11} /> {cutDemoActive ? 'Reparar' : 'Simular corte'}
+                        </button>
 
                         <div className="hidden md:block w-px h-6 bg-slate-800 mx-1"></div>
 
@@ -6353,6 +6464,8 @@
                                 globalEvents={globalEvents}
                                 topologyMode={topologyMode}
                                 onCableMeters={setCableMeters}
+                                cutDemoActive={cutDemoActive}
+                                cutTargetId={cutTargetId}
                                 hmiValues={{
                                     salaTemp:  telemetry.salaTemp,
                                     humidity:  telemetry.salaHumidity,
