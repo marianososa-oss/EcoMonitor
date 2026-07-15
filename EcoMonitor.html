@@ -5363,12 +5363,11 @@
                 let   centralizadoTotalMeters = 0;
 
                 // Anchor points en los COSTADOS del master (master está en pared oeste, Z=0, mD=0.9)
-                // - Lado NORTE del master (cara -Z, hacia pared norte)
-                // - Lado SUR  del master (cara +Z, hacia pared sur)
-                const _c_masterX_out = -roomW/2 + 0.35 + 0.02;     // apenas más adentro que la cara este del master
-                const _c_masterY_out = 2.21 + 0.9 + 1.7 - 0.20;    // ~15 cm bajo el techo del master
-                const _c_masterZ_northFace = -0.45 - 0.02;         // -mD/2 - clearance
-                const _c_masterZ_southFace =  0.45 + 0.02;         // +mD/2 + clearance
+                // Salen POR LA CARA LATERAL a MEDIA ALTURA — se ve claramente que emerge por el costado
+                const _c_masterX_out = -roomW/2 + 0.35 + 0.02;                     // apenas más adentro que la cara este del master
+                const _c_masterY_out = (2.21 + 0.9) + 1.7 / 2;                     // MEDIA altura del cuerpo del master
+                const _c_masterZ_northFace = -0.45 - 0.02;                         // -mD/2 - clearance
+                const _c_masterZ_southFace =  0.45 + 0.02;                         // +mD/2 + clearance
 
                 // Clasificar cada equipo: sale por lado NORTE o SUR del master
                 const allEquip = [];
@@ -5454,13 +5453,16 @@
                             midPt          = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ);
                         }
 
-                        // Trayectoria completa: master(costado) → sube al bundle → corre por pared oeste
-                        // hasta esquina → corre por pared del equipo → RODEA la rejilla por el costado
+                        // Trayectoria: master (COSTADO a media altura) → sale HORIZONTAL → sube a cornisa
+                        // → recorre pared oeste hasta esquina → pared del equipo → RODEA la rejilla
                         // → baja a media altura entre rejillas → entra a la cajita de paso
                         const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
                         const pts = [];
                         pts.push(startPt);
-                        pts.push(new THREE.Vector3(_c_masterX_out - 0.2, bundleY, startZ));
+                        // Sale HORIZONTALMENTE del costado (mismo Y de salida)
+                        pts.push(new THREE.Vector3(_c_masterX_out + 0.15, _c_masterY_out, startZ));
+                        // Sube al bundle (cornisa)
+                        pts.push(new THREE.Vector3(_c_masterX_out + 0.15, bundleY, startZ));
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, startZ));
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, cornerZ));
                         if (eq.wall === 'east') {
@@ -5514,7 +5516,7 @@
                     const _sec_Y  = _sec_mH/2 + 0.9 + 2.21;
                     const _sec_facePosZ_north = -_sec_mD/2 - 0.02;
                     const _sec_facePosZ_south =  _sec_mD/2 + 0.02;
-                    const _sec_faceY          = _sec_Y + _sec_mH/2 - 0.10;   // 10 cm bajo el techo del tablero
+                    const _sec_faceY          = _sec_Y;   // MEDIA altura del cuerpo del tablero — salida por el costado, no arriba
 
                     const _routeSecCable = (eq, colorMat, pairIdx, groupSize, sideKey) => {
                         const yOff = (pairIdx - (groupSize - 1) / 2) * 0.032;
@@ -5533,7 +5535,9 @@
 
                         const pts = [];
                         pts.push(startPt);
-                        // Sube por el costado del tablero secundario a la cornisa
+                        // Sale HORIZONTALMENTE del costado del tablero secundario (mismo Y de salida)
+                        pts.push(new THREE.Vector3(_sec_X - 0.15, _sec_faceY, startZ));
+                        // Sube al bundle (cornisa)
                         pts.push(new THREE.Vector3(_sec_X - 0.15, bundleY, startZ));
                         pts.push(new THREE.Vector3(_c_wallX_east, bundleY, startZ));
                         // Va a la esquina correspondiente
