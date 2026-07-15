@@ -3171,14 +3171,21 @@
                 });
 
                 // === Floor interior — piso técnico epóxico con juntas ===
+                // Ajustes vs slab: más variación (splotchDarkness alto), juntas mas oscuras +
+                // gruesas, repeticion menor para que las juntas se vean bien.
                 const floorTex = makeConcreteTexture({
-                    baseColor: '#dcdad3', splotchDarkness: 0.09, jointSpacing: 128,
-                    jointColor: 'rgba(80,75,68,0.28)', salt: 2
+                    baseColor: '#d4d0c6', splotchDarkness: 0.14, jointSpacing: 96,
+                    jointColor: 'rgba(50,45,38,0.42)', salt: 2
                 });
-                floorTex.repeat.set(4, 3);
+                floorTex.repeat.set(3, 2);   // menos tiles = juntas más grandes y visibles
+                floorTex.anisotropy = 8;      // se ve nítido en ángulos rasantes
                 const floor = new THREE.Mesh(
                     new THREE.PlaneGeometry(roomW, roomD),
-                    new THREE.MeshStandardMaterial({ map: floorTex, metalness: 0.05, roughness: 0.82 })
+                    new THREE.MeshStandardMaterial({
+                        map: floorTex,
+                        metalness: 0.10,       // leve reflejo — piso epóxico tiene brillo sutil
+                        roughness: 0.55        // más pulido (era 0.82)
+                    })
                 );
                 floor.rotation.x = -Math.PI / 2;
                 floor.position.y = 2.21;
@@ -3963,6 +3970,49 @@
                     return sprite;
                 };
 
+                // === Etiquetas flotantes: "HVAC-1", "PRES-1", etc. ===
+                const _labelTexCache = {};
+                const makeIdLabel = (text) => {
+                    let tex = _labelTexCache[text];
+                    if (!tex) {
+                        const c = document.createElement('canvas');
+                        c.width = 256; c.height = 64;
+                        const ctx = c.getContext('2d');
+                        // Píldora oscura con borde verde brand
+                        const r = 18;
+                        ctx.beginPath();
+                        ctx.moveTo(r, 2); ctx.lineTo(254 - r, 2);
+                        ctx.quadraticCurveTo(254, 2, 254, 2 + r);
+                        ctx.lineTo(254, 62 - r);
+                        ctx.quadraticCurveTo(254, 62, 254 - r, 62);
+                        ctx.lineTo(r, 62);
+                        ctx.quadraticCurveTo(2, 62, 2, 62 - r);
+                        ctx.lineTo(2, 2 + r);
+                        ctx.quadraticCurveTo(2, 2, r, 2);
+                        ctx.closePath();
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+                        ctx.fill();
+                        ctx.strokeStyle = 'rgba(154, 182, 59, 0.90)';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        // Texto
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 34px system-ui, -apple-system, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(text, 128, 34);
+                        tex = new THREE.CanvasTexture(c);
+                        if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+                        _labelTexCache[text] = tex;
+                    }
+                    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: tex, transparent: true, depthTest: false, sizeAttenuation: true
+                    }));
+                    sprite.scale.set(1.6, 0.4, 1);
+                    sprite.renderOrder = 998;
+                    return sprite;
+                };
+
                 sceneObj.current = {
                     THREE, scene, camera, renderer,
                     hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, secondaryMasterGroup, secondaryOutputPos,
@@ -3982,7 +4032,7 @@
                         }
                     },
                     // Helpers de fault icons — expuestos para que buildHvac/PRES (rebuild useEffect) los use
-                    makeAlertSprite, getFaultTexture,
+                    makeAlertSprite, getFaultTexture, makeIdLabel,
                     // faultIcons se leen de hvacInfo/presInfo via .alertSprite en el animate loop
                     faultIcons: {},
                     heatBanner,
@@ -4388,9 +4438,10 @@
                 const n = hvacUnits.length;
                 const hvacInfo = []; // {wall, alongCoord, canon values..., idx}
 
-                // === makeAlertSprite / getFaultTexture viven ahora en el INIT useEffect (ver arriba).
+                // === makeAlertSprite / getFaultTexture / makeIdLabel viven ahora en el INIT useEffect (ver arriba).
                 //     Se leen de sceneObj.current para evitar el ReferenceError silencioso.
                 const makeAlertSprite = sceneObj.current?.makeAlertSprite || ((uid) => null);
+                const makeIdLabel     = sceneObj.current?.makeIdLabel     || ((txt) => null);
 
                 const buildHvac = (idx, wall, alongCoord) => {
                     const u = hvacUnits[idx];
@@ -4703,6 +4754,12 @@
                     alertSprite.position.set(bodyX, y + unitH/2 + 0.6, z);
                     alertSprite.visible = false;
                     g.add(alertSprite);
+                    // === Etiqueta ID flotando sobre el equipo ===
+                    const idLabel = makeIdLabel(u.id);
+                    if (idLabel) {
+                        idLabel.position.set(bodyX, y + unitH/2 + 1.15, z);
+                        g.add(idLabel);
+                    }
                     // === WRAP-AND-ROTATE: mover el group canónico a la pared destino ===
                     if (wall === 'north') {
                         g.rotation.y =  Math.PI/2;
@@ -4955,6 +5012,12 @@
                     alertSprite.position.set(bodyX, y + unitH/2 + 0.5, z);
                     alertSprite.visible = false;
                     g.add(alertSprite);
+                    // Etiqueta ID flotando sobre el presurizador
+                    const idLabel = makeIdLabel(u.id);
+                    if (idLabel) {
+                        idLabel.position.set(bodyX, y + unitH/2 + 1.05, z);
+                        g.add(idLabel);
+                    }
                     // PRES canónico este — sin rotación (wall === 'east')
                     presGroup.add(g);
                     presInfo.push({
