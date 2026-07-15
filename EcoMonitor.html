@@ -2686,6 +2686,12 @@
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                 renderer.shadowMap.enabled = true;
                 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                // === Visual polish ===
+                // ACESFilmicToneMapping = colores más cinematográficos, menos "digitales"
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 1.05;
+                // sRGBEncoding en el output → colores correctos (por defecto Three.js r0.149 usa Linear que se ve washed-out)
+                renderer.outputEncoding = THREE.sRGBEncoding;
 
                 const ambient = new THREE.AmbientLight(0xfff2e0, 0.55);
                 scene.add(ambient);
@@ -3564,7 +3570,7 @@
                     const y = eqH/2 + 2.21;
                     const body = new THREE.Mesh(
                         new THREE.BoxGeometry(eqW, eqH, eqD),
-                        new THREE.MeshLambertMaterial({ color: TH_COLOR.equipBody })
+                        new THREE.MeshStandardMaterial({ color: TH_COLOR.equipBody, metalness: 0.35, roughness: 0.55 })
                     );
                     body.position.set(x, y, z); scene.add(body);
                     const edges = new THREE.LineSegments(
@@ -3635,7 +3641,7 @@
                 const masterZ = 0;
                 const masterBody = new THREE.Mesh(
                     new THREE.BoxGeometry(mW, mH, mD),
-                    new THREE.MeshLambertMaterial({ color: TH_COLOR.master })
+                    new THREE.MeshStandardMaterial({ color: TH_COLOR.master, metalness: 0.5, roughness: 0.45 })
                 );
                 masterBody.position.set(masterX, masterY, masterZ); scene.add(masterBody);
                 const masterEdges = new THREE.LineSegments(
@@ -3763,7 +3769,7 @@
                 const secondaryZ = masterZ;
                 const secondaryBody = new THREE.Mesh(
                     new THREE.BoxGeometry(mW, mH, mD),
-                    new THREE.MeshLambertMaterial({ color: '#cbd5e1' })   // gris claro para diferenciarlo del maestro
+                    new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 0.4, roughness: 0.55 })   // gris claro metálico
                 );
                 secondaryBody.position.set(secondaryX, secondaryY, secondaryZ);
                 secondaryMasterGroup.add(secondaryBody);
@@ -4044,10 +4050,10 @@
                     }
                 };
 
-                // Habilitar sombras en todos los Mesh Lambert (skip terrain ya tiene receive, basic materials no participan)
+                // Habilitar sombras en Mesh Lambert y Standard (skip terrain ya tiene receive, basic materials no participan)
                 const enableShadows = (group) => {
                     group.traverse(o => {
-                        if (o.isMesh && o.material && o.material.type === 'MeshLambertMaterial' && o !== terrain) {
+                        if (o.isMesh && o.material && (o.material.type === 'MeshLambertMaterial' || o.material.type === 'MeshStandardMaterial') && o !== terrain) {
                             o.castShadow = true;
                             if (!o.material.transparent || o.material.opacity > 0.7) {
                                 o.receiveShadow = true;
@@ -5029,7 +5035,7 @@
 
                     const g = new THREE.Group();
                     const bGeo = new THREE.BoxGeometry(escD, escH, escW);
-                    const body = new THREE.Mesh(bGeo, new THREE.MeshLambertMaterial({ color: '#e2e8f0' }));
+                    const body = new THREE.Mesh(bGeo, new THREE.MeshStandardMaterial({ color: '#e2e8f0', metalness: 0.35, roughness: 0.55 }));
                     body.position.copy(pos); g.add(body);
                     const eds = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
                     eds.position.copy(pos); g.add(eds);
@@ -5624,10 +5630,10 @@
                     try { onCableMeters(_meters); } catch (err) { console.warn('onCableMeters failed', err); }
                 }
 
-                // Habilitar sombras en los grupos dinámicos
+                // Habilitar sombras en los grupos dinámicos (Lambert y Standard)
                 [hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup].forEach(g => {
                     g.traverse(o => {
-                        if (o.isMesh && o.material && o.material.type === 'MeshLambertMaterial') {
+                        if (o.isMesh && o.material && (o.material.type === 'MeshLambertMaterial' || o.material.type === 'MeshStandardMaterial')) {
                             o.castShadow = true;
                             o.receiveShadow = true;
                         }
