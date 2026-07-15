@@ -2642,35 +2642,55 @@
                 let H = container.clientHeight || 560;   // altura dinámica: llena el contenedor padre
 
                 const scene = new THREE.Scene();
-                // === Cielo con gradiente vertical (CanvasTexture) — día y noche pre-generados ===
-                const makeSkyTex = (stops) => {
+                // === Cielo con gradiente atmosférico + glow de sol/luna cerca del horizonte ===
+                // Canvas más grande (32×1024) y más stops para transiciones más suaves.
+                // Agrego un GLOW radial cerca del horizonte para simular la posición del sol/luna.
+                const makeSkyTex = (stops, glow) => {
                     const c = document.createElement('canvas');
-                    c.width = 4; c.height = 512;
-                    const g = c.getContext('2d').createLinearGradient(0, 0, 0, 512);
-                    stops.forEach(([t, col]) => g.addColorStop(t, col));
+                    c.width = 64; c.height = 1024;
                     const cx = c.getContext('2d');
-                    cx.fillStyle = g; cx.fillRect(0, 0, 4, 512);
+                    // Base: gradiente vertical con muchos stops
+                    const g = cx.createLinearGradient(0, 0, 0, 1024);
+                    stops.forEach(([t, col]) => g.addColorStop(t, col));
+                    cx.fillStyle = g; cx.fillRect(0, 0, 64, 1024);
+                    // Glow atmosférico cerca del horizonte (sol o luna)
+                    if (glow) {
+                        const rg = cx.createRadialGradient(32, glow.y, 5, 32, glow.y, glow.radius);
+                        rg.addColorStop(0.00, glow.color);
+                        rg.addColorStop(0.35, glow.color.replace('rgba', 'rgba').replace(/[\d.]+\)$/, '0.4)'));
+                        rg.addColorStop(1.00, 'rgba(0,0,0,0)');
+                        cx.globalCompositeOperation = 'lighter';
+                        cx.fillStyle = rg;
+                        cx.fillRect(0, 0, 64, 1024);
+                        cx.globalCompositeOperation = 'source-over';
+                    }
                     const t = new THREE.CanvasTexture(c);
                     if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
                     return t;
                 };
                 const skyDayTex = makeSkyTex([
-                    [0.00, '#7a95b3'],  // cenit celeste
-                    [0.40, '#a8b4bc'],  // media altura
-                    [0.72, '#d0c2a5'],  // horizonte tostado
-                    [1.00, '#b8a382']   // banda de tierra
-                ]);
+                    [0.00, '#3a6ea5'],   // cenit azul
+                    [0.15, '#5a86b7'],
+                    [0.35, '#8fa8bd'],   // media altura
+                    [0.55, '#b8c5cd'],   // banda difusa
+                    [0.72, '#dccbb0'],   // horizonte cálido
+                    [0.85, '#c9b088'],   // haze bajo
+                    [1.00, '#8a755a']    // tierra distante
+                ], { y: 750, radius: 340, color: 'rgba(255,220,170,0.55)' });
                 const skyNightTex = makeSkyTex([
-                    [0.00, '#050813'],  // cenit muy oscuro
-                    [0.35, '#0e1530'],
-                    [0.75, '#26304f'],  // resplandor bajo (luna implícita)
-                    [1.00, '#0f1428']
-                ]);
-                const SKY_DAY   = { bg: skyDayTex,   fog: new THREE.Color('#d0c2a5') };
-                const SKY_NIGHT = { bg: skyNightTex, fog: new THREE.Color('#1a2240') };
+                    [0.00, '#020617'],   // cenit casi negro
+                    [0.20, '#08122a'],
+                    [0.45, '#0e1a3a'],
+                    [0.65, '#1a2650'],   // banda difusa
+                    [0.82, '#243560'],   // resplandor de luna bajo horizonte
+                    [0.95, '#141c34'],
+                    [1.00, '#0a0e1c']    // tierra oscura
+                ], { y: 780, radius: 260, color: 'rgba(180,200,240,0.35)' });
+                const SKY_DAY   = { bg: skyDayTex,   fog: new THREE.Color('#c9b088') };
+                const SKY_NIGHT = { bg: skyNightTex, fog: new THREE.Color('#1a2450') };
                 scene.background = skyNightTex;
-                // Niebla densa que absorbe el horizonte y simula la atmósfera
-                scene.fog = new THREE.Fog(SKY_NIGHT.fog.clone(), 22, 75);
+                // Niebla exponencial — más natural que Fog lineal, absorbe el horizonte suavemente
+                scene.fog = new THREE.FogExp2(SKY_NIGHT.fog.clone().getHex(), 0.014);
 
                 // Frustum reducido para que el shelter ocupe ~85% del alto del canvas (antes 17 = mucho aire).
                 const fs = 10;
@@ -2718,17 +2738,15 @@
                     scene.background = isDay ? skyDayTex : skyNightTex;
                     scene.fog.color.copy(isDay ? SKY_DAY.fog : SKY_NIGHT.fog);
                     if (isDay) {
-                        // Día patagónico — sol cenital cálido, sombras nítidas
-                        scene.fog.near = 24;
-                        scene.fog.far  = 80;
+                        // Día patagónico — sol cenital cálido, atmósfera abierta
+                        scene.fog.density = 0.010;   // FogExp2 — atmósfera más limpia de día
                         ambient.color.setHex(0xfff3e2); ambient.intensity = 0.72;
                         dir.color.setHex(0xfff0d8);     dir.intensity     = 1.25;
                         warm.color.setHex(0xd0c0a2);    warm.intensity    = 0.28;
                         hemi.color.setHex(0xbcd0e2); hemi.groundColor.setHex(0xa89478); hemi.intensity = 0.68;
                     } else {
-                        // Noche — protagonismo de LEDs/HMI, luces frías y bajas
-                        scene.fog.near = 16;
-                        scene.fog.far  = 58;
+                        // Noche — protagonismo de LEDs/HMI, atmósfera más densa y fría
+                        scene.fog.density = 0.020;
                         ambient.color.setHex(0x1f2a48); ambient.intensity = 0.28;
                         dir.color.setHex(0x8ea2c8);     dir.intensity     = 0.35;
                         warm.color.setHex(0x232840);    warm.intensity    = 0.12;
