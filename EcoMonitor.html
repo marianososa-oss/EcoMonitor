@@ -2325,7 +2325,7 @@
             titular: '#9ab63b',
             suplente: '#38bdf8',   // celeste — reserva visible, distinto de titular/apoyo/falla
             apoyo: '#f59e0b',
-            master: '#1d4ed8',   /* azul fuerte EcoMonitor (blue-700 Tailwind) */
+            master: '#1e3a8a',   /* azul MUY fuerte EcoMonitor (blue-900 Tailwind) */
             masterAccent: '#0098c6',
             cable: '#0098c6',
             cloudGreen: '#9ab63b'
@@ -5042,7 +5042,7 @@
 
                     const g = new THREE.Group();
                     const bGeo = new THREE.BoxGeometry(escD, escH, escW);
-                    const body = new THREE.Mesh(bGeo, new THREE.MeshStandardMaterial({ color: '#60a5fa', metalness: 0.35, roughness: 0.55 }));   // azul claro esclavo (blue-400 Tailwind)
+                    const body = new THREE.Mesh(bGeo, new THREE.MeshStandardMaterial({ color: '#1d4ed8', metalness: 0.35, roughness: 0.55 }));   // azul esclavo (blue-700, mismo tono que tenía el master antes)
                     body.position.copy(pos); g.add(body);
                     const eds = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
                     eds.position.copy(pos); g.add(eds);
