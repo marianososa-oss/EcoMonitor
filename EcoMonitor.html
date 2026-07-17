@@ -3739,6 +3739,29 @@
                 );
                 secondaryLed.position.set(secondaryX - mW/2 - 0.008, secondaryY + mH/2 - 0.15, secondaryZ);
                 secondaryMasterGroup.add(secondaryLed);
+                // === PANTALLA HMI en el TABLERO SECUNDARIO — usa la misma screenTex (canvas texture reactiva) ===
+                // Como el master desaparece en modo Central, ponemos la pantalla EcoMonitor aquí. Se ve
+                // enfrente (cara -X, hacia el interior del shelter). Reusa el mismo screenTex que ya
+                // actualiza updateHMI() en cada tick físico → la misma info que en el master.
+                const secondaryScreen = new THREE.Mesh(
+                    new THREE.PlaneGeometry(scrW, scrH),
+                    new THREE.MeshBasicMaterial({ map: screenTex })
+                );
+                secondaryScreen.position.set(secondaryX - mW/2 - 0.005, secondaryY + 0.25, secondaryZ);
+                secondaryScreen.rotation.y = -Math.PI / 2;   // opuesto al master
+                secondaryMasterGroup.add(secondaryScreen);
+                // Marco de la pantalla (idéntico al del master, mirror)
+                const secondaryScreenFrame = new THREE.LineSegments(
+                    new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 - halfH, secondaryZ - halfW),
+                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 + halfH, secondaryZ - halfW),
+                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 + halfH, secondaryZ + halfW),
+                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 - halfH, secondaryZ + halfW),
+                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 - halfH, secondaryZ - halfW)
+                    ]),
+                    new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 })
+                );
+                secondaryMasterGroup.add(secondaryScreenFrame);
                 // Punto de salida de cables (rojo + verde por equipo) — sale POR ARRIBA
                 const secondaryOutputPos = new THREE.Vector3(secondaryX - 0.1, secondaryY + mH/2 + 0.05, secondaryZ);
 
@@ -5598,7 +5621,9 @@
                         );
                         tube.castShadow = true;
                         centralizedGroup.add(tube);
-                        centralizadoTotalMeters += curve.getLength();
+                        // Cada caño (rojo o verde) carga 15 hilos individuales — 30 hilos por equipo total.
+                        // Metros LINEALES DE CABLE = largo del caño × cantidad de hilos que lleva adentro.
+                        centralizadoTotalMeters += curve.getLength() * 15;
                     };
 
                     // Agrupamos equipos por lado (norte / sur) para que la numeración de pares sea local
