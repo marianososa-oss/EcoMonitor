@@ -1205,7 +1205,7 @@
             titular: '#9ab63b',
             suplente: '#38bdf8',   // celeste — reserva visible, distinto de titular/apoyo/falla
             apoyo: '#f59e0b',
-            master: '#00478F',
+            master: '#dc2626',   /* rojo llamativo — antes era azul oscuro #00478F */
             masterAccent: '#0098c6',
             cable: '#0098c6',
             cloudGreen: '#9ab63b'
@@ -2598,7 +2598,9 @@
                 // Mismo tamaño que el maestro (mW × mH × mD), montado en la pared este a la misma
                 // altura y centrado en Z. Es un tablero de conexiones / borneras — de él salen
                 // pares rojo + verde (uno por cada equipo) hacia sus cajitas de paso.
-                const secondaryX = roomW/2 - mW/2 - 0.04;   // mirror del maestro
+                // Tablero secundario en la MISMA posición que el master (pared oeste) — nunca son
+                // visibles al mismo tiempo (mutuamente excluyentes por topología).
+                const secondaryX = masterX;
                 const secondaryY = masterY;
                 const secondaryZ = masterZ;
                 const secondaryBody = new THREE.Mesh(
@@ -2612,38 +2614,35 @@
                 );
                 secondaryEdges.position.set(secondaryX, secondaryY, secondaryZ);
                 secondaryMasterGroup.add(secondaryEdges);
-                // LED de estado (verde con emissive) — cara hacia el interior del shelter (-X)
+                // LED de estado (verde con emissive) — cara hacia el interior del shelter (+X — mismo lado que master)
                 const secondaryLed = new THREE.Mesh(
                     new THREE.SphereGeometry(0.04, 12, 10),
                     new THREE.MeshStandardMaterial({ color: TH_COLOR.titular, emissive: TH_COLOR.titular, emissiveIntensity: 2.2, metalness: 0, roughness: 0.35 })
                 );
-                secondaryLed.position.set(secondaryX - mW/2 - 0.008, secondaryY + mH/2 - 0.15, secondaryZ);
+                secondaryLed.position.set(secondaryX + mW/2 + 0.008, secondaryY + mH/2 - 0.15, secondaryZ);
                 secondaryMasterGroup.add(secondaryLed);
-                // === PANTALLA HMI en el TABLERO SECUNDARIO — usa la misma screenTex (canvas texture reactiva) ===
-                // Como el master desaparece en modo Central, ponemos la pantalla EcoMonitor aquí. Se ve
-                // enfrente (cara -X, hacia el interior del shelter). Reusa el mismo screenTex que ya
-                // actualiza updateHMI() en cada tick físico → la misma info que en el master.
+                // === PANTALLA HMI en el TABLERO SECUNDARIO — cara +X (interior), mismo lado que la pantalla del master
                 const secondaryScreen = new THREE.Mesh(
                     new THREE.PlaneGeometry(scrW, scrH),
                     new THREE.MeshBasicMaterial({ map: screenTex })
                 );
-                secondaryScreen.position.set(secondaryX - mW/2 - 0.005, secondaryY + 0.25, secondaryZ);
-                secondaryScreen.rotation.y = -Math.PI / 2;   // opuesto al master
+                secondaryScreen.position.set(secondaryX + mW/2 + 0.005, secondaryY + 0.25, secondaryZ);
+                secondaryScreen.rotation.y = Math.PI / 2;   // igual que master (cara hacia el interior)
                 secondaryMasterGroup.add(secondaryScreen);
-                // Marco de la pantalla (idéntico al del master, mirror)
+                // Marco de la pantalla — cara +X (mirror del master)
                 const secondaryScreenFrame = new THREE.LineSegments(
                     new THREE.BufferGeometry().setFromPoints([
-                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 - halfH, secondaryZ - halfW),
-                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 + halfH, secondaryZ - halfW),
-                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 + halfH, secondaryZ + halfW),
-                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 - halfH, secondaryZ + halfW),
-                        new THREE.Vector3(secondaryX - mW/2 - 0.006, secondaryY + 0.25 - halfH, secondaryZ - halfW)
+                        new THREE.Vector3(secondaryX + mW/2 + 0.006, secondaryY + 0.25 - halfH, secondaryZ - halfW),
+                        new THREE.Vector3(secondaryX + mW/2 + 0.006, secondaryY + 0.25 + halfH, secondaryZ - halfW),
+                        new THREE.Vector3(secondaryX + mW/2 + 0.006, secondaryY + 0.25 + halfH, secondaryZ + halfW),
+                        new THREE.Vector3(secondaryX + mW/2 + 0.006, secondaryY + 0.25 - halfH, secondaryZ + halfW),
+                        new THREE.Vector3(secondaryX + mW/2 + 0.006, secondaryY + 0.25 - halfH, secondaryZ - halfW)
                     ]),
                     new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 })
                 );
                 secondaryMasterGroup.add(secondaryScreenFrame);
-                // Punto de salida de cables (rojo + verde por equipo) — sale POR ARRIBA
-                const secondaryOutputPos = new THREE.Vector3(secondaryX - 0.1, secondaryY + mH/2 + 0.05, secondaryZ);
+                // Punto de salida de cables (rojo + verde por equipo) — sale POR ARRIBA (mismo output que master)
+                const secondaryOutputPos = new THREE.Vector3(secondaryX + 0.1, secondaryY + mH/2 + 0.05, secondaryZ);
 
                 // === Cloud (esferas puffy grandes, arriba a la izquierda del Master) ===
                 const cloudY = 8;
@@ -4438,7 +4437,7 @@
                     // del maestro (mW, mH, mD) que están en el init useEffect. Aquí los replicamos
                     // localmente para el cálculo del punto de salida.
                     const _sec_mW = 0.35, _sec_mH = 1.7, _sec_mD = 0.9;
-                    const _sec_X  =  roomW/2 - _sec_mW/2 - 0.04;
+                    const _sec_X  = -roomW/2 + _sec_mW/2 + 0.04;   // ← PARED OESTE (misma que master)
                     const _sec_Y  = _sec_mH/2 + 0.9 + 2.21;
                     const _sec_facePosZ_north = -_sec_mD/2 - 0.02;
                     const _sec_facePosZ_south =  _sec_mD/2 + 0.02;
@@ -4476,17 +4475,18 @@
                         const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
                         const pts = [];
                         pts.push(startPt);
-                        // Route TOWARD the east wall (X-wise) — mismo Y de salida (propio de este cable)
-                        pts.push(new THREE.Vector3(_c_wallX_east, startY, startZ));
-                        // Sube al bundle (cornisa) PEGADO A LA PARED este
-                        pts.push(new THREE.Vector3(_c_wallX_east, bundleY, startZ));
-                        // Va a la esquina correspondiente
+                        // Route TOWARD the WEST wall (X-wise) — tablero ahora en pared oeste
+                        pts.push(new THREE.Vector3(_c_wallX_west, startY, startZ));
+                        // Sube al bundle (cornisa) pegado a la pared OESTE
+                        pts.push(new THREE.Vector3(_c_wallX_west, bundleY, startZ));
+                        // Va a la esquina correspondiente (NW o SW)
+                        pts.push(new THREE.Vector3(_c_wallX_west, bundleY, cornerZ));
                         if (eq.wall === 'east') {
-                            // Directo por pared este: no hace corner, va al bypass Z
-                            // (bypassBundlePt ya tiene la Z opuesta al azul)
+                            // Cruza por la pared norte o sur hasta la esquina NE o SE, después baja al bypass
+                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, cornerZ));
                             pts.push(bypassBundlePt);
                         } else {
-                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, cornerZ));
+                            // norte o sur: va directo al bypass del equipo por su pared
                             pts.push(bypassBundlePt);
                         }
                         // Baja pegado a la pared por el LADO OPUESTO al azul
@@ -4539,9 +4539,14 @@
                 obj.esclavoAssemblies = esclavoData.map(e => e.assembly);
 
                 // Reportar metros al padre (Simulador) para que actualice el HUD
+                // CANALIZACION:
+                //  - EcoMonitor: mismo valor que cable (todo va dentro de caño/conduit metálico)
+                //  - Central: 0 m — el cableado va suelto (cable tray/aire), sin protección de caño
                 const _meters = {
-                    ecomonitor: Math.round(ecomonitorTotalMeters * 10) / 10,
-                    centralizado: Math.round(centralizadoTotalMeters * 10) / 10
+                    ecomonitor:              Math.round(ecomonitorTotalMeters   * 10) / 10,
+                    centralizado:            Math.round(centralizadoTotalMeters * 10) / 10,
+                    ecomonitor_canaliz:      Math.round(ecomonitorTotalMeters   * 10) / 10,
+                    centralizado_canaliz:    0
                 };
                 if (typeof onCableMeters === 'function') {
                     try { onCableMeters(_meters); } catch (err) { console.warn('onCableMeters failed', err); }
@@ -5247,17 +5252,32 @@
                                 </>
                             )}
                         </div>
-                        {cableMeters && cableMeters.ecomonitor > 0 && (
-                            <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${topologyMode === 'ecomonitor' ? 'border-eco-lightgreen' : 'border-amber-400'}`} title="Metros lineales de HILO (largo del caño × cantidad de hilos que lleva adentro — 30 hilos por equipo + 2 Modbus)">
-                                <span className="text-[9px] font-bold text-slate-500 uppercase">Cable</span>
-                                <span className="text-sm font-mono font-bold text-white">{(topologyMode === 'ecomonitor' ? cableMeters.ecomonitor : cableMeters.centralizado).toFixed(0)}<span className="text-[9px] text-slate-400 ml-0.5">m de cable</span></span>
-                                {topologyMode === 'ecomonitor' && cableMeters.centralizado > 0 && (
-                                    <span className="text-[10px] font-bold text-eco-lightgreen ml-1" title="Ahorro respecto al modo Centralizado">
-                                        −{Math.round((1 - cableMeters.ecomonitor / cableMeters.centralizado) * 100)}%
-                                    </span>
-                                )}
-                            </div>
-                        )}
+                        {cableMeters && cableMeters.ecomonitor > 0 && (() => {
+                            const cur     = topologyMode === 'ecomonitor' ? cableMeters.ecomonitor          : cableMeters.centralizado;
+                            const curCan  = topologyMode === 'ecomonitor' ? cableMeters.ecomonitor_canaliz  : cableMeters.centralizado_canaliz;
+                            const other   = topologyMode === 'ecomonitor' ? cableMeters.centralizado        : cableMeters.ecomonitor;
+                            const borderCol = topologyMode === 'ecomonitor' ? 'border-eco-lightgreen' : 'border-amber-400';
+                            return (
+                                <>
+                                    <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${borderCol}`} title="Metros lineales de HILO (largo del caño × cantidad de hilos que lleva adentro — 15 hilos por caño rojo/verde, 2 hilos Modbus)">
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase">Cable</span>
+                                        <span className="text-sm font-mono font-bold text-white">{cur.toFixed(0)}<span className="text-[9px] text-slate-400 ml-0.5">m</span></span>
+                                        {topologyMode === 'ecomonitor' && other > 0 && (
+                                            <span className="text-[10px] font-bold text-eco-lightgreen ml-1" title="Ahorro de cable respecto al modo Centralizado">
+                                                −{Math.round((1 - cur / other) * 100)}%
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${borderCol}`} title="Metros de CAÑERÍA metálica (conduit) que protege los cables. En EcoMonitor todo va en caño; en Central los cables van sueltos (cable tray o aire)">
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase">Canaliz.</span>
+                                        <span className="text-sm font-mono font-bold text-white">{curCan.toFixed(0)}<span className="text-[9px] text-slate-400 ml-0.5">m</span></span>
+                                        {topologyMode === 'centralizado' && (
+                                            <span className="text-[9px] font-bold text-rose-400 ml-1" title="En Central no hay caño protector — cable expuesto">sin protec.</span>
+                                        )}
+                                    </div>
+                                </>
+                            );
+                        })()}
                         {/* Demo de falla — muestra cómo reacciona cada topología a un corte de cable */}
                         <button
                             onClick={() => setCutDemoActive(v => !v)}
