@@ -5633,15 +5633,17 @@
                 // Guardar refs para el toggle useEffect
                 obj.esclavoAssemblies = esclavoData.map(e => e.assembly);
 
-                // Reportar metros al padre (Simulador) para que actualice el HUD
-                // CANALIZACION: mismo valor en ambos modos (cañería metálica para el recorrido interior).
-                //  - EcoMonitor: cañería del troncal Modbus + accesorios locales
-                //  - Central: misma cañería (recorrido perimetral desde el tablero a cada equipo)
+                // Reportar metros al padre (Simulador) para que actualice el HUD.
+                // CANALIZACION: el TRONCAL perimetral es fijo (mismo largo para 4 o 8 equipos),
+                // solo se agrega ~1 m por cada equipo por la BAJADA de la cornisa al tablero.
+                // Fórmula: canalización = trunk_length + N_equipos × 1 m
+                const _perDropMeters = 1.0;
+                const _canalizTotal = ecomonitorTrunkMeters + esclavoData.length * _perDropMeters;
                 const _meters = {
                     ecomonitor:              Math.round(ecomonitorTotalMeters   * 10) / 10,
                     centralizado:            Math.round(centralizadoTotalMeters * 10) / 10,
-                    ecomonitor_canaliz:      Math.round(ecomonitorTotalMeters   * 10) / 10,
-                    centralizado_canaliz:    Math.round(ecomonitorTotalMeters   * 10) / 10
+                    ecomonitor_canaliz:      Math.round(_canalizTotal * 10) / 10,
+                    centralizado_canaliz:    Math.round(_canalizTotal * 10) / 10
                 };
                 if (typeof onCableMeters === 'function') {
                     try { onCableMeters(_meters); } catch (err) { console.warn('onCableMeters failed', err); }
