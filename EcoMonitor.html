@@ -3581,6 +3581,8 @@
                 // Tablero SECUNDARIO — mismo tamaño que el maestro, en la pared ESTE (cruzado al maestro).
                 // De él sale un par rojo + verde por cada equipo hacia la cajita de paso.
                 const secondaryMasterGroup = new THREE.Group(); scene.add(secondaryMasterGroup);
+                // Group del MASTER — para poder ocultarlo en modo Central
+                const masterGroup = new THREE.Group(); scene.add(masterGroup);
 
                 // === MAESTRO (montado en pared interior IZQUIERDA, con pantalla) ===
                 const mW = 0.35, mH = 1.7, mD = 0.9;  // depth ancha (largo en Z)
@@ -3591,11 +3593,11 @@
                     new THREE.BoxGeometry(mW, mH, mD),
                     new THREE.MeshStandardMaterial({ color: TH_COLOR.master, metalness: 0.5, roughness: 0.45 })
                 );
-                masterBody.position.set(masterX, masterY, masterZ); scene.add(masterBody);
+                masterBody.position.set(masterX, masterY, masterZ); masterGroup.add(masterBody);
                 const masterEdges = new THREE.LineSegments(
                     new THREE.EdgesGeometry(new THREE.BoxGeometry(mW, mH, mD)), lineMat
                 );
-                masterEdges.position.set(masterX, masterY, masterZ); scene.add(masterEdges);
+                masterEdges.position.set(masterX, masterY, masterZ); masterGroup.add(masterEdges);
                 // PANTALLA HMI — canvas texture reactiva. drawHMI(values) se llama en cada tick físico.
                 const screenCanvas = document.createElement('canvas');
                 screenCanvas.width = 512; screenCanvas.height = 288;
@@ -3679,7 +3681,7 @@
                 );
                 screen.position.set(masterX + mW/2 + 0.005, masterY + 0.25, masterZ);
                 screen.rotation.y = Math.PI / 2;
-                scene.add(screen);
+                masterGroup.add(screen);
                 // Marco metálico oscuro
                 const halfH = scrH / 2;
                 const halfW = scrW / 2;
@@ -3693,7 +3695,7 @@
                     ]),
                     new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 })
                 );
-                scene.add(screenFrame);
+                masterGroup.add(screenFrame);
                 // LEDs status debajo de la pantalla — con emissive para que BRILLEN (ACES tone mapping los infla como bloom)
                 const _mkLed = (color, intensity) => new THREE.MeshStandardMaterial({
                     color, emissive: color, emissiveIntensity: intensity,
@@ -3701,14 +3703,14 @@
                 });
                 const led1 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), _mkLed(TH_COLOR.titular, 2.2));
                 led1.position.set(masterX + mW/2 + 0.008, masterY - 0.55, masterZ - 0.18);
-                scene.add(led1);
+                masterGroup.add(led1);
                 const led2 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), _mkLed(TH_COLOR.masterAccent, 2.2));
                 led2.position.set(masterX + mW/2 + 0.008, masterY - 0.55, masterZ + 0);
-                scene.add(led2);
+                masterGroup.add(led2);
                 // led3 (gris apagado) — no emissive, es un LED "off"
                 const led3 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.2, roughness: 0.6 }));
                 led3.position.set(masterX + mW/2 + 0.008, masterY - 0.55, masterZ + 0.18);
-                scene.add(led3);
+                masterGroup.add(led3);
                 // Punto de salida del cable Modbus: ARRIBA del master (sale por el TOP)
                 const masterOutputPos = new THREE.Vector3(masterX + 0.1, masterY + mH/2 + 0.05, masterZ);
 
@@ -4015,7 +4017,7 @@
 
                 sceneObj.current = {
                     THREE, scene, camera, renderer,
-                    hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, secondaryMasterGroup, secondaryOutputPos,
+                    hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, secondaryMasterGroup, secondaryOutputPos, masterGroup,
                     heatMeshes, heatWaves, wifiRings, dataPackets, wallMeshes,
                     perimeterWisps, doorStreams, puddleGroup,
                     masterOutputPos, cloudPos,
@@ -5513,8 +5515,10 @@
                         centralizadoTotalMeters += curve.getLength() * _WIRES_PER_EQUIP;
                     };
 
-                    northSideEq.forEach((eq, idx) => _buildCable(eq, idx, northSideEq.length, 'north'));
-                    southSideEq.forEach((eq, idx) => _buildCable(eq, idx, southSideEq.length, 'south'));
+                    // (Bundle azul del master REMOVIDO — en modo Central solo queda el tablero secundario
+                    //  con red/green. El master se oculta por el useEffect de topología.)
+                    // northSideEq.forEach((eq, idx) => _buildCable(eq, idx, northSideEq.length, 'north'));
+                    // southSideEq.forEach((eq, idx) => _buildCable(eq, idx, southSideEq.length, 'south'));
 
                     // === CABLES ROJO + VERDE desde el TABLERO SECUNDARIO ===
                     // Salen POR EL COSTADO del tablero secundario según el lado del equipo:
@@ -5541,7 +5545,7 @@
                     // Los rojo/verde bypassan por el LADO CONTRARIO: +X (norte), -X (sur), -Z (este).
                     // Y aterrizan en una cajita distinta (caj2), separada del azul.
                     const _opp_offset = 0.50;   // mismo sideOffset del azul, aplicado al lado opuesto
-                    const _caj2_offset = 0.35;   // separación entre caj1 (bundle azul) y caj2 (rojo/verde)
+                    const _caj2_offset = 0;   // cajita centrada en el equipo (ya no hay caj1 del bundle azul)
 
                     const _routeSecCable = (eq, colorMat, pairIdx, groupSize, sideKey) => {
                         const yOff = _computeYOff(pairIdx, groupSize);
@@ -5686,14 +5690,15 @@
                 obj.setSceneThemeOverride(sceneTheme || 'auto');
             }, [sceneTheme]);
 
-            // Topología: alterna visibilidad entre EcoMonitor (troncal + esclavos) y Centralizado (tablero secundario + N cables)
+            // Topología: EcoMonitor (master + troncal + esclavos) vs Centralizado (tablero secundario con red/green solamente, sin master, sin azul)
             useEffect(() => {
                 const obj = sceneObj.current;
                 if (!obj) return;
                 const isEco = topologyMode !== 'centralizado';
-                if (obj.cableGroup)           obj.cableGroup.visible = isEco;
-                if (obj.centralizedGroup)     obj.centralizedGroup.visible = !isEco;
-                if (obj.secondaryMasterGroup) obj.secondaryMasterGroup.visible = !isEco;   // en modo Central
+                if (obj.masterGroup)          obj.masterGroup.visible = isEco;             // master solo en EcoMonitor
+                if (obj.cableGroup)           obj.cableGroup.visible = isEco;              // Modbus interior solo en EcoMonitor
+                if (obj.centralizedGroup)     obj.centralizedGroup.visible = !isEco;       // cables rojo/verde en Central
+                if (obj.secondaryMasterGroup) obj.secondaryMasterGroup.visible = !isEco;   // tablero secundario en Central
                 if (obj.esclavoAssemblies)    obj.esclavoAssemblies.forEach(a => { if (a) a.visible = isEco; });
             }, [topologyMode, hvacUnits, presUnits]);
 
