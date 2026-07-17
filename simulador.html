@@ -3506,32 +3506,7 @@
                         g.add(handle);
                     }
 
-                    // === WESTRIC BRANDING (placa en la base de la cara frontal) ===
-                    const brandCanvas = document.createElement('canvas');
-                    brandCanvas.width = 320; brandCanvas.height = 80;
-                    const bctx = brandCanvas.getContext('2d');
-                    bctx.fillStyle = '#f2ede0';
-                    bctx.fillRect(0, 0, 320, 80);
-                    bctx.strokeStyle = '#a89e88';
-                    bctx.lineWidth = 3;
-                    bctx.strokeRect(2, 2, 316, 76);
-                    bctx.fillStyle = '#00478F';
-                    bctx.font = 'bold 42px "Geist Mono", ui-monospace, monospace';
-                    bctx.textAlign = 'center';
-                    bctx.textBaseline = 'middle';
-                    bctx.fillText('WESTRIC', 160, 32);
-                    bctx.fillStyle = '#4f7725';
-                    bctx.font = '13px "Geist Mono", ui-monospace, monospace';
-                    bctx.fillText('AM-010 · INY. SUPERIOR', 160, 62);
-                    const brandTex = new THREE.CanvasTexture(brandCanvas);
-                    if (THREE.SRGBColorSpace) brandTex.colorSpace = THREE.SRGBColorSpace;
-                    const brandPlate = new THREE.Mesh(
-                        new THREE.PlaneGeometry(unitD * 0.45, 0.12),
-                        new THREE.MeshBasicMaterial({ map: brandTex })
-                    );
-                    brandPlate.position.set(fanFaceX + outSign * 0.006, y + unitH * 0.44, z);
-                    brandPlate.rotation.y = outSign === -1 ? -Math.PI/2 : Math.PI/2;
-                    g.add(brandPlate);
+                    // (Placa "WESTRIC AM-010" removida a pedido del cliente)
 
                     // === REJILLAS LATERALES DE INTAKE — condenser coil (aletas verticales densas) ===
                     for (const sideZ of [-unitD/2 - 0.001, unitD/2 + 0.001]) {
