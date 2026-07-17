@@ -3725,7 +3725,7 @@
                 const secondaryZ = masterZ;
                 const secondaryBody = new THREE.Mesh(
                     new THREE.BoxGeometry(mW, mH, mD),
-                    new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 0.4, roughness: 0.55 })   // gris claro metálico
+                    new THREE.MeshStandardMaterial({ color: TH_COLOR.master, metalness: 0.5, roughness: 0.45 })   // rojo llamativo (igual que master)
                 );
                 secondaryBody.position.set(secondaryX, secondaryY, secondaryZ);
                 secondaryMasterGroup.add(secondaryBody);
@@ -5634,14 +5634,14 @@
                 obj.esclavoAssemblies = esclavoData.map(e => e.assembly);
 
                 // Reportar metros al padre (Simulador) para que actualice el HUD
-                // CANALIZACION:
-                //  - EcoMonitor: mismo valor que cable (todo va dentro de caño/conduit metálico)
-                //  - Central: 0 m — el cableado va suelto (cable tray/aire), sin protección de caño
+                // CANALIZACION: mismo valor en ambos modos (cañería metálica para el recorrido interior).
+                //  - EcoMonitor: cañería del troncal Modbus + accesorios locales
+                //  - Central: misma cañería (recorrido perimetral desde el tablero a cada equipo)
                 const _meters = {
                     ecomonitor:              Math.round(ecomonitorTotalMeters   * 10) / 10,
                     centralizado:            Math.round(centralizadoTotalMeters * 10) / 10,
                     ecomonitor_canaliz:      Math.round(ecomonitorTotalMeters   * 10) / 10,
-                    centralizado_canaliz:    0
+                    centralizado_canaliz:    Math.round(ecomonitorTotalMeters   * 10) / 10
                 };
                 if (typeof onCableMeters === 'function') {
                     try { onCableMeters(_meters); } catch (err) { console.warn('onCableMeters failed', err); }
@@ -6363,12 +6363,9 @@
                                             </span>
                                         )}
                                     </div>
-                                    <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${borderCol}`} title="Metros de CAÑERÍA metálica (conduit) que protege los cables. En EcoMonitor todo va en caño; en Central los cables van sueltos (cable tray o aire)">
+                                    <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${borderCol}`} title="Metros de CAÑERÍA metálica (conduit) del recorrido perimetral desde el tablero a cada equipo">
                                         <span className="text-[9px] font-bold text-slate-500 uppercase">Canaliz.</span>
                                         <span className="text-sm font-mono font-bold text-white">{curCan.toFixed(0)}<span className="text-[9px] text-slate-400 ml-0.5">m</span></span>
-                                        {topologyMode === 'centralizado' && (
-                                            <span className="text-[9px] font-bold text-rose-400 ml-1" title="En Central no hay caño protector — cable expuesto">sin protec.</span>
-                                        )}
                                     </div>
                                 </>
                             );
