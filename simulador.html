@@ -4424,14 +4424,12 @@
                     const _opp_offset = 0.50;   // mismo sideOffset del azul, aplicado al lado opuesto
                     const _caj2_offset = 0;   // cajita centrada en el equipo (ya no hay caj1 del bundle azul)
 
-                    const _routeSecCable = (eq, colorMat, pairIdx, groupSize, sideKey) => {
-                        const yOff = _computeYOff(pairIdx, groupSize);
+                    // Helper: computa los waypoints del ruteo (compartido entre cables rojo/verde y el caño transparente)
+                    const _computeSecPts = (eq, yOff, sideKey) => {
                         const bundleY = cableYCornisa + yOff;
                         const startY  = _sec_faceY + yOff;
                         const startZ = (sideKey === 'north') ? _sec_facePosZ_north : _sec_facePosZ_south;
                         const startPt = new THREE.Vector3(_sec_X, startY, startZ);
-
-                        // Punto lateral OPUESTO al azul y punto de entrada a caj2
                         let bypassBundlePt, bypassMidPt, caj2Pt;
                         if (eq.wall === 'north') {
                             bypassBundlePt = new THREE.Vector3(eq.wpX + _opp_offset, bundleY, _c_wallZ_north);
@@ -4441,34 +4439,32 @@
                             bypassBundlePt = new THREE.Vector3(eq.wpX - _opp_offset, bundleY, _c_wallZ_south);
                             bypassMidPt    = new THREE.Vector3(eq.wpX - _opp_offset, eq.y,   _c_wallZ_south);
                             caj2Pt         = new THREE.Vector3(eq.wpX - _caj2_offset, eq.y,  _c_wallZ_south);
-                        } else {   // east
+                        } else {
                             bypassBundlePt = new THREE.Vector3(_c_wallX_east, bundleY, eq.wpZ - _opp_offset);
                             bypassMidPt    = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ - _opp_offset);
                             caj2Pt         = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ - _caj2_offset);
                         }
-
                         const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
                         const pts = [];
                         pts.push(startPt);
-                        // Route TOWARD the WEST wall (X-wise) — tablero ahora en pared oeste
                         pts.push(new THREE.Vector3(_c_wallX_west, startY, startZ));
-                        // Sube al bundle (cornisa) pegado a la pared OESTE
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, startZ));
-                        // Va a la esquina correspondiente (NW o SW)
                         pts.push(new THREE.Vector3(_c_wallX_west, bundleY, cornerZ));
                         if (eq.wall === 'east') {
-                            // Cruza por la pared norte o sur hasta la esquina NE o SE, después baja al bypass
                             pts.push(new THREE.Vector3(_c_wallX_east, bundleY, cornerZ));
                             pts.push(bypassBundlePt);
                         } else {
-                            // norte o sur: va directo al bypass del equipo por su pared
                             pts.push(bypassBundlePt);
                         }
-                        // Baja pegado a la pared por el LADO OPUESTO al azul
                         pts.push(bypassMidPt);
-                        // Entra a la caj2 (a 35 cm de la caj1 sobre la pared)
                         pts.push(caj2Pt);
+                        return pts;
+                    };
 
+                    // Cable rojo o verde — DENTRO del caño transparente
+                    const _routeSecCable = (eq, colorMat, pairIdx, groupSize, sideKey) => {
+                        const yOff = _computeYOff(pairIdx, groupSize);
+                        const pts = _computeSecPts(eq, yOff, sideKey);
                         const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
                         const tube = new THREE.Mesh(
                             new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.020, 8, false),
@@ -4476,19 +4472,44 @@
                         );
                         tube.castShadow = true;
                         centralizedGroup.add(tube);
-                        // Cada caño (rojo o verde) carga _WIRES_PER_EQUIP/2 hilos → total 42 hilos por equipo.
-                        // Metros LINEALES DE CABLE = largo del caño × cantidad de hilos que lleva adentro.
+                        // Metros lineales: cada caño rojo/verde carga _WIRES_PER_EQUIP/2 hilos
                         centralizadoTotalMeters += curve.getLength() * (_WIRES_PER_EQUIP / 2);
+                    };
+
+                    // === CAÑO TRANSPARENTE — envuelve el par rojo+verde de cada equipo ===
+                    // Se dibuja UNA VEZ por equipo con el ruteo CENTRAL (yOff = 0). Los cables rojo/verde
+                    // quedan visibles adentro gracias a la opacidad baja del material.
+                    const _c_conduitMat = new THREE.MeshPhysicalMaterial({
+                        color: '#e2e8f0',
+                        metalness: 0.1,
+                        roughness: 0.05,
+                        transparent: true,
+                        opacity: 0.22,
+                        side: THREE.DoubleSide,
+                        depthWrite: false
+                    });
+                    const _routeSecConduit = (eq, sideKey) => {
+                        const pts = _computeSecPts(eq, 0, sideKey);   // yOff = 0 → center del bundle
+                        const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
+                        // Radio grande (5 cm) que envuelva a ambos cables rojo/verde
+                        const conduit = new THREE.Mesh(
+                            new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.050, 12, false),
+                            _c_conduitMat
+                        );
+                        conduit.renderOrder = -1;   // se dibuja antes → los cables se ven encima
+                        centralizedGroup.add(conduit);
                     };
 
                     // Agrupamos equipos por lado (norte / sur) para que la numeración de pares sea local
                     const _secNorthEq = allEquip.filter(e => e.wpZ < 0);
                     const _secSouthEq = allEquip.filter(e => e.wpZ >= 0);
                     _secNorthEq.forEach((eq, i) => {
+                        _routeSecConduit(eq, 'north');   // caño transparente que envuelve el par
                         _routeSecCable(eq, _secRedMat,   i * 2,     _secNorthEq.length * 2, 'north');
                         _routeSecCable(eq, _secGreenMat, i * 2 + 1, _secNorthEq.length * 2, 'north');
                     });
                     _secSouthEq.forEach((eq, i) => {
+                        _routeSecConduit(eq, 'south');   // caño transparente
                         _routeSecCable(eq, _secRedMat,   i * 2,     _secSouthEq.length * 2, 'south');
                         _routeSecCable(eq, _secGreenMat, i * 2 + 1, _secSouthEq.length * 2, 'south');
                     });
