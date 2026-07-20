@@ -5375,7 +5375,7 @@
                     return Math.max(-0.22, Math.min(0.22, raw));   // cap para que no supere el techo ni el piso del tablero
                 };
                 // Hilos por equipo en el cálculo de metros lineales de HILO
-                const _WIRES_PER_EQUIP   = 30;   // 30 hilos por equipo — solo para Central (los cables rojo/verde del tablero al equipo)
+                const _WIRES_PER_EQUIP   = 42;   // 42 hilos por equipo — sensores (T, HR, ΔP, flow) + control VFD + start/stop + fault relay + alarma humo + cierre puertas + redundancias
                 const _WIRES_MODBUS_BUS  = 4;    // Modbus + alim = 4 hilos (A + B + GND + V) en un solo cable troncal
                 const _ECOMON_LOCAL_M    = 0;    // EcoMonitor NO cuenta el cableado local del esclavo al equipo (según cliente)
                 let   centralizadoTotalMeters = 0;
@@ -5596,9 +5596,9 @@
                         );
                         tube.castShadow = true;
                         centralizedGroup.add(tube);
-                        // Cada caño (rojo o verde) carga 15 hilos individuales — 30 hilos por equipo total.
+                        // Cada caño (rojo o verde) carga _WIRES_PER_EQUIP/2 hilos → total 42 hilos por equipo.
                         // Metros LINEALES DE CABLE = largo del caño × cantidad de hilos que lleva adentro.
-                        centralizadoTotalMeters += curve.getLength() * 15;
+                        centralizadoTotalMeters += curve.getLength() * (_WIRES_PER_EQUIP / 2);
                     };
 
                     // Agrupamos equipos por lado (norte / sur) para que la numeración de pares sea local
