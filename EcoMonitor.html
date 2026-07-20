@@ -5597,26 +5597,22 @@
                     };
 
                     // === CAÑO TRANSPARENTE — envuelve el par rojo+verde de cada equipo ===
-                    // Se dibuja UNA VEZ por equipo con el ruteo CENTRAL (yOff = 0). Los cables rojo/verde
-                    // quedan visibles adentro gracias a la opacidad baja del material.
-                    const _c_conduitMat = new THREE.MeshPhysicalMaterial({
-                        color: '#e2e8f0',
-                        metalness: 0.1,
-                        roughness: 0.05,
+                    // Material tipo vidrio con tinte celeste que se vea claro pero deje ver los cables adentro.
+                    const _c_conduitMat = new THREE.MeshStandardMaterial({
+                        color: '#a8c8e8',
+                        metalness: 0.0,
+                        roughness: 0.15,
                         transparent: true,
-                        opacity: 0.22,
-                        side: THREE.DoubleSide,
-                        depthWrite: false
+                        opacity: 0.35,
+                        side: THREE.DoubleSide
                     });
                     const _routeSecConduit = (eq, sideKey) => {
                         const pts = _computeSecPts(eq, 0, sideKey);   // yOff = 0 → center del bundle
                         const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
-                        // Radio grande (5 cm) que envuelva a ambos cables rojo/verde
                         const conduit = new THREE.Mesh(
-                            new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.050, 12, false),
+                            new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.055, 12, false),
                             _c_conduitMat
                         );
-                        conduit.renderOrder = -1;   // se dibuja antes → los cables se ven encima
                         centralizedGroup.add(conduit);
                     };
 
