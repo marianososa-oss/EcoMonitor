@@ -5606,11 +5606,15 @@
                         opacity: 0.35,
                         side: THREE.DoubleSide
                     });
-                    const _routeSecConduit = (eq, sideKey) => {
-                        const pts = _computeSecPts(eq, 0, sideKey);   // yOff = 0 → center del bundle
+                    // El conduit sigue el yOff MEDIO entre el rojo (pairIdx=i*2) y el verde (pairIdx=i*2+1)
+                    // de su propio equipo → siempre queda centrado sobre el par que envuelve.
+                    const _routeSecConduit = (eq, sideKey, pairIdxCenter, groupSize) => {
+                        const yOffCenter = _computeYOff(pairIdxCenter, groupSize);
+                        const pts = _computeSecPts(eq, yOffCenter, sideKey);
                         const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
+                        // Radio 6.5 cm — envuelve red+green (bundleGap 8 cm + radios propios)
                         const conduit = new THREE.Mesh(
-                            new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.055, 12, false),
+                            new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.065, 12, false),
                             _c_conduitMat
                         );
                         centralizedGroup.add(conduit);
@@ -5620,14 +5624,16 @@
                     const _secNorthEq = allEquip.filter(e => e.wpZ < 0);
                     const _secSouthEq = allEquip.filter(e => e.wpZ >= 0);
                     _secNorthEq.forEach((eq, i) => {
-                        _routeSecConduit(eq, 'north');   // caño transparente que envuelve el par
-                        _routeSecCable(eq, _secRedMat,   i * 2,     _secNorthEq.length * 2, 'north');
-                        _routeSecCable(eq, _secGreenMat, i * 2 + 1, _secNorthEq.length * 2, 'north');
+                        const groupSize = _secNorthEq.length * 2;
+                        _routeSecConduit(eq, 'north', i * 2 + 0.5, groupSize);   // caño transparente centrado entre red (i*2) y green (i*2+1)
+                        _routeSecCable(eq, _secRedMat,   i * 2,     groupSize, 'north');
+                        _routeSecCable(eq, _secGreenMat, i * 2 + 1, groupSize, 'north');
                     });
                     _secSouthEq.forEach((eq, i) => {
-                        _routeSecConduit(eq, 'south');   // caño transparente
-                        _routeSecCable(eq, _secRedMat,   i * 2,     _secSouthEq.length * 2, 'south');
-                        _routeSecCable(eq, _secGreenMat, i * 2 + 1, _secSouthEq.length * 2, 'south');
+                        const groupSize = _secSouthEq.length * 2;
+                        _routeSecConduit(eq, 'south', i * 2 + 0.5, groupSize);
+                        _routeSecCable(eq, _secRedMat,   i * 2,     groupSize, 'south');
+                        _routeSecCable(eq, _secGreenMat, i * 2 + 1, groupSize, 'south');
                     });
                     // Cajita de paso 2 por equipo, ubicada en la POSICIÓN OPUESTA a la caj1 del azul
                     allEquip.forEach(eq => {
