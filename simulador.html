@@ -4255,7 +4255,7 @@
                     return Math.max(-0.22, Math.min(0.22, raw));   // cap para que no supere el techo ni el piso del tablero
                 };
                 // Hilos por equipo en el cálculo de metros lineales de HILO
-                const _WIRES_PER_EQUIP   = 42;   // 42 hilos por equipo — sensores (T, HR, ΔP, flow) + control VFD + start/stop + fault relay + alarma humo + cierre puertas + redundancias
+                const _WIRES_PER_EQUIP   = 25;   // 25 hilos por equipo (rojo + verde SUMADOS pueden llegar a 25 hilos) — Central
                 const _WIRES_MODBUS_BUS  = 4;    // Modbus + alim = 4 hilos (A + B + GND + V) en un solo cable troncal
                 const _ECOMON_LOCAL_M    = 0;    // EcoMonitor NO cuenta el cableado local del esclavo al equipo (según cliente)
                 let   centralizadoTotalMeters = 0;
