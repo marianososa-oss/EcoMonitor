@@ -1618,12 +1618,13 @@
                     scene.background = isDay ? skyDayTex : skyNightTex;
                     scene.fog.color.copy(isDay ? SKY_DAY.fog : SKY_NIGHT.fog);
                     if (isDay) {
-                        // Día patagónico — sol cenital cálido, atmósfera abierta
-                        scene.fog.density = 0.010;   // FogExp2 — atmósfera más limpia de día
-                        ambient.color.setHex(0xfff3e2); ambient.intensity = 0.72;
-                        dir.color.setHex(0xfff0d8);     dir.intensity     = 1.25;
-                        warm.color.setHex(0xd0c0a2);    warm.intensity    = 0.28;
-                        hemi.color.setHex(0xbcd0e2); hemi.groundColor.setHex(0xa89478); hemi.intensity = 0.68;
+                        // Día patagónico — bajado para NO empastar con ACES tone mapping (antes quedaba todo blanco)
+                        scene.fog.density = 0.010;
+                        ambient.color.setHex(0xfff3e2); ambient.intensity = 0.42;   // era 0.72
+                        dir.color.setHex(0xfff0d8);     dir.intensity     = 0.85;   // era 1.25
+                        warm.color.setHex(0xd0c0a2);    warm.intensity    = 0.18;   // era 0.28
+                        hemi.color.setHex(0xbcd0e2); hemi.groundColor.setHex(0xa89478); hemi.intensity = 0.42;   // era 0.68
+                        renderer.toneMappingExposure = 0.85;   // baja la exposición general para no quemar highlights
                     } else {
                         // Noche — protagonismo de LEDs/HMI, atmósfera más densa y fría
                         scene.fog.density = 0.020;
@@ -1631,6 +1632,7 @@
                         dir.color.setHex(0x8ea2c8);     dir.intensity     = 0.35;
                         warm.color.setHex(0x232840);    warm.intensity    = 0.12;
                         hemi.color.setHex(0x4a5e88); hemi.groundColor.setHex(0x0e1220); hemi.intensity = 0.18;
+                        renderer.toneMappingExposure = 1.05;   // exposición neutral en noche (los LEDs son la fuente clave)
                     }
                 };
                 // Estado del tema de la escena: 'auto' sigue al body.classList, 'day'/'night' lo sobrescribe
