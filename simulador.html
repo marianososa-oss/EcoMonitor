@@ -4089,6 +4089,7 @@
                 };
                 // Metros de troncal EcoMonitor — se calcula dentro del bloque if pero se usa despues
                 let ecomonitorTrunkMeters = 0;
+                let ecomonitorStubsMetersOuter = 0;   // suma de bajadas T-tap por equipo
                 const cableYCornisa = roomH * 0.92 + 2.21;
                 if (esclavoData.length > 0) {
                     const cableY = cableYCornisa;
@@ -4169,6 +4170,8 @@
                     // curva 90° corta y ENTRA por el hombro del costado (top-left interior). Sin
                     // tramo horizontal largo colgando — se lee como un caño clavado en la esquina.
                     const glandMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.7, roughness: 0.35 });
+                    // Acumulador global — largo total de las bajadas T-tap del Modbus (por equipo)
+                    let ecomonitorStubsMeters = 0;
                     const buildStub = (waypoints, glandPos, glandAxis, attach) => {
                         const stubCurve = new THREE.CatmullRomCurve3(waypoints, false, 'catmullrom', 0.5);
                         const stub = new THREE.Mesh(
@@ -4177,6 +4180,8 @@
                         );
                         stub.castShadow = true;
                         cableGroup.add(stub);
+                        // Suma el largo de este stub al total (para el cálculo de metros de cable Modbus)
+                        ecomonitorStubsMeters += stubCurve.getLength();
                         // T-fitting sobre el troncal
                         const tap = new THREE.Mesh(
                             new THREE.BoxGeometry(0.06, 0.06, 0.06),
@@ -4234,6 +4239,8 @@
                         buildStub([attach, knee, inside], gland, 'x', attach);
                     });
 
+                    // Propagar los stubs sumados al scope exterior
+                    ecomonitorStubsMetersOuter = ecomonitorStubsMeters;
                 }
 
                 // === TOPOLOGÍA CENTRALIZADA (comparación argumental EcoMonitor vs Central) ===
@@ -4531,9 +4538,9 @@
                 // === MEDIR METROS DE HILO ECOMONITOR ===
                 // Troncal Modbus: solo 2 hilos (A/B) recorren TODO el troncal.
                 // Cada equipo tiene ~3 m de cableado LOCAL con 30 hilos (sensores + control).
-                // EcoMonitor: SOLO el troncal Modbus (1 cable con 4 hilos internos).
-                // No se cuenta el cableado local del esclavo al equipo (según cliente).
-                let ecomonitorTotalMeters = ecomonitorTrunkMeters * _WIRES_MODBUS_BUS;
+                // EcoMonitor: TRONCAL Modbus + BAJADAS T-tap por cada esclavo (todo con 4 hilos Modbus).
+                // Con más equipos → más bajadas → más metros de cable.
+                let ecomonitorTotalMeters = (ecomonitorTrunkMeters + ecomonitorStubsMetersOuter) * _WIRES_MODBUS_BUS;
 
                 // Guardar refs para el toggle useEffect
                 obj.esclavoAssemblies = esclavoData.map(e => e.assembly);
