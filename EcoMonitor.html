@@ -5375,9 +5375,9 @@
                     return Math.max(-0.22, Math.min(0.22, raw));   // cap para que no supere el techo ni el piso del tablero
                 };
                 // Hilos por equipo en el cálculo de metros lineales de HILO
-                const _WIRES_PER_EQUIP   = 30;   // 30 hilos por equipo (sensores + control + fault relay + fan status + etc.)
-                const _WIRES_MODBUS_BUS  = 2;    // Modbus RS-485 A/B (compartido para todos los esclavos)
-                const _ECOMON_LOCAL_M    = 3.0;  // largo estimado de cableado LOCAL por equipo en EcoMonitor (elbows + cruce pared + entrada al equipo)
+                const _WIRES_PER_EQUIP   = 30;   // 30 hilos por equipo — solo para Central (los cables rojo/verde del tablero al equipo)
+                const _WIRES_MODBUS_BUS  = 4;    // Modbus + alim = 4 hilos (A + B + GND + V) en un solo cable troncal
+                const _ECOMON_LOCAL_M    = 0;    // EcoMonitor NO cuenta el cableado local del esclavo al equipo (según cliente)
                 let   centralizadoTotalMeters = 0;
 
                 // Anchor points en los COSTADOS del master (master está en pared oeste, Z=0, mD=0.9)
@@ -5627,8 +5627,9 @@
                 // === MEDIR METROS DE HILO ECOMONITOR ===
                 // Troncal Modbus: solo 2 hilos (A/B) recorren TODO el troncal.
                 // Cada equipo tiene ~3 m de cableado LOCAL con 30 hilos (sensores + control).
+                // EcoMonitor: SOLO el troncal Modbus (1 cable con 4 hilos internos).
+                // No se cuenta el cableado local del esclavo al equipo (según cliente).
                 let ecomonitorTotalMeters = ecomonitorTrunkMeters * _WIRES_MODBUS_BUS;
-                ecomonitorTotalMeters += esclavoData.length * _ECOMON_LOCAL_M * _WIRES_PER_EQUIP;
 
                 // Guardar refs para el toggle useEffect
                 obj.esclavoAssemblies = esclavoData.map(e => e.assembly);
