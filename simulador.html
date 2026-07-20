@@ -1549,14 +1549,13 @@
                     return t;
                 };
                 const skyDayTex = makeSkyTex([
-                    [0.00, '#3a6ea5'],   // cenit azul
-                    [0.15, '#5a86b7'],
-                    [0.35, '#8fa8bd'],   // media altura
-                    [0.55, '#b8c5cd'],   // banda difusa
-                    [0.72, '#dccbb0'],   // horizonte cálido
-                    [0.85, '#c9b088'],   // haze bajo
-                    [1.00, '#8a755a']    // tierra distante
-                ], { y: 750, radius: 340, color: 'rgba(255,220,170,0.55)' });
+                    [0.00, '#3a6ea5'],   // cenit azul saturado
+                    [0.15, '#5486b8'],
+                    [0.40, '#8fabc4'],   // media altura — más azulada, menos gris
+                    [0.65, '#a5b8ca'],   // banda difusa — azul frío
+                    [0.85, '#9aa8b8'],   // horizonte gris azulado (no cálido)
+                    [1.00, '#6b7a89']    // tierra distante gris azulado
+                ], { y: 780, radius: 220, color: 'rgba(220,230,245,0.32)' });
                 const skyNightTex = makeSkyTex([
                     [0.00, '#020617'],   // cenit casi negro
                     [0.20, '#08122a'],
@@ -1566,7 +1565,7 @@
                     [0.95, '#141c34'],
                     [1.00, '#0a0e1c']    // tierra oscura
                 ], { y: 780, radius: 260, color: 'rgba(180,200,240,0.35)' });
-                const SKY_DAY   = { bg: skyDayTex,   fog: new THREE.Color('#c9b088') };
+                const SKY_DAY   = { bg: skyDayTex,   fog: new THREE.Color('#8ea0b0') };   // fog gris azulado (no crema)
                 const SKY_NIGHT = { bg: skyNightTex, fog: new THREE.Color('#1a2450') };
                 scene.background = skyNightTex;
                 // Niebla exponencial — más natural que Fog lineal, absorbe el horizonte suavemente
@@ -1618,13 +1617,13 @@
                     scene.background = isDay ? skyDayTex : skyNightTex;
                     scene.fog.color.copy(isDay ? SKY_DAY.fog : SKY_NIGHT.fog);
                     if (isDay) {
-                        // Día patagónico — bajado para NO empastar con ACES tone mapping (antes quedaba todo blanco)
-                        scene.fog.density = 0.010;
-                        ambient.color.setHex(0xfff3e2); ambient.intensity = 0.42;   // era 0.72
-                        dir.color.setHex(0xfff0d8);     dir.intensity     = 0.85;   // era 1.25
-                        warm.color.setHex(0xd0c0a2);    warm.intensity    = 0.18;   // era 0.28
-                        hemi.color.setHex(0xbcd0e2); hemi.groundColor.setHex(0xa89478); hemi.intensity = 0.42;   // era 0.68
-                        renderer.toneMappingExposure = 0.85;   // baja la exposición general para no quemar highlights
+                        // Día patagónico — bajo intensidades + colores neutros para NO quemar la escena
+                        scene.fog.density = 0.012;
+                        ambient.color.setHex(0xe8ecf2); ambient.intensity = 0.28;   // color neutro-frío en vez de cálido
+                        dir.color.setHex(0xf4ecdb);     dir.intensity     = 0.65;   // sol menos intenso
+                        warm.color.setHex(0xa8b0bc);    warm.intensity    = 0.10;   // bounce frío
+                        hemi.color.setHex(0x9ab2c8); hemi.groundColor.setHex(0x5a6070); hemi.intensity = 0.30;
+                        renderer.toneMappingExposure = 0.75;   // baja mas la exposición para no quemar
                     } else {
                         // Noche — protagonismo de LEDs/HMI, atmósfera más densa y fría
                         scene.fog.density = 0.020;
