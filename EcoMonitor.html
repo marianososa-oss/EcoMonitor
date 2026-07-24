@@ -5205,61 +5205,63 @@
                     }
                     buildEsclavo(sharedInfo, hvacInfo.length, 'PRES');
 
-                    // Si hay múltiples PRES: agregar CAJITAS DE PASO + cables desde el tablero
-                    // compartido al centro de CADA equipo por el lado interior de la pared.
+                    // Si hay múltiples PRES: agregar UN conduit gris horizontal por lado del tablero
+                    // → cajita de paso pegada al costado interior de cada equipo (como en el sketch).
                     if (presInfo.length >= 2) {
-                        const cajitaMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
+                        const cajitaMat    = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
                         const cajitaTapMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.5, roughness: 0.4 });
-                        const presRedMat   = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
-                        const presGreenMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
-                        const _presConduitR = 0.022;
-                        const _tabZ = sharedInfo.canon_z;
+                        // Conduit metálico (mismo look que los sensor pipes plateados del HVAC)
+                        const conduitMat   = new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 0.85, roughness: 0.25 });
+                        const flangeMat    = new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.7, roughness: 0.4 });
+                        const _conduitR    = 0.032;
+                        const _tabZ        = sharedInfo.canon_z;
                         const _tabInterior = sharedInfo.interiorX;
-                        const _outSign = sharedInfo.outSign;
-                        const _tabBottomY = sharedInfo.y - escH/2;   // borde inferior del tablero
-                        const _cableY = _tabBottomY - 0.35;          // altura del recorrido horizontal
-                        const _groupRef = sharedInfo.groupRef;
+                        const _outSign     = sharedInfo.outSign;
+                        const _midY        = sharedInfo.y;   // centro del tablero — el conduit sale horizontal desde ahí
+                        const _groupRef    = sharedInfo.groupRef;
+                        const _tabHalfZ    = escW / 2;   // costado del tablero en canon_z
 
                         presInfo.forEach(pp => {
                             const _targetZ = pp.canon_z;
-                            if (Math.abs(_targetZ - _tabZ) < 0.01) return;   // saltar si coincide con el tablero
+                            if (Math.abs(_targetZ - _tabZ) < 0.01) return;
+                            const dir = (_targetZ > _tabZ) ? 1 : -1;
+                            // Empieza a la salida del costado del tablero, termina antes de entrar a la cajita
+                            const _zStart = _tabZ + dir * _tabHalfZ;
+                            const _zEnd   = _targetZ - dir * 0.04;
+                            const _len    = Math.abs(_zEnd - _zStart);
 
-                            // Cajita de paso al lado interior del equipo, a media altura
+                            // Conduit gris horizontal
+                            const conduit = new THREE.Mesh(
+                                new THREE.CylinderGeometry(_conduitR, _conduitR, _len, 14),
+                                conduitMat
+                            );
+                            conduit.rotation.x = Math.PI/2;
+                            conduit.position.set(_tabInterior, _midY, (_zStart + _zEnd) / 2);
+                            conduit.castShadow = true;
+                            _groupRef.add(conduit);
+                            // Bridas en cada punta del conduit — acoples reales
+                            [_zStart, _zEnd].forEach(z => {
+                                const flange = new THREE.Mesh(
+                                    new THREE.CylinderGeometry(_conduitR * 1.4, _conduitR * 1.4, 0.025, 16),
+                                    flangeMat
+                                );
+                                flange.rotation.x = Math.PI/2;
+                                flange.position.set(_tabInterior, _midY, z);
+                                _groupRef.add(flange);
+                            });
+                            // Cajita de paso pegada al costado interior del PRES equipo
                             const cajBody = new THREE.Mesh(
-                                new THREE.BoxGeometry(0.06, 0.18, 0.14),
+                                new THREE.BoxGeometry(0.06, 0.16, 0.10),
                                 cajitaMat
                             );
-                            cajBody.position.set(_tabInterior, _cableY, _targetZ);
+                            cajBody.position.set(_tabInterior, _midY, _targetZ);
                             _groupRef.add(cajBody);
-                            // Tapa gris clara (indica que es accesible)
                             const cajCover = new THREE.Mesh(
-                                new THREE.BoxGeometry(0.005, 0.14, 0.10),
+                                new THREE.BoxGeometry(0.005, 0.12, 0.08),
                                 cajitaTapMat
                             );
-                            cajCover.position.set(_tabInterior + (-_outSign) * 0.033, _cableY, _targetZ);
+                            cajCover.position.set(_tabInterior + (-_outSign) * 0.033, _midY, _targetZ);
                             _groupRef.add(cajCover);
-
-                            // Cables rojo + verde: bajan del tablero → recorren horizontal hasta la cajita
-                            const _dropLen = Math.max(0.02, _tabBottomY - _cableY);
-                            [-0.04, 0.04].forEach((zOff, idx) => {
-                                const mat = (idx === 0) ? presRedMat : presGreenMat;
-                                // Tramo vertical (desde el fondo del tablero hasta la altura horizontal)
-                                const vert = new THREE.Mesh(
-                                    new THREE.CylinderGeometry(_presConduitR, _presConduitR, _dropLen, 10),
-                                    mat
-                                );
-                                vert.position.set(_tabInterior, _cableY + _dropLen/2, _tabZ + zOff);
-                                _groupRef.add(vert);
-                                // Tramo horizontal (desde tablero hasta cajita del equipo)
-                                const dz = _targetZ - _tabZ;
-                                const horiz = new THREE.Mesh(
-                                    new THREE.CylinderGeometry(_presConduitR, _presConduitR, Math.abs(dz), 10),
-                                    mat
-                                );
-                                horiz.rotation.x = Math.PI/2;
-                                horiz.position.set(_tabInterior, _cableY + zOff, (_tabZ + _targetZ) / 2);
-                                _groupRef.add(horiz);
-                            });
                         });
                     }
                 }
