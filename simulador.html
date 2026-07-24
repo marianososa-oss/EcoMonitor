@@ -3998,10 +3998,8 @@
                         wallCap.position.set(wallXCanon + outSign * 0.01, yElbow, pos.z + zOffset);
                         g.add(wallCap);
                     };
-                    _addElbow(conduitRedMat,   -0.10);   // ROJO — cables de control (tablero 1)
-                    _addElbow(conduitGreenMat, +0.10);   // VERDE — cables de sensores (tablero 1)
-
-                    // === CAJITA DE PASO 1 — junction box donde terminan los elbows del tablero 1 ===
+                    // Elbows rojo/verde + cajita de paso 1 → SOLO HVAC (PRES tiene su propio
+                    // conduit horizontal a las cajitas de cada equipo)
                     const passBoxMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
                     const passBoxCoverMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.5, roughness: 0.4 });
                     const _addPassBox = (zCenter) => {
@@ -4012,7 +4010,11 @@
                         cover.position.set(wallXCanon + (-outSign) * 0.005, yElbow, zCenter);
                         g.add(cover);
                     };
-                    _addPassBox(pos.z);
+                    if (type !== 'PRES') {
+                        _addElbow(conduitRedMat,   -0.10);   // ROJO — cables de control (tablero 1)
+                        _addElbow(conduitGreenMat, +0.10);   // VERDE — cables de sensores (tablero 1)
+                        _addPassBox(pos.z);
+                    }
 
 
                     // === CAÑOS DE SENSORES (plateados) — solo HVAC ===
