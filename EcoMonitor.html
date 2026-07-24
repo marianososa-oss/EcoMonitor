@@ -5461,6 +5461,7 @@
                 const _WIRES_MODBUS_BUS  = 4;    // Modbus + alim = 4 hilos (A + B + GND + V) en un solo cable troncal
                 const _ECOMON_LOCAL_M    = 0;    // EcoMonitor NO cuenta el cableado local del esclavo al equipo (según cliente)
                 let   centralizadoTotalMeters = 0;
+                let   centralizadoCanalizMeters = 0;   // suma de largos individuales de los caños transparentes por equipo
 
                 // Anchor points en los COSTADOS del master (master está en pared oeste, Z=0, mD=0.9)
                 // Salen POR LA CARA LATERAL a MEDIA ALTURA — se ve claramente que emerge por el costado
@@ -5700,6 +5701,8 @@
                             _c_conduitMat
                         );
                         centralizedGroup.add(conduit);
+                        // Cada caño transparente CUENTA para canalización de Central (individual por equipo)
+                        centralizadoCanalizMeters += curve.getLength();
                     };
 
                     // Agrupamos equipos por lado (norte / sur) para que la numeración de pares sea local
@@ -5740,16 +5743,19 @@
                 obj.esclavoAssemblies = esclavoData.map(e => e.assembly);
 
                 // Reportar metros al padre (Simulador) para que actualice el HUD.
-                // CANALIZACION: el TRONCAL perimetral es fijo (mismo largo para 4 o 8 equipos),
-                // solo se agrega ~1 m por cada equipo por la BAJADA de la cornisa al tablero.
-                // Fórmula: canalización = trunk_length + N_equipos × 1 m
+                // CANALIZACION:
+                //   - EcoMonitor: 1 caño Modbus troncal perimetral + 1 m de bajada por equipo
+                //       ecoCanaliz = trunk + N × 1 m
+                //   - Central: cada equipo lleva SU PROPIO caño individual (topología estrella).
+                //     La suma de todos los caños transparentes por equipo → mucho más que EcoMonitor.
+                //       centralCanaliz = Σ largo_del_caño_i por cada equipo
                 const _perDropMeters = 1.0;
-                const _canalizTotal = ecomonitorTrunkMeters + esclavoData.length * _perDropMeters;
+                const _ecoCanalizTotal = ecomonitorTrunkMeters + esclavoData.length * _perDropMeters;
                 const _meters = {
-                    ecomonitor:              Math.round(ecomonitorTotalMeters   * 10) / 10,
-                    centralizado:            Math.round(centralizadoTotalMeters * 10) / 10,
-                    ecomonitor_canaliz:      Math.round(_canalizTotal * 10) / 10,
-                    centralizado_canaliz:    Math.round(_canalizTotal * 10) / 10
+                    ecomonitor:              Math.round(ecomonitorTotalMeters       * 10) / 10,
+                    centralizado:            Math.round(centralizadoTotalMeters     * 10) / 10,
+                    ecomonitor_canaliz:      Math.round(_ecoCanalizTotal            * 10) / 10,
+                    centralizado_canaliz:    Math.round(centralizadoCanalizMeters   * 10) / 10
                 };
                 if (typeof onCableMeters === 'function') {
                     try { onCableMeters(_meters); } catch (err) { console.warn('onCableMeters failed', err); }
