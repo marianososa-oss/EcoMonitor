@@ -1205,7 +1205,7 @@
             titular: '#9ab63b',
             suplente: '#38bdf8',   // celeste — reserva visible, distinto de titular/apoyo/falla
             apoyo: '#f59e0b',
-            master: '#1e3a8a',   /* azul MUY fuerte EcoMonitor (blue-900 Tailwind) */
+            master: '#0033a0',   /* azul BRAND fuerte EcoMonitor — más saturado que blue-900 */
             masterAccent: '#0098c6',
             cable: '#0098c6',
             cloudGreen: '#9ab63b'
@@ -1623,7 +1623,7 @@
                         dir.color.setHex(0xf4ecdb);     dir.intensity     = 0.65;   // sol menos intenso
                         warm.color.setHex(0xa8b0bc);    warm.intensity    = 0.10;   // bounce frío
                         hemi.color.setHex(0x9ab2c8); hemi.groundColor.setHex(0x5a6070); hemi.intensity = 0.30;
-                        renderer.toneMappingExposure = 0.75;   // baja mas la exposición para no quemar
+                        renderer.toneMappingExposure = 0.90;   // más contraste — los colores saturados se ven bien
                     } else {
                         // Noche — protagonismo de LEDs/HMI, atmósfera más densa y fría
                         scene.fog.density = 0.020;
@@ -2606,7 +2606,7 @@
                 const secondaryZ = masterZ;
                 const secondaryBody = new THREE.Mesh(
                     new THREE.BoxGeometry(mW, mH, mD),
-                    new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.5, roughness: 0.45 })   // ROJO (Central) — hardcoded, no depende de TH_COLOR.master
+                    new THREE.MeshStandardMaterial({ color: '#c81212', metalness: 0.5, roughness: 0.4 })   // ROJO (Central) — MÁS saturado, deep crimson
                 );
                 secondaryBody.position.set(secondaryX, secondaryY, secondaryZ);
                 secondaryMasterGroup.add(secondaryBody);
@@ -3923,7 +3923,7 @@
 
                     const g = new THREE.Group();
                     const bGeo = new THREE.BoxGeometry(escD, escH, escW);
-                    const body = new THREE.Mesh(bGeo, new THREE.MeshStandardMaterial({ color: '#1d4ed8', metalness: 0.35, roughness: 0.55 }));   // azul esclavo (blue-700, mismo tono que tenía el master antes)
+                    const body = new THREE.Mesh(bGeo, new THREE.MeshStandardMaterial({ color: '#0059d1', metalness: 0.35, roughness: 0.45 }));   // azul esclavo — más vivo y saturado (contrast con master más oscuro)
                     body.position.copy(pos); g.add(body);
                     const eds = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), lineMat.clone());
                     eds.position.copy(pos); g.add(eds);
@@ -3951,8 +3951,8 @@
                     // así son visibles y no quedan enterrados en el cuerpo del tablero) y hacen 90°
                     // hacia la pared. Rojo = cables de control · Verde = cables de sensores.
                     const conduitRadius   = 0.028;
-                    const conduitRedMat   = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
-                    const conduitGreenMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
+                    const conduitRedMat   = new THREE.MeshStandardMaterial({ color: '#e30d0d', metalness: 0.35, roughness: 0.4 });
+                    const conduitGreenMat = new THREE.MeshStandardMaterial({ color: '#00b83a', metalness: 0.35, roughness: 0.4 });
                     const escBottomY = pos.y - escH/2;
                     // yElbow ARRIBA de la rejilla RET (que vive en y-0.95, top a y-0.725).
                     // Panel bottom a y-0.3 → dejamos 15 cm de bajada y clavamos el codo a y-0.45,
@@ -4485,8 +4485,8 @@
                     //  - Equipos con wpZ >= 0 → cara SUR (+Z) del tablero secundario
                     // Recorren la cornisa este, van a la esquina NE o SE, y bajan a la cajita
                     // de paso del equipo (a media altura entre rejillas).
-                    const _secRedMat    = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
-                    const _secGreenMat  = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
+                    const _secRedMat    = new THREE.MeshStandardMaterial({ color: '#e30d0d', metalness: 0.35, roughness: 0.4 });
+                    const _secGreenMat  = new THREE.MeshStandardMaterial({ color: '#00b83a', metalness: 0.35, roughness: 0.4 });
                     const _secCajitaMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
 
                     // Caras del tablero secundario (mismo eje X, Z=-mD/2 o Z=+mD/2)
@@ -4561,11 +4561,11 @@
                     // === CAÑO TRANSPARENTE — envuelve el par rojo+verde de cada equipo ===
                     // Material tipo vidrio con tinte celeste que se vea claro pero deje ver los cables adentro.
                     const _c_conduitMat = new THREE.MeshStandardMaterial({
-                        color: '#a8c8e8',
+                        color: '#3fa9ff',   // tinte celeste MÁS saturado, se ve claro pero fuerte
                         metalness: 0.0,
-                        roughness: 0.15,
+                        roughness: 0.12,
                         transparent: true,
-                        opacity: 0.35,
+                        opacity: 0.45,
                         side: THREE.DoubleSide
                     });
                     // El conduit sigue el yOff MEDIO entre el rojo (pairIdx=i*2) y el verde (pairIdx=i*2+1)
