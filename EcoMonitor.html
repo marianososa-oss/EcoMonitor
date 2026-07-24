@@ -5193,13 +5193,76 @@
 
                 hvacInfo.forEach((hp, i) => buildEsclavo(hp, i, 'HVAC'));
                 // Los presurizadores COMPARTEN un solo tablero — un único esclavo controla ambos.
-                // Solo se construye el tablero para el PRIMER PRES; los demás se conectan
-                // internamente al mismo tablero (no se dibuja tablero propio para el segundo).
-                presInfo.forEach((pp, i) => {
-                    if (i === 0) {
-                        buildEsclavo(pp, hvacInfo.length + i, 'PRES');
+                // Si hay 2+ PRES, el tablero se ubica EN EL MEDIO entre los 2 primeros.
+                // Si hay 1 solo PRES, el tablero va al lado del PRES único (comportamiento normal).
+                if (presInfo.length > 0) {
+                    let sharedInfo = presInfo[0];
+                    if (presInfo.length >= 2) {
+                        sharedInfo = {
+                            ...presInfo[0],
+                            canon_z: (presInfo[0].canon_z + presInfo[1].canon_z) / 2
+                        };
                     }
-                });
+                    buildEsclavo(sharedInfo, hvacInfo.length, 'PRES');
+
+                    // Si hay múltiples PRES: agregar CAJITAS DE PASO + cables desde el tablero
+                    // compartido al centro de CADA equipo por el lado interior de la pared.
+                    if (presInfo.length >= 2) {
+                        const cajitaMat = new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.6, roughness: 0.5 });
+                        const cajitaTapMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.5, roughness: 0.4 });
+                        const presRedMat   = new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.3, roughness: 0.5 });
+                        const presGreenMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.3, roughness: 0.5 });
+                        const _presConduitR = 0.022;
+                        const _tabZ = sharedInfo.canon_z;
+                        const _tabInterior = sharedInfo.interiorX;
+                        const _outSign = sharedInfo.outSign;
+                        const _tabBottomY = sharedInfo.y - escH/2;   // borde inferior del tablero
+                        const _cableY = _tabBottomY - 0.35;          // altura del recorrido horizontal
+                        const _groupRef = sharedInfo.groupRef;
+
+                        presInfo.forEach(pp => {
+                            const _targetZ = pp.canon_z;
+                            if (Math.abs(_targetZ - _tabZ) < 0.01) return;   // saltar si coincide con el tablero
+
+                            // Cajita de paso al lado interior del equipo, a media altura
+                            const cajBody = new THREE.Mesh(
+                                new THREE.BoxGeometry(0.06, 0.18, 0.14),
+                                cajitaMat
+                            );
+                            cajBody.position.set(_tabInterior, _cableY, _targetZ);
+                            _groupRef.add(cajBody);
+                            // Tapa gris clara (indica que es accesible)
+                            const cajCover = new THREE.Mesh(
+                                new THREE.BoxGeometry(0.005, 0.14, 0.10),
+                                cajitaTapMat
+                            );
+                            cajCover.position.set(_tabInterior + (-_outSign) * 0.033, _cableY, _targetZ);
+                            _groupRef.add(cajCover);
+
+                            // Cables rojo + verde: bajan del tablero → recorren horizontal hasta la cajita
+                            const _dropLen = Math.max(0.02, _tabBottomY - _cableY);
+                            [-0.04, 0.04].forEach((zOff, idx) => {
+                                const mat = (idx === 0) ? presRedMat : presGreenMat;
+                                // Tramo vertical (desde el fondo del tablero hasta la altura horizontal)
+                                const vert = new THREE.Mesh(
+                                    new THREE.CylinderGeometry(_presConduitR, _presConduitR, _dropLen, 10),
+                                    mat
+                                );
+                                vert.position.set(_tabInterior, _cableY + _dropLen/2, _tabZ + zOff);
+                                _groupRef.add(vert);
+                                // Tramo horizontal (desde tablero hasta cajita del equipo)
+                                const dz = _targetZ - _tabZ;
+                                const horiz = new THREE.Mesh(
+                                    new THREE.CylinderGeometry(_presConduitR, _presConduitR, Math.abs(dz), 10),
+                                    mat
+                                );
+                                horiz.rotation.x = Math.PI/2;
+                                horiz.position.set(_tabInterior, _cableY + zOff, (_tabZ + _targetZ) / 2);
+                                _groupRef.add(horiz);
+                            });
+                        });
+                    }
+                }
 
                 // (Conduits exterior removidos — el cable pasa internamente por la pared.
                 //  Solo dejamos un pequeño accesorio visual donde el cable entra a cada esclavo)
