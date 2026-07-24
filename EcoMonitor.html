@@ -5192,7 +5192,14 @@
                 };
 
                 hvacInfo.forEach((hp, i) => buildEsclavo(hp, i, 'HVAC'));
-                presInfo.forEach((pp, i) => buildEsclavo(pp, hvacInfo.length + i, 'PRES'));
+                // Los presurizadores COMPARTEN un solo tablero — un único esclavo controla ambos.
+                // Solo se construye el tablero para el PRIMER PRES; los demás se conectan
+                // internamente al mismo tablero (no se dibuja tablero propio para el segundo).
+                presInfo.forEach((pp, i) => {
+                    if (i === 0) {
+                        buildEsclavo(pp, hvacInfo.length + i, 'PRES');
+                    }
+                });
 
                 // (Conduits exterior removidos — el cable pasa internamente por la pared.
                 //  Solo dejamos un pequeño accesorio visual donde el cable entra a cada esclavo)
