@@ -3255,6 +3255,9 @@
                     });
                     // Partículas rojas — 2 tramos: SUBEN hasta el techo, DESPUÉS van a los costados
                     // (como si fueran absorbidas por las rejillas RET superiores de los HVACs).
+                    // Blending según tema: NOCHE = additive (glow) · DÍA = normal (color sólido,
+                    // porque additive contra el cielo claro desaparece).
+                    const _isDayNow = sceneObj.current.resolveTheme ? sceneObj.current.resolveTheme() : false;
                     const _ceilingY = 2.21 + 3.0 - 0.10;   // techo del shelter (roomH=3), 10cm de margen
                     sceneObj.current.heatWaves?.forEach(pts => {
                         if (!pts.geometry?.attributes?.position) return;
@@ -3292,7 +3295,15 @@
                             arr[p * 3 + 2] = pz;
                         }
                         pts.geometry.attributes.position.needsUpdate = true;
-                        pts.material.opacity = (isHeat ? 0.95 : 0.65);
+                        if (_isDayNow) {
+                            // Día: blending normal + opacidad plena — el rojo sangre se ve sólido contra el cielo claro
+                            pts.material.blending = THREE.NormalBlending;
+                            pts.material.opacity  = (isHeat ? 1.0 : 0.9);
+                        } else {
+                            // Noche: additive para el glow
+                            pts.material.blending = THREE.AdditiveBlending;
+                            pts.material.opacity  = (isHeat ? 0.95 : 0.65);
+                        }
                     });
                     // === AURORA AZUL HVAC — inyección de aire frío que sube y se oscurece ===
                     // Halos: pulse suave, muy visible
@@ -3449,6 +3460,7 @@
                         sceneObj.current.vfdHeatShaderMat.uniforms.uTime.value = t;
                     }
                     // Cometas de streamlines — pulsos viajando por la curva (samples precomputados)
+                    // Día: color oscuro + blending normal (el blanco additive desaparece contra cielo claro)
                     sceneObj.current.hvacColdComets?.forEach(c => {
                         const ud = c.userData;
                         if (!ud.samples) return;
@@ -3456,7 +3468,15 @@
                         const si = Math.min(ud.samples.length - 1, Math.floor(u * (ud.samples.length - 1)));
                         c.position.copy(ud.samples[si]);
                         const fade = Math.max(0, Math.sin(u * Math.PI));
-                        c.material.opacity = 0.95 * fade;
+                        if (_isDayNow) {
+                            c.material.blending = THREE.NormalBlending;
+                            c.material.color.setHex(0x0f172a);   // pip oscuro — contrasta contra el fondo claro
+                            c.material.opacity = 0.9 * fade;
+                        } else {
+                            c.material.blending = THREE.AdditiveBlending;
+                            c.material.color.setHex(0xffffff);
+                            c.material.opacity = 0.95 * fade;
+                        }
                     });
                     // Partículas (modo Partículas) — viajan por la misma curva, color JET según
                     // su posición en el circuito (azul frío → verde/amarillo → rojo caliente)
