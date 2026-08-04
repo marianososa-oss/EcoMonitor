@@ -3875,7 +3875,7 @@
             useEffect(() => {
                 const obj = sceneObj.current;
                 if (!obj) return;
-                const { THREE, hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, roomW, roomD, roomH, masterOutputPos } = obj;
+                const { THREE, scene, hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, roomW, roomD, roomH, masterOutputPos } = obj;
                 const lineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line });
 
                 const clearGroup = (g) => {
