@@ -1218,6 +1218,247 @@
             hvacYellow:    '#fbbf24'    // amarillo — transición temprana
         };
 
+        // ═══════════════════════════════════════════════════════════════════════════
+        // THERMAL SIMULATION — Config central + LUT termográfico + debug GUI (Fase 1)
+        // ═══════════════════════════════════════════════════════════════════════════
+        // Objeto único que centraliza TODOS los parámetros de la simulación térmica
+        // volumétrica. Se lee desde los sistemas de partículas GPU, shaders, passes de
+        // post-processing y el panel dat.GUI. Cambios acá deben reflejarse en vivo.
+        const THERMAL_CONFIG = {
+            // === Preset de calidad — controla density de partículas + optionals ===
+            quality: 'high',   // 'low' | 'medium' | 'high' (low = sin composer, fallback a renderer.render)
+
+            // === Penachos de calor (VFDs) — Fase 2 ===
+            heat: {
+                legacyBillboards: true,   // TRUE durante desarrollo: mantiene halos+streams para A/B
+                enabled: true,
+                intensity: 1.0,
+                plumeCount: { low: 80,  medium: 180, high: 320 },   // partículas GPU por VFD
+                turbulence: 1.0,           // amplitud del curl noise
+                dissipation: 1.0,          // qué rápido se enfría/desaparece al subir
+                riseHeight: 2.0,           // metros que sube antes de dispersarse
+                riseSpeed: 0.35,           // ciclos/segundo
+                particleSize: 0.045        // radio base de partícula (metros mundo)
+            },
+
+            // === Inyección de aire frío (rejillas HVAC inferiores) — Fase 3 ===
+            cold: {
+                enabled: true,
+                flowRate: 1.0,
+                tint: '#67d7ff',           // cyan/celeste — se lee como aire fresco
+                laminarLen: 0.45,          // metros cerca de la rejilla donde el flujo va recto
+                riseSpeed: 0.28,
+                particleCount: { low: 60, medium: 140, high: 240 },
+                particleSize: 0.040
+            },
+
+            // === Estratificación térmica volumétrica — Fase 4 ===
+            strata: {
+                enabled: true,
+                opacity: 0.18,             // opacidad max del volumen
+                convectionSpeed: 0.03,     // desplazamiento del noise en Y por segundo
+                noiseScale: 1.4            // escala del noise interno (más grande = celdas más grandes)
+            },
+
+            // === Extracción superior (convergencia hacia rejillas RET) — Fase 5 ===
+            extract: {
+                enabled: true,
+                attraction: 1.0,           // qué fuerte se "atraen" las partículas calientes
+                sinkRadius: 0.45           // radio de la zona donde entran a la rejilla
+            },
+
+            // === Heat haze (distorsión screen-space) — Fase 2 ===
+            haze: {
+                enabled: true,
+                strength: 0.35,            // amplitud de la distorsión (0 = off, 1 = fuerte)
+                frequency: 8.0             // frecuencia del ripple
+            },
+
+            // === Post-processing pipeline (opcional en low quality) — Fase 2 ===
+            postProcessing: {
+                enabled: true,             // en low quality se desactiva y va a renderer.render directo
+                bloom: {
+                    enabled: true,
+                    strength: 0.8,
+                    radius: 0.6,
+                    threshold: 0.15
+                },
+                heatHaze: {
+                    enabled: true             // toggleable independiente del bloom
+                }
+            },
+
+            // === LUT termográfico centralizado ===
+            // Stops en [0..1] con RGB en [0..1]. Se interpola con smoothstep entre stops.
+            // Se usa desde JS (sampleLUT) y desde GLSL (via DataTexture generada por buildLUTTexture).
+            lut: {
+                stops: [
+                    { t: 0.00, color: [0.05, 0.15, 0.55] },   // azul profundo (muy frío)
+                    { t: 0.18, color: [0.15, 0.55, 0.92] },   // azul
+                    { t: 0.35, color: [0.30, 0.85, 0.98] },   // cyan
+                    { t: 0.50, color: [0.45, 0.90, 0.55] },   // verde-templado
+                    { t: 0.65, color: [0.98, 0.90, 0.20] },   // amarillo
+                    { t: 0.82, color: [0.99, 0.55, 0.10] },   // naranja
+                    { t: 1.00, color: [0.90, 0.15, 0.10] }    // rojo (muy caliente)
+                ]
+            },
+
+            // === Compatibility flags para A/B testing con implementaciones anteriores ===
+            hvac: {
+                legacyEllipsoid: true      // TRUE = mantiene hvacAirShaderMat ellipsoid; se desactiva post-Fase 4
+            },
+
+            // === Multiplicadores día/noche (aplicados al toggle applySceneTheme) ===
+            dayNight: {
+                dayMultipliers: {
+                    plumeOpacity: 0.75,     // más definición, menos glow que se lava con luz
+                    bloomStrength: 0.4,     // bloom bajo en día para no perder contraste
+                    strataOpacity: 0.90,
+                    hazeStrength: 0.60
+                },
+                nightMultipliers: {
+                    plumeOpacity: 1.20,     // en noche puede pisar de más — additive + bloom compensan
+                    bloomStrength: 1.00,
+                    strataOpacity: 1.00,
+                    hazeStrength: 1.00
+                }
+            }
+        };
+
+        // Sample del LUT termográfico a partir de un valor t normalizado [0..1].
+        // Devuelve triplet RGB en [0..1]. Interpolación smoothstep entre los stops.
+        function sampleLUT(t) {
+            t = Math.max(0, Math.min(1, t));
+            const stops = THERMAL_CONFIG.lut.stops;
+            for (let i = 0; i < stops.length - 1; i++) {
+                if (t <= stops[i + 1].t) {
+                    const a = stops[i], b = stops[i + 1];
+                    const localT = (t - a.t) / (b.t - a.t);
+                    const s = localT * localT * (3 - 2 * localT);   // smoothstep
+                    return [
+                        a.color[0] + (b.color[0] - a.color[0]) * s,
+                        a.color[1] + (b.color[1] - a.color[1]) * s,
+                        a.color[2] + (b.color[2] - a.color[2]) * s
+                    ];
+                }
+            }
+            return stops[stops.length - 1].color.slice();
+        }
+
+        // Genera un THREE.DataTexture 1D (Nx1 RGBA) con el LUT muestreado.
+        // Se usará desde shaders GLSL en Fase 2+ para mapear temperatura → color en GPU.
+        function buildLUTTexture(size) {
+            size = size || 256;
+            const data = new Uint8Array(size * 4);
+            for (let i = 0; i < size; i++) {
+                const c = sampleLUT(i / (size - 1));
+                data[i * 4    ] = Math.round(c[0] * 255);
+                data[i * 4 + 1] = Math.round(c[1] * 255);
+                data[i * 4 + 2] = Math.round(c[2] * 255);
+                data[i * 4 + 3] = 255;
+            }
+            const tex = new THREE.DataTexture(data, size, 1, THREE.RGBAFormat);
+            tex.needsUpdate = true;
+            tex.magFilter = THREE.LinearFilter;
+            tex.minFilter = THREE.LinearFilter;
+            tex.wrapS = THREE.ClampToEdgeWrapping;
+            if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        // ─── Debug GUI (dat.GUI) ────────────────────────────────────────────────
+        // El panel NO debe verse en la demo comercial → se activa solo con:
+        //   • URL param `?debug` (útil para acceso rápido con URL propia)
+        //   • Tecla backtick `` ` `` (arriba-izq del teclado — no colisiona con browser)
+        let _thermalGUI = null;
+        let _thermalLUTBar = null;
+
+        function _isThermalDebugMode() {
+            try {
+                return new URLSearchParams(window.location.search).has('debug');
+            } catch (e) { return false; }
+        }
+
+        function _loadDatGUI() {
+            if (window.dat && window.dat.GUI) return Promise.resolve(window.dat);
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js';
+                s.onload = () => resolve(window.dat);
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+        }
+
+        function _initThermalDebugGUI() {
+            if (_thermalGUI) return;   // idempotente — solo se crea una vez
+            _loadDatGUI().then(dat => {
+                const gui = new dat.GUI({ width: 340 });
+                gui.domElement.style.zIndex = 10000;
+                _thermalGUI = gui;
+
+                // Fase 1 — panel mínimo. Se expande en fases siguientes.
+                gui.add(THERMAL_CONFIG, 'quality', ['low', 'medium', 'high']).name('Calidad');
+
+                // Preview visual del LUT termográfico como barra horizontal
+                const lutFolder = gui.addFolder('LUT termográfico');
+                lutFolder.open();
+                const lutRow = document.createElement('div');
+                lutRow.style.cssText = 'height:22px; margin:6px 8px 6px 8px; border-radius:3px; overflow:hidden;';
+                const lutBar = document.createElement('div');
+                lutBar.style.cssText = 'width:100%; height:100%;';
+                lutRow.appendChild(lutBar);
+                lutFolder.domElement.appendChild(lutRow);
+                _updateLUTBar(lutBar);
+                _thermalLUTBar = lutBar;
+
+                // Log de que Fase 1 quedó cargada — útil para verificar
+                console.log('[Thermal] Fase 1 GUI activa. THERMAL_CONFIG:', THERMAL_CONFIG);
+                console.log('[Thermal] Test sampleLUT(0.5) =', sampleLUT(0.5));
+            }).catch(err => console.warn('[Thermal] dat.GUI no pudo cargar:', err));
+        }
+
+        function _updateLUTBar(bar) {
+            if (!bar) return;
+            const stops = THERMAL_CONFIG.lut.stops.map(s => {
+                const [r, g, b] = s.color;
+                const rgb = 'rgb(' + Math.round(r * 255) + ',' + Math.round(g * 255) + ',' + Math.round(b * 255) + ')';
+                return rgb + ' ' + (s.t * 100).toFixed(1) + '%';
+            });
+            bar.style.background = 'linear-gradient(to right, ' + stops.join(', ') + ')';
+        }
+
+        // Bootstrap: activación por URL param o atajo de teclado
+        if (typeof window !== 'undefined') {
+            if (_isThermalDebugMode()) {
+                if (document.readyState === 'loading') {
+                    window.addEventListener('DOMContentLoaded', _initThermalDebugGUI);
+                } else {
+                    _initThermalDebugGUI();
+                }
+            }
+            window.addEventListener('keydown', (e) => {
+                // Backtick key (`) — no colisiona con Ctrl+Alt+D del browser.
+                // Se ignora si el foco está en un input/textarea (para no molestar tipeo).
+                const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+                if (e.key === '`' || e.key === '~') {
+                    e.preventDefault();
+                    _initThermalDebugGUI();
+                }
+            });
+            // Exponer en window para debugging desde consola
+            window.THERMAL_CONFIG = THERMAL_CONFIG;
+            window.sampleLUT = sampleLUT;
+            window.buildLUTTexture = buildLUTTexture;
+            // Función pública por si el usuario prefiere invocar desde consola
+            window.showThermalDebugGUI = _initThermalDebugGUI;
+
+            // Log discreto para saber que Fase 1 está cargada
+            console.info('%c[Thermal] Fase 1 cargada. Activá el panel con la tecla ` (backtick) o con ?debug en la URL.',
+                'color: #9ab63b; font-weight: 600;');
+        }
+
         // Icon: renderiza el SVG de lucide INLINE dentro del árbol de React.
         // Antes usábamos <i data-lucide> + lucide.createIcons() en un useEffect, pero eso
         // mutaba el DOM por fuera de React → cualquier re-render (ej. al inyectar una falla)
