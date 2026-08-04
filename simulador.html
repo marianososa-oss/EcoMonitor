@@ -1211,257 +1211,12 @@
             cloudGreen: '#9ab63b',
             // Airflow visualization: caliente (rojo dramático) para calor emitido y aire retornando,
             // frío (azul saturado) para inyección de aire frío, y warm-intermedio para transición.
-            hvacHot:       '#dc2626',   // rojo saturado — calor / aire retornando
-            hvacHotBright: '#ef4444',   // rojo brillante — brillos de calor
+            hvacHot:       '#f97316',   // naranja saturado — calor emitido por VFDs (aurora)
+            hvacHotBright: '#fdba74',   // naranja claro — brillos de calor
             hvacCold:      '#2563eb',   // azul saturado — aire frío inyectado
             hvacCoolWarm:  '#f59e0b',   // amarillo/naranja — transición cool→hot
             hvacYellow:    '#fbbf24'    // amarillo — transición temprana
         };
-
-        // ═══════════════════════════════════════════════════════════════════════════
-        // THERMAL SIMULATION — Config central + LUT termográfico + debug GUI (Fase 1)
-        // ═══════════════════════════════════════════════════════════════════════════
-        // Objeto único que centraliza TODOS los parámetros de la simulación térmica
-        // volumétrica. Se lee desde los sistemas de partículas GPU, shaders, passes de
-        // post-processing y el panel dat.GUI. Cambios acá deben reflejarse en vivo.
-        const THERMAL_CONFIG = {
-            // === Preset de calidad — controla density de partículas + optionals ===
-            quality: 'high',   // 'low' | 'medium' | 'high' (low = sin composer, fallback a renderer.render)
-
-            // === Penachos de calor (VFDs) — Fase 2 ===
-            heat: {
-                legacyBillboards: false,  // FALSE = billboards viejos apagados. TRUE = A/B con nuevo sistema.
-                enabled: true,
-                intensity: 1.0,
-                plumeCount: { low: 80,  medium: 180, high: 320 },   // partículas GPU por VFD
-                turbulence: 1.0,           // amplitud del curl noise
-                dissipation: 1.0,          // qué rápido se enfría/desaparece al subir
-                riseHeight: 2.0,           // metros que sube antes de dispersarse
-                riseSpeed: 0.35,           // ciclos/segundo
-                particleSize: 0.045        // radio base de partícula (metros mundo)
-            },
-
-            // === Inyección de aire frío (rejillas HVAC inferiores) — Fase 3 ===
-            cold: {
-                enabled: true,
-                flowRate: 1.0,
-                tint: '#67d7ff',           // cyan/celeste — se lee como aire fresco
-                laminarLen: 0.45,          // metros cerca de la rejilla donde el flujo va recto
-                riseSpeed: 0.28,
-                particleCount: { low: 60, medium: 140, high: 240 },
-                particleSize: 0.040
-            },
-
-            // === Estratificación térmica volumétrica — Fase 4 ===
-            strata: {
-                enabled: true,
-                opacity: 0.18,             // opacidad max del volumen
-                convectionSpeed: 0.03,     // desplazamiento del noise en Y por segundo
-                noiseScale: 1.4            // escala del noise interno (más grande = celdas más grandes)
-            },
-
-            // === Extracción superior (convergencia hacia rejillas RET) — Fase 5 ===
-            extract: {
-                enabled: true,
-                attraction: 1.0,           // qué fuerte se "atraen" las partículas calientes
-                sinkRadius: 0.45           // radio de la zona donde entran a la rejilla
-            },
-
-            // === Heat haze (distorsión screen-space) — Fase 2 ===
-            haze: {
-                enabled: true,
-                strength: 0.35,            // amplitud de la distorsión (0 = off, 1 = fuerte)
-                frequency: 8.0             // frecuencia del ripple
-            },
-
-            // === Post-processing pipeline (opcional en low quality) — Fase 2 ===
-            postProcessing: {
-                enabled: true,             // en low quality se desactiva y va a renderer.render directo
-                bloom: {
-                    enabled: true,
-                    strength: 0.8,
-                    radius: 0.6,
-                    threshold: 0.15
-                },
-                heatHaze: {
-                    enabled: true             // toggleable independiente del bloom
-                }
-            },
-
-            // === LUT termográfico centralizado ===
-            // Stops en [0..1] con RGB en [0..1]. Se interpola con smoothstep entre stops.
-            // Se usa desde JS (sampleLUT) y desde GLSL (via DataTexture generada por buildLUTTexture).
-            lut: {
-                stops: [
-                    { t: 0.00, color: [0.05, 0.15, 0.55] },   // azul profundo (muy frío)
-                    { t: 0.18, color: [0.15, 0.55, 0.92] },   // azul
-                    { t: 0.35, color: [0.30, 0.85, 0.98] },   // cyan
-                    { t: 0.50, color: [0.45, 0.90, 0.55] },   // verde-templado
-                    { t: 0.65, color: [0.98, 0.90, 0.20] },   // amarillo
-                    { t: 0.82, color: [0.99, 0.55, 0.10] },   // naranja
-                    { t: 1.00, color: [0.90, 0.15, 0.10] }    // rojo (muy caliente)
-                ]
-            },
-
-            // === Compatibility flags para A/B testing con implementaciones anteriores ===
-            hvac: {
-                legacyEllipsoid: true      // TRUE = mantiene hvacAirShaderMat ellipsoid; se desactiva post-Fase 4
-            },
-
-            // === Multiplicadores día/noche (aplicados al toggle applySceneTheme) ===
-            dayNight: {
-                dayMultipliers: {
-                    plumeOpacity: 0.75,     // más definición, menos glow que se lava con luz
-                    bloomStrength: 0.4,     // bloom bajo en día para no perder contraste
-                    strataOpacity: 0.90,
-                    hazeStrength: 0.60
-                },
-                nightMultipliers: {
-                    plumeOpacity: 1.20,     // en noche puede pisar de más — additive + bloom compensan
-                    bloomStrength: 1.00,
-                    strataOpacity: 1.00,
-                    hazeStrength: 1.00
-                }
-            }
-        };
-
-        // Sample del LUT termográfico a partir de un valor t normalizado [0..1].
-        // Devuelve triplet RGB en [0..1]. Interpolación smoothstep entre los stops.
-        function sampleLUT(t) {
-            t = Math.max(0, Math.min(1, t));
-            const stops = THERMAL_CONFIG.lut.stops;
-            for (let i = 0; i < stops.length - 1; i++) {
-                if (t <= stops[i + 1].t) {
-                    const a = stops[i], b = stops[i + 1];
-                    const localT = (t - a.t) / (b.t - a.t);
-                    const s = localT * localT * (3 - 2 * localT);   // smoothstep
-                    return [
-                        a.color[0] + (b.color[0] - a.color[0]) * s,
-                        a.color[1] + (b.color[1] - a.color[1]) * s,
-                        a.color[2] + (b.color[2] - a.color[2]) * s
-                    ];
-                }
-            }
-            return stops[stops.length - 1].color.slice();
-        }
-
-        // Genera un THREE.DataTexture 1D (Nx1 RGBA) con el LUT muestreado.
-        // Se usará desde shaders GLSL en Fase 2+ para mapear temperatura → color en GPU.
-        function buildLUTTexture(size) {
-            size = size || 256;
-            const data = new Uint8Array(size * 4);
-            for (let i = 0; i < size; i++) {
-                const c = sampleLUT(i / (size - 1));
-                data[i * 4    ] = Math.round(c[0] * 255);
-                data[i * 4 + 1] = Math.round(c[1] * 255);
-                data[i * 4 + 2] = Math.round(c[2] * 255);
-                data[i * 4 + 3] = 255;
-            }
-            const tex = new THREE.DataTexture(data, size, 1, THREE.RGBAFormat);
-            tex.needsUpdate = true;
-            tex.magFilter = THREE.LinearFilter;
-            tex.minFilter = THREE.LinearFilter;
-            tex.wrapS = THREE.ClampToEdgeWrapping;
-            if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-            return tex;
-        }
-
-        // ─── Debug GUI (dat.GUI) ────────────────────────────────────────────────
-        // El panel NO debe verse en la demo comercial → se activa solo con:
-        //   • URL param `?debug` (útil para acceso rápido con URL propia)
-        //   • Tecla backtick `` ` `` (arriba-izq del teclado — no colisiona con browser)
-        let _thermalGUI = null;
-        let _thermalLUTBar = null;
-
-        function _isThermalDebugMode() {
-            try {
-                return new URLSearchParams(window.location.search).has('debug');
-            } catch (e) { return false; }
-        }
-
-        function _loadDatGUI() {
-            if (window.dat && window.dat.GUI) return Promise.resolve(window.dat);
-            return new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = 'https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js';
-                s.onload = () => resolve(window.dat);
-                s.onerror = reject;
-                document.head.appendChild(s);
-            });
-        }
-
-        function _initThermalDebugGUI() {
-            if (_thermalGUI) return;
-            _loadDatGUI().then(dat => {
-                const gui = new dat.GUI({ width: 280, autoPlace: false });
-                const wrapper = document.createElement('div');
-                wrapper.style.cssText = [
-                    'position:fixed', 'right:14px', 'top:120px',
-                    'z-index:10000', 'font-family:system-ui, sans-serif',
-                    'box-shadow:0 8px 24px rgba(0,0,0,0.45)',
-                    'border-radius:4px', 'overflow:hidden'
-                ].join(';');
-                wrapper.appendChild(gui.domElement);
-                document.body.appendChild(wrapper);
-                _thermalGUI = gui;
-                // Sliders VISIBLES por default — controlan la simulación térmica
-                gui.add(THERMAL_CONFIG.heat, 'intensity', 0.0, 3.0, 0.1).name('Calor VFDs');
-                gui.add(THERMAL_CONFIG.cold, 'flowRate', 0.0, 3.0, 0.1).name('Aire frío HVAC');
-                gui.add(THERMAL_CONFIG.heat, 'riseSpeed', 0.05, 1.0, 0.01).name('Velocidad calor');
-                gui.add(THERMAL_CONFIG.cold, 'riseSpeed', 0.05, 1.0, 0.01).name('Velocidad frío');
-                const lutFolder = gui.addFolder('LUT termográfico');
-                const lutRow = document.createElement('div');
-                lutRow.style.cssText = 'height:18px; margin:6px 8px 8px 8px; border-radius:3px; overflow:hidden;';
-                const lutBar = document.createElement('div');
-                lutBar.style.cssText = 'width:100%; height:100%;';
-                lutRow.appendChild(lutBar);
-                lutFolder.domElement.appendChild(lutRow);
-                _updateLUTBar(lutBar);
-                _thermalLUTBar = lutBar;
-                console.log('[Thermal] Panel activo. Ajustá los sliders para ver el efecto en vivo.');
-            }).catch(err => console.warn('[Thermal] dat.GUI no cargó:', err));
-        }
-
-        function _updateLUTBar(bar) {
-            if (!bar) return;
-            const stops = THERMAL_CONFIG.lut.stops.map(s => {
-                const [r, g, b] = s.color;
-                const rgb = 'rgb(' + Math.round(r * 255) + ',' + Math.round(g * 255) + ',' + Math.round(b * 255) + ')';
-                return rgb + ' ' + (s.t * 100).toFixed(1) + '%';
-            });
-            bar.style.background = 'linear-gradient(to right, ' + stops.join(', ') + ')';
-        }
-
-        // Bootstrap: activación por URL param o atajo de teclado
-        if (typeof window !== 'undefined') {
-            if (_isThermalDebugMode()) {
-                if (document.readyState === 'loading') {
-                    window.addEventListener('DOMContentLoaded', _initThermalDebugGUI);
-                } else {
-                    _initThermalDebugGUI();
-                }
-            }
-            window.addEventListener('keydown', (e) => {
-                // Backtick key (`) — no colisiona con Ctrl+Alt+D del browser.
-                // Se ignora si el foco está en un input/textarea (para no molestar tipeo).
-                const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
-                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-                if (e.key === '`' || e.key === '~') {
-                    e.preventDefault();
-                    _initThermalDebugGUI();
-                }
-            });
-            // Exponer en window para debugging desde consola
-            window.THERMAL_CONFIG = THERMAL_CONFIG;
-            window.sampleLUT = sampleLUT;
-            window.buildLUTTexture = buildLUTTexture;
-            // Función pública por si el usuario prefiere invocar desde consola
-            window.showThermalDebugGUI = _initThermalDebugGUI;
-
-            // Log discreto para saber que Fase 1 está cargada
-            console.info('%c[Thermal] Fase 1 cargada. Activá el panel con la tecla ` (backtick) o con ?debug en la URL.',
-                'color: #9ab63b; font-weight: 600;');
-        }
 
         // Icon: renderiza el SVG de lucide INLINE dentro del árbol de React.
         // Antes usábamos <i data-lucide> + lucide.createIcons() en un useEffect, pero eso
@@ -2675,156 +2430,6 @@
                     depthWrite: false,
                     side: THREE.DoubleSide
                 });
-
-                // ═══════════════════════════════════════════════════════════════════
-                // HEAT PARTICLES SHADER — Penachos volumétricos de calor VFDs
-                // ═══════════════════════════════════════════════════════════════════
-                // THREE.Points con ShaderMaterial custom. Cada partícula:
-                //  • Nace en la base (VFD top) definida por position attribute
-                //  • Sube por Y con velocidad function del tiempo + phase
-                //  • Recibe turbulencia via CURL NOISE 3D (derivada de simplex noise) inline en GLSL
-                //  • Color muestreado del LUT termográfico según edad (hot → cool al ascender)
-                //  • Soft particle (radial gradient) + additive blending
-                // Da look de HUMO/AIRE CALIENTE con volumen y profundidad.
-                const heatLUTTex = buildLUTTexture(256);
-                const heatPointsShaderMat = new THREE.ShaderMaterial({
-                    uniforms: {
-                        uTime:       { value: 0 },
-                        uIntensity:  { value: 1.0 },
-                        uRiseHeight: { value: 2.4 },
-                        uTurbulence: { value: 0.55 },
-                        uPointScale: { value: 300.0 },
-                        uLUT:        { value: heatLUTTex }
-                    },
-                    vertexShader: `
-                        attribute float phase;
-                        attribute float seed;
-                        uniform float uTime;
-                        uniform float uIntensity;
-                        uniform float uRiseHeight;
-                        uniform float uTurbulence;
-                        uniform float uPointScale;
-                        varying float vAge;
-                        varying float vSeed;
-
-                        // ═══ Simplex noise 3D (Ashima Arts, inline) ═══
-                        vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-                        vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-                        vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
-                        vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
-                        float snoise(vec3 v) {
-                            const vec2 C = vec2(1.0/6.0, 1.0/3.0);
-                            const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-                            vec3 i = floor(v + dot(v, C.yyy));
-                            vec3 x0 = v - i + dot(i, C.xxx);
-                            vec3 g = step(x0.yzx, x0.xyz);
-                            vec3 l = 1.0 - g;
-                            vec3 i1 = min(g.xyz, l.zxy);
-                            vec3 i2 = max(g.xyz, l.zxy);
-                            vec3 x1 = x0 - i1 + C.xxx;
-                            vec3 x2 = x0 - i2 + C.yyy;
-                            vec3 x3 = x0 - D.yyy;
-                            i = mod289(i);
-                            vec4 p = permute(permute(permute(
-                                     i.z + vec4(0.0, i1.z, i2.z, 1.0))
-                                   + i.y + vec4(0.0, i1.y, i2.y, 1.0))
-                                   + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-                            float n_ = 0.142857142857;
-                            vec3 ns = n_ * D.wyz - D.xzx;
-                            vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-                            vec4 x_ = floor(j * ns.z);
-                            vec4 y_ = floor(j - 7.0 * x_);
-                            vec4 x = x_ * ns.x + ns.yyyy;
-                            vec4 y = y_ * ns.x + ns.yyyy;
-                            vec4 h = 1.0 - abs(x) - abs(y);
-                            vec4 b0 = vec4(x.xy, y.xy);
-                            vec4 b1 = vec4(x.zw, y.zw);
-                            vec4 s0 = floor(b0)*2.0 + 1.0;
-                            vec4 s1 = floor(b1)*2.0 + 1.0;
-                            vec4 sh = -step(h, vec4(0.0));
-                            vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
-                            vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
-                            vec3 p0 = vec3(a0.xy, h.x);
-                            vec3 p1 = vec3(a0.zw, h.y);
-                            vec3 p2 = vec3(a1.xy, h.z);
-                            vec3 p3 = vec3(a1.zw, h.w);
-                            vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
-                            p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-                            vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-                            m = m * m;
-                            return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
-                        }
-
-                        // ═══ Curl noise 3D — derivada rotacional del simplex noise ═══
-                        // Divergence-free field → perfecto para flujos incompresibles (humo, gas).
-                        vec3 curlNoise(vec3 p) {
-                            const float eps = 0.1;
-                            const vec3 dx = vec3(eps, 0.0, 0.0);
-                            const vec3 dy = vec3(0.0, eps, 0.0);
-                            const vec3 dz = vec3(0.0, 0.0, eps);
-                            // Sampleamos 3 potenciales scalares desplazados en el espacio
-                            vec3 pyz1 = vec3(snoise(p + dy), 0.0, snoise(p + dz));
-                            vec3 pyz0 = vec3(snoise(p - dy), 0.0, snoise(p - dz));
-                            float ay = (snoise(p + dy + vec3(0.0, 12.7, 0.0)) - snoise(p - dy + vec3(0.0, 12.7, 0.0))) / (2.0 * eps);
-                            float az = (snoise(p + dz + vec3(0.0, 27.3, 0.0)) - snoise(p - dz + vec3(0.0, 27.3, 0.0))) / (2.0 * eps);
-                            float bx = (snoise(p + dx + vec3(0.0, 0.0, 27.3)) - snoise(p - dx + vec3(0.0, 0.0, 27.3))) / (2.0 * eps);
-                            float bz = (snoise(p + dz) - snoise(p - dz)) / (2.0 * eps);
-                            float cx = (snoise(p + dx + vec3(0.0, 12.7, 0.0)) - snoise(p - dx + vec3(0.0, 12.7, 0.0))) / (2.0 * eps);
-                            float cy = (snoise(p + dy) - snoise(p - dy)) / (2.0 * eps);
-                            return vec3(az - bz, bx - cx, cy - ay);
-                        }
-
-                        void main() {
-                            // Cada partícula tiene su ciclo de vida — algunas están naciendo, otras subiendo, otras muriendo
-                            float cycle = mod(uTime * 0.32 + phase, 1.0);
-                            vAge  = cycle;
-                            vSeed = seed;
-
-                            // Base position (VFD top world coord) + rise vertical
-                            vec3 pos = position;
-                            pos.y += cycle * uRiseHeight;
-
-                            // Turbulencia por CURL NOISE — crece con la edad (dispersión al ascender)
-                            vec3 noiseCoord = pos * 0.45 + vec3(seed * 0.033, uTime * 0.10, seed * 0.041);
-                            vec3 turb = curlNoise(noiseCoord) * uTurbulence * (0.15 + cycle * 1.35);
-                            pos += turb;
-
-                            vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
-                            gl_Position = projectionMatrix * mvPos;
-
-                            // Tamaño escalado por distancia (perspectiva correcta) + variación con edad
-                            float size = 14.0 * uIntensity * (1.30 - cycle * 0.55);
-                            gl_PointSize = clamp(size * (uPointScale / -mvPos.z), 2.0, 55.0);
-                        }
-                    `,
-                    fragmentShader: `
-                        uniform sampler2D uLUT;
-                        varying float vAge;
-                        varying float vSeed;
-                        void main() {
-                            // Soft particle: gradiente radial suave, sin bordes duros
-                            vec2 uv = gl_PointCoord - 0.5;
-                            float r = length(uv);
-                            if (r > 0.5) discard;
-                            float alpha = pow(smoothstep(0.5, 0.0, r), 1.3);
-
-                            // Sample LUT: caliente al nacer (t=0.98) → frío al morir (t=0.55)
-                            float lutT = mix(0.98, 0.55, vAge);
-                            vec3 color = texture2D(uLUT, vec2(lutT, 0.5)).rgb;
-
-                            // Fade out al final de vida
-                            alpha *= (1.0 - smoothstep(0.72, 1.0, vAge));
-                            // Variación de brillo por seed → cada partícula un poco distinta
-                            alpha *= 0.70 + 0.45 * fract(vSeed * 0.719);
-
-                            gl_FragColor = vec4(color, alpha);
-                        }
-                    `,
-                    transparent: true,
-                    blending: THREE.AdditiveBlending,
-                    depthWrite: false
-                });
-
                 const _makePuff = () => new THREE.Sprite(new THREE.SpriteMaterial({
                     map: puffTex, transparent: true, opacity: 0.35,
                     blending: THREE.AdditiveBlending, depthWrite: false
@@ -2942,7 +2547,6 @@
                 // Así las mochilas AM-010 y sus rejillas quedan bien visibles desde el pasillo.
                 const heatMeshes = [];
                 const heatWaves = [];
-                const heatPointClouds = [];   // THREE.Points por VFD — sistema volumétrico GPU
                 const eqW = 1.3, eqH = 2.0, eqD = 0.9;
                 const vfdRowGap = 0.05;                            // huequito visible entre backs
                 const vfdRowN_Z = -eqD/2 - vfdRowGap/2;            // fila NORTE — fronts miran a -Z
@@ -2989,73 +2593,40 @@
                     label.position.set(x, y + eqH/2 - 0.3, z + facesOutward * (eqD/2 + 0.006));
                     if (facesOutward < 0) label.rotation.y = Math.PI;
                     scene.add(label);
-                    // === BILLBOARDS LEGACY — atrás del flag heat.legacyBillboards para A/B ===
-                    // Por default apagados. Se pueden reactivar cambiando THERMAL_CONFIG.heat.legacyBillboards=true.
-                    const _useLegacyBillboards = (typeof THERMAL_CONFIG !== 'undefined' && THERMAL_CONFIG.heat.legacyBillboards);
-                    if (_useLegacyBillboards) {
-                        const heat = new THREE.Mesh(
-                            new THREE.SphereGeometry(1.3, 20, 14),
-                            new THREE.MeshBasicMaterial({ color: TH_COLOR.hvacHot, transparent: true, opacity: 0.32, depthWrite: false })
+                    // === AURORA ROJA VFD — halo + núcleo + ondas ascendentes que suben ===
+                    // Halo rojo exterior — difuso, define la zona de emisión de calor
+                    const heat = new THREE.Mesh(
+                        new THREE.SphereGeometry(1.3, 20, 14),
+                        new THREE.MeshBasicMaterial({
+                            color: TH_COLOR.hvacHot, transparent: true, opacity: 0.32, depthWrite: false
+                        })
+                    );
+                    heat.position.set(x, eqH + 2.21, z);
+                    heat.userData.phase = i * 0.65;
+                    scene.add(heat); heatMeshes.push(heat);
+                    // Núcleo interno rojo brillante
+                    const heatCore = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.60, 16, 12),
+                        new THREE.MeshBasicMaterial({
+                            color: TH_COLOR.hvacHotBright, transparent: true, opacity: 0.62, depthWrite: false
+                        })
+                    );
+                    heatCore.position.set(x, eqH + 2.21, z);
+                    heatCore.userData.phase = i * 0.65;
+                    scene.add(heatCore); heatMeshes.push(heatCore);
+                    // Ondas rojas ascendentes — suben para mostrar emisión de calor
+                    for (let r = 0; r < 6; r++) {
+                        const wave = new THREE.Mesh(
+                            new THREE.RingGeometry(0.30, 0.42, 32),
+                            new THREE.MeshBasicMaterial({
+                                color: TH_COLOR.hvacHot, transparent: true, opacity: 0,
+                                side: THREE.DoubleSide, depthWrite: false
+                            })
                         );
-                        heat.position.set(x, eqH + 2.21, z);
-                        heat.userData.phase = i * 0.65;
-                        scene.add(heat); heatMeshes.push(heat);
-                        const heatCore = new THREE.Mesh(
-                            new THREE.SphereGeometry(0.60, 16, 12),
-                            new THREE.MeshBasicMaterial({ color: TH_COLOR.hvacHotBright, transparent: true, opacity: 0.62, depthWrite: false })
-                        );
-                        heatCore.position.set(x, eqH + 2.21, z);
-                        heatCore.userData.phase = i * 0.65;
-                        scene.add(heatCore); heatMeshes.push(heatCore);
-                        for (let r = 0; r < 10; r++) {
-                            const stream = new THREE.Mesh(
-                                new THREE.SphereGeometry(0.10, 12, 10),
-                                new THREE.MeshBasicMaterial({ color: TH_COLOR.hvacHot, transparent: true, opacity: 0, depthWrite: false })
-                            );
-                            stream.scale.set(1, 3.2, 1);
-                            stream.position.set(x, eqH + 2.21, z);
-                            const angleR = (r / 10) * Math.PI * 2;
-                            const radR = 0.12 + (r % 3) * 0.10;
-                            stream.userData = {
-                                phase: (i * 0.35 + r * 0.11) % 1,
-                                baseX: x, baseZ: z, offsetX: Math.cos(angleR) * radR, offsetZ: Math.sin(angleR) * radR
-                            };
-                            scene.add(stream); heatWaves.push(stream);
-                        }
-                    }
-
-                    // === PENACHO VOLUMÉTRICO GPU — THREE.Points con 320 partículas por VFD ===
-                    // Cada punto es una partícula soft additive. Vertex shader las anima con curl noise 3D
-                    // (divergence-free) para movimiento turbulento realístico. Color muestreado del LUT
-                    // termográfico según edad → nacen calientes (rojo) y se enfrían al ascender (naranja→amarillo).
-                    // NO es billboard 2D — cada partícula tiene su posición 3D única → rotando la cámara
-                    // se ve una nube tridimensional diferente desde cada ángulo.
-                    // Referencia local: sceneObj.current aún no está seteado en este punto del init useEffect
-                    const _heatMat = heatPointsShaderMat;
-                    if (_heatMat) {
-                        const N = 320;
-                        const positions = new Float32Array(N * 3);
-                        const phases    = new Float32Array(N);
-                        const seeds     = new Float32Array(N);
-                        for (let p = 0; p < N; p++) {
-                            // Spawn en el footprint del VFD (elipse chata, radio ~0.35 m X, ~0.25 m Z)
-                            const angle = Math.random() * Math.PI * 2;
-                            const rad   = Math.sqrt(Math.random());   // uniform distribution 0..1
-                            positions[p * 3    ] = x + Math.cos(angle) * rad * 0.35;
-                            positions[p * 3 + 1] = eqH + 2.21;
-                            positions[p * 3 + 2] = z + Math.sin(angle) * rad * 0.28;
-                            phases[p] = Math.random();
-                            seeds[p]  = Math.random() * 100;
-                        }
-                        const geo = new THREE.BufferGeometry();
-                        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                        geo.setAttribute('phase',    new THREE.BufferAttribute(phases, 1));
-                        geo.setAttribute('seed',     new THREE.BufferAttribute(seeds, 1));
-                        const points = new THREE.Points(geo, _heatMat);
-                        points.frustumCulled = false;   // Evita clipping cuando la nube se dispersa
-                        points.renderOrder = 10;
-                        scene.add(points);
-                        heatPointClouds.push(points);
+                        wave.rotation.x = -Math.PI / 2;
+                        wave.position.set(x, eqH + 2.21, z);
+                        wave.userData = { phase: (i * 0.35 + r * 0.18) % 1, baseX: x, baseZ: z };
+                        scene.add(wave); heatWaves.push(wave);
                     }
                 });
 
@@ -3528,8 +3099,8 @@
                 sceneObj.current = {
                     THREE, scene, camera, renderer,
                     hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, secondaryMasterGroup, secondaryOutputPos, masterGroup,
-                    heatMeshes, heatWaves, heatPointClouds, wallMeshes, wifiRings, dataPackets,
-                    perimeterWisps, doorStreams, puddleGroup, puffTex, hvacAirShaderMat, vfdHeatShaderMat, heatPointsShaderMat, heatLUTTex,
+                    heatMeshes, heatWaves, wifiRings, dataPackets, wallMeshes,
+                    perimeterWisps, doorStreams, puddleGroup, puffTex, hvacAirShaderMat, vfdHeatShaderMat,
                     masterOutputPos, cloudPos,
                     roomW, roomD, roomH,
                     targetView: 'iso',
@@ -3664,68 +3235,14 @@
                         const baseOp = isHeat ? 0.50 : 0.28;
                         h.material.opacity = baseOp + 0.12 * (0.5 + 0.5 * Math.sin(ph * 1.0));
                     });
-                    // Columnas verticales de calor — suben rectas, controladas por THERMAL_CONFIG.heat.
-                    // La intensidad y la velocidad se ajustan desde el panel dat.GUI en tiempo real.
-                    const heatCfg = (typeof THERMAL_CONFIG !== 'undefined') ? THERMAL_CONFIG.heat : { intensity: 1, riseSpeed: 0.30 };
+                    // Ondas de calor rojas — subiendo, mucho más opacas para exagerar el calor
                     sceneObj.current.heatWaves?.forEach(w => {
-                        const u = ((t * heatCfg.riseSpeed * heatMul + w.userData.phase) % 1);
-                        w.position.set(
-                            w.userData.baseX + w.userData.offsetX,
-                            eqH + 2.21 + u * 2.0,
-                            w.userData.baseZ + w.userData.offsetZ
-                        );
-                        w.scale.set(1, 3.2, 1);
-                        const peakOp = (isHeat ? 0.85 : 0.55) * heatCfg.intensity;
-                        w.material.opacity = peakOp * Math.max(0, Math.sin(u * Math.PI));
-                    });
-                    // === AIRE FRÍO HVAC — CIRCUITO DE CONVECCIÓN COMPLETO ===
-                    // Cada partícula sigue un path scripted de 3 tramos: horizontal desde INJ →
-                    // centro low → sube al centro high → horizontal hasta RET (extracción arriba).
-                    // Todo en WORLD coords + turbulencia sinusoidal encima.
-                    const coldCfg = (typeof THERMAL_CONFIG !== 'undefined') ? THERMAL_CONFIG.cold : { flowRate: 1, riseSpeed: 0.28 };
-                    const _speedMul = coldCfg.riseSpeed / 0.28;   // el slider "Velocidad frío" escala uniformemente
-                    sceneObj.current.hvacColdStreams?.forEach(s => {
-                        const ud = s.userData;
-                        const u = ((t * ud.cycleSpeed * _speedMul + ud.phase) % 1);
-                        let px, py, pz;
-                        // Tramo 1: INJ → centro bajo (horizontal, atravesando la sala)
-                        if (u < 0.38) {
-                            const tt = u / 0.38;
-                            px = ud.spawn.x + (ud.centerLow.x - ud.spawn.x) * tt;
-                            py = ud.spawn.y + (ud.centerLow.y - ud.spawn.y) * tt;
-                            pz = ud.spawn.z + (ud.centerLow.z - ud.spawn.z) * tt;
-                        }
-                        // Tramo 2: centro bajo → centro alto (SUBE por buoyancy sobre los VFDs)
-                        else if (u < 0.68) {
-                            const tt = (u - 0.38) / 0.30;
-                            px = ud.centerLow.x + (ud.centerHigh.x - ud.centerLow.x) * tt;
-                            py = ud.centerLow.y + (ud.centerHigh.y - ud.centerLow.y) * tt;
-                            pz = ud.centerLow.z + (ud.centerHigh.z - ud.centerLow.z) * tt;
-                        }
-                        // Tramo 3: centro alto → RET (horizontal a la rejilla superior, absorción)
-                        else {
-                            const tt = (u - 0.68) / 0.32;
-                            px = ud.centerHigh.x + (ud.ret.x - ud.centerHigh.x) * tt;
-                            py = ud.centerHigh.y + (ud.ret.y - ud.centerHigh.y) * tt;
-                            pz = ud.centerHigh.z + (ud.ret.z - ud.centerHigh.z) * tt;
-                        }
-                        // Turbulencia sinusoidal — movimiento orgánico, no líneas rectas
-                        const seed = ud.seed;
-                        px += Math.sin(t * 1.4 + seed * 0.017) * 0.20;
-                        pz += Math.cos(t * 1.1 + seed * 0.023) * 0.20;
-                        py += Math.sin(t * 0.8 + seed * 0.031) * 0.10;
-                        s.position.set(px, py, pz);
-                        s.scale.set(1, 1, 1);   // Sin elongación vertical — es una nube esférica
-                        // Color: azul frío al principio → cambia al templado al llegar al centro alto
-                        //        para simular que se calentó y va a extracción
-                        const warmMix = Math.max(0, (u - 0.5) * 2);   // 0..1 a partir del medio
-                        const cR = 0.40 + warmMix * 0.55;
-                        const cG = 0.84 - warmMix * 0.30;
-                        const cB = 1.00 - warmMix * 0.60;
-                        s.material.color.setRGB(cR, cG, cB);
-                        // Opacidad: sinusoidal — pico en medio del cycle, fade en extremos
-                        const peakOp = 0.60 * coldCfg.flowRate;
-                        s.material.opacity = peakOp * Math.max(0, Math.sin(u * Math.PI));
+                        const u = ((t * 0.32 * heatMul + w.userData.phase) % 1);
+                        w.position.y = eqH + 2.21 + u * 2.2;
+                        const sc = 1 + u * 2.0;
+                        w.scale.set(sc, sc, sc);
+                        const peakOp = isHeat ? 0.90 : 0.60;
+                        w.material.opacity = (1 - u) * peakOp * Math.max(0, Math.sin(u * Math.PI));
                     });
                     // === AURORA AZUL HVAC — inyección de aire frío que sube y se oscurece ===
                     // Halos: pulse suave, muy visible
@@ -3880,14 +3397,6 @@
                     // Shader volumétrico VFD (calor emitido) — mismo pattern
                     if (sceneObj.current.vfdHeatShaderMat) {
                         sceneObj.current.vfdHeatShaderMat.uniforms.uTime.value = t;
-                    }
-                    // Heat particles GPU — actualizar uTime + intensidad desde THERMAL_CONFIG
-                    if (sceneObj.current.heatPointsShaderMat) {
-                        const hu = sceneObj.current.heatPointsShaderMat.uniforms;
-                        hu.uTime.value = t;
-                        if (typeof THERMAL_CONFIG !== 'undefined') {
-                            hu.uIntensity.value = THERMAL_CONFIG.heat.intensity;
-                        }
                     }
                     // Aire visible — perimeter wisps siempre + door streams solo con door_open
                     sceneObj.current.perimeterWisps?.forEach(w => {
@@ -4058,7 +3567,7 @@
             useEffect(() => {
                 const obj = sceneObj.current;
                 if (!obj) return;
-                const { THREE, scene, hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, roomW, roomD, roomH, masterOutputPos } = obj;
+                const { THREE, hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, roomW, roomD, roomH, masterOutputPos } = obj;
                 const lineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line });
 
                 const clearGroup = (g) => {
@@ -4076,15 +3585,6 @@
                 clearGroup(esclavoGroup);
                 clearGroup(cableGroup);
                 clearGroup(centralizedGroup);
-                // Limpiar partículas de aire frío de la iteración anterior (viven en scene, no en un group)
-                if (sceneObj.current?.hvacColdStreams?.length) {
-                    sceneObj.current.hvacColdStreams.forEach(s => {
-                        s.geometry?.dispose();
-                        s.material?.dispose();
-                        scene.remove(s);
-                    });
-                    sceneObj.current.hvacColdStreams.length = 0;
-                }
 
                 const colorByState = (state) => state === 'TITULAR' ? TH_COLOR.titular
                                               : state === 'APOYO'   ? TH_COLOR.apoyo
@@ -4123,11 +3623,10 @@
                 const presAssignments = presUnits.map((u, i) => ({ wall: 'east', along: presZs[i], idx: i }));
                 const n = hvacUnits.length;
                 const hvacInfo = []; // {wall, alongCoord, canon values..., idx}
-                const hvacAirPuffs = []; // (legacy)
-                const hvacBgGlow   = []; // (legacy)
-                const hvacInjMeshes = []; // (legacy)
-                const hvacInjWaves  = []; // (legacy)
-                const hvacColdStreams = []; // Partículas azules subiendo desde rejillas INJ inferiores
+                const hvacAirPuffs = []; // (legacy, no usado ahora)
+                const hvacBgGlow   = []; // (legacy, no usado ahora)
+                const hvacInjMeshes = []; // Halo + núcleo azul de la INYECCIÓN de aire frío
+                const hvacInjWaves  = []; // Ondas expansivas azules que suben y oscurecen
 
                 // === makeAlertSprite / getFaultTexture / makeIdLabel viven ahora en el INIT useEffect (ver arriba).
                 //     Se leen de sceneObj.current para evitar el ReferenceError silencioso.
@@ -4436,62 +3935,6 @@
                         airEsfumado.position.set(asX_esfumado, y, z);
                         airEsfumado.renderOrder = 5;
                         g.add(airEsfumado);
-                    }
-
-                    // === AIRE FRÍO INYECTADO — CIRCULACIÓN COMPLETA POR LA SALA ===
-                    // Las partículas NO suben derecho como una columna. Siguen un flujo de convección:
-                    //   1) Salen HORIZONTAL desde la rejilla INJ (abajo) hacia el interior del shelter
-                    //   2) Recorren el ambiente hasta el centro de la sala (bajo)
-                    //   3) SUBEN en la zona caliente central (buoyancy)
-                    //   4) Regresan HORIZONTAL en el techo hacia la rejilla RET (arriba)
-                    //   5) Son absorbidas por la extracción
-                    // Se agregan a SCENE (no a g) para trabajar en world coords y cruzar la sala.
-
-                    // Calcular coords mundo del INJ + RET + dir interior por tipo de pared
-                    const yWorld = 2.21 + roomH * 0.5;   // Y mundo centro del HVAC
-                    let injX, injZ, retX, retZ, interiorX_world, interiorZ_world;
-                    if (wall === 'east') {
-                        injX = roomW/2 - 0.15;  retX = injX;
-                        injZ = alongCoord;      retZ = alongCoord;
-                        interiorX_world = -1; interiorZ_world = 0;
-                    } else if (wall === 'north') {
-                        injX = alongCoord;      retX = alongCoord;
-                        injZ = -roomD/2 + 0.15; retZ = injZ;
-                        interiorX_world = 0;  interiorZ_world = 1;
-                    } else { // south
-                        injX = alongCoord;      retX = alongCoord;
-                        injZ = roomD/2 - 0.15;  retZ = injZ;
-                        interiorX_world = 0;  interiorZ_world = -1;
-                    }
-                    const yInjWorld = yWorld - 0.95;
-                    const yRetWorld = yWorld + 0.95;
-
-                    // 20 partículas por HVAC con fases distribuidas
-                    const N_COLD = 20;
-                    for (let p = 0; p < N_COLD; p++) {
-                        const sprite = new THREE.Mesh(
-                            new THREE.SphereGeometry(0.14, 14, 12),
-                            new THREE.MeshBasicMaterial({
-                                color: 0x67d7ff, transparent: true, opacity: 0,
-                                depthWrite: false, blending: THREE.AdditiveBlending
-                            })
-                        );
-                        // Distribuir el spawn a lo ancho de la rejilla (~1 m)
-                        const spread = (p / (N_COLD - 1) - 0.5) * 0.8;
-                        const sx = injX + (wall === 'east' ? 0 : spread);
-                        const sz = injZ + (wall === 'east' ? spread : 0);
-
-                        sprite.userData = {
-                            spawn: new THREE.Vector3(sx, yInjWorld, sz),
-                            ret:   new THREE.Vector3(retX, yRetWorld, retZ),
-                            centerLow:  new THREE.Vector3(0, yInjWorld + 0.4, 0),   // centro bajo
-                            centerHigh: new THREE.Vector3(0, yRetWorld - 0.4, 0),   // centro alto
-                            phase: (idx * 0.13 + p / N_COLD) % 1,
-                            seed: p * 37 + idx * 91,
-                            cycleSpeed: 0.055 + (p % 4) * 0.008
-                        };
-                        scene.add(sprite);   // ← Directo a scene, en world coords
-                        hvacColdStreams.push(sprite);
                     }
 
                     g.userData = { fan, spinSpeed: spin, stateBand, unitId: u.id };
@@ -5740,7 +5183,6 @@
                 obj.hvacBgGlow   = hvacBgGlow;
                 obj.hvacInjMeshes = hvacInjMeshes;
                 obj.hvacInjWaves  = hvacInjWaves;
-                obj.hvacColdStreams = hvacColdStreams;
             }, [hvacUnits, presUnits]);
 
             // Toggle interior/exterior — actualiza opacidad de paredes
