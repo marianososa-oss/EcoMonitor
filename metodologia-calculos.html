@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Metodología de cálculo — Cable y Canalización · EcoMonitor</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+    :root {
+        --eco-blue: #00478F;
+        --eco-lightblue: #0098c6;
+        --eco-green: #4f7725;
+        --eco-lightgreen: #9ab63b;
+        --eco-dark: #111827;
+        --ink: #1f2937;
+        --ink-soft: #4b5563;
+        --line: #e5e7eb;
+        --paper: #ffffff;
+        --tint: #f3f6fb;
+        --tint-green: #f4f8ea;
+    }
+    @page {
+        size: A4;
+        margin: 10mm 12mm;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        font-size: 9.5pt;
+        line-height: 1.35;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .page {
+        max-width: 190mm;
+        margin: 0 auto;
+        padding: 4mm 0;
+    }
+
+    /* === HEADER === */
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2px solid var(--eco-blue);
+        padding-bottom: 6px;
+        margin-bottom: 10px;
+    }
+    header .brand img {
+        height: 28px;
+        display: block;
+    }
+    header .meta {
+        text-align: right;
+        font-size: 7.5pt;
+        color: var(--ink-soft);
+    }
+    header .meta .kicker {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 600;
+        color: var(--eco-blue);
+        font-size: 7pt;
+    }
+
+    /* === TITLE === */
+    h1 {
+        font-size: 16pt;
+        line-height: 1.15;
+        color: var(--eco-dark);
+        margin: 0 0 3px 0;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+    .subtitle {
+        color: var(--ink-soft);
+        font-size: 9pt;
+        margin: 0 0 10px 0;
+    }
+
+    /* === SECTIONS === */
+    h2 {
+        font-size: 10pt;
+        color: var(--eco-blue);
+        margin: 10px 0 6px 0;
+        padding-bottom: 3px;
+        border-bottom: 1px solid var(--line);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    /* === CONCEPT === */
+    .concept-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    .concept-card {
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 8px 10px;
+        position: relative;
+    }
+    .concept-card.central {
+        border-left: 3px solid var(--eco-lightblue);
+        background: var(--tint);
+    }
+    .concept-card.ecomonitor {
+        border-left: 3px solid var(--eco-lightgreen);
+        background: var(--tint-green);
+    }
+    .concept-card h3 {
+        font-size: 9.5pt;
+        margin: 0 0 3px 0;
+        color: var(--eco-dark);
+        font-weight: 700;
+    }
+    .concept-card h3 .badge {
+        display: inline-block;
+        font-size: 6.5pt;
+        padding: 1px 5px;
+        border-radius: 3px;
+        margin-left: 4px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    .concept-card.central h3 .badge {
+        background: var(--eco-lightblue);
+        color: white;
+    }
+    .concept-card.ecomonitor h3 .badge {
+        background: var(--eco-lightgreen);
+        color: white;
+    }
+    .concept-card p {
+        margin: 0 0 3px 0;
+        font-size: 8.5pt;
+        color: var(--ink);
+    }
+    .concept-card ul {
+        margin: 2px 0 0 0;
+        padding-left: 14px;
+        font-size: 8pt;
+        color: var(--ink);
+    }
+    .concept-card ul li { margin-bottom: 1px; }
+
+    /* === FORMULAS === */
+    .formulas-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    .formula-block {
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    .formula-head {
+        padding: 4px 8px;
+        font-weight: 700;
+        font-size: 8.5pt;
+        color: white;
+    }
+    .formula-block.central .formula-head { background: var(--eco-lightblue); }
+    .formula-block.ecomonitor .formula-head { background: var(--eco-lightgreen); }
+    .formula-body {
+        padding: 6px 8px;
+    }
+    .formula-row {
+        margin-bottom: 5px;
+    }
+    .formula-row:last-child { margin-bottom: 0; }
+    .formula-label {
+        font-size: 7pt;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        margin-bottom: 1px;
+    }
+    .formula-value {
+        font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+        font-size: 8pt;
+        background: #f9fafb;
+        border: 1px solid var(--line);
+        padding: 3px 6px;
+        border-radius: 3px;
+        color: var(--eco-dark);
+    }
+
+    /* === EXAMPLE === */
+    .example-context {
+        font-size: 8.5pt;
+        color: var(--ink-soft);
+        margin: 4px 0 6px 0;
+        padding: 5px 8px;
+        background: #f9fafb;
+        border-left: 3px solid var(--eco-blue);
+        border-radius: 0 3px 3px 0;
+    }
+    table.comparison {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 4px;
+    }
+    table.comparison th,
+    table.comparison td {
+        padding: 4px 6px;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        font-size: 8.5pt;
+    }
+    table.comparison th {
+        background: var(--eco-blue);
+        color: white;
+        font-weight: 600;
+        font-size: 8pt;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    table.comparison td.metric {
+        font-weight: 600;
+        color: var(--eco-dark);
+    }
+    table.comparison td.central-cell {
+        color: var(--ink);
+    }
+    table.comparison td.ecomonitor-cell {
+        color: var(--eco-green);
+        font-weight: 600;
+    }
+    table.comparison td.diff-cell {
+        color: white;
+        font-weight: 700;
+        text-align: center;
+        background: var(--eco-lightgreen);
+    }
+    table.comparison tr:last-child td { border-bottom: none; }
+    table.comparison .value-strong {
+        font-family: 'JetBrains Mono', 'Consolas', monospace;
+        font-weight: 700;
+    }
+    table.comparison tr.subtotal-row td {
+        background: #f3f4f6;
+        font-weight: 700;
+    }
+    table.comparison tr.subtotal-row td.central-cell,
+    table.comparison tr.subtotal-row td.ecomonitor-cell {
+        color: var(--eco-dark);
+    }
+
+    /* === COMMERCIAL === */
+    .commercial {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        margin-top: 4px;
+    }
+    .commercial-card {
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--eco-lightgreen);
+        border-radius: 4px;
+        padding: 6px 8px;
+    }
+    .commercial-card h4 {
+        margin: 0 0 2px 0;
+        font-size: 8.5pt;
+        color: var(--eco-dark);
+        font-weight: 700;
+    }
+    .commercial-card p {
+        margin: 0;
+        font-size: 8pt;
+        color: var(--ink-soft);
+        line-height: 1.3;
+    }
+
+    /* === FOOTER === */
+    footer {
+        margin-top: 10px;
+        padding-top: 6px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 7pt;
+        color: var(--ink-soft);
+    }
+    footer .brand-mark {
+        font-weight: 700;
+        color: var(--eco-blue);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        font-size: 7pt;
+    }
+
+    @media print {
+        html, body { background: white; }
+        .page { padding: 0; }
+    }
+</style>
+</head>
+<body>
+    <div class="page">
+
+        <header>
+            <div class="brand">
+                <img src="ecomonitor-color.png" alt="EcoMonitor">
+            </div>
+            <div class="meta">
+                <div class="kicker">Documento técnico interno</div>
+                <div>Ecocontrol · Ingeniería EcoMonitor</div>
+            </div>
+        </header>
+
+        <h1>Comparativa técnica: PLC Central vs EcoMonitor</h1>
+        <p class="subtitle">Metodología de cálculo de cable y canalización. Ejemplo real: shelter 12 × 8 m con 8 HVAC + 1 Presurizador.</p>
+
+        <h2>El sistema en simple</h2>
+        <div class="concept-grid">
+            <div class="concept-card central">
+                <h3>PLC Central <span class="badge">Estrella</span></h3>
+                <p>Cada equipo tiene su propio cableado dedicado que va desde el tablero central hasta el equipo.</p>
+                <ul>
+                    <li><strong>Bandeja portacables</strong> perimetral a 2,70 m del piso</li>
+                    <li><strong>Caño vertical</strong> de 1 m baja de la bandeja al tablero de cada equipo</li>
+                    <li>Cada equipo lleva 2 cables: <strong>Marcha</strong> (5 conductores) + <strong>Sensores</strong> (8 conductores) = <strong>13 conductores</strong></li>
+                </ul>
+            </div>
+            <div class="concept-card ecomonitor">
+                <h3>EcoMonitor <span class="badge">Guirnalda</span></h3>
+                <p>Un solo bus de datos troncal recorre toda la sala pasando cerca de todos los equipos, con bajadas cortas a cada uno.</p>
+                <ul>
+                    <li><strong>Sin bandeja</strong> — el cable troncal va con canalización propia</li>
+                    <li><strong>Bus de datos único</strong> con 4 conductores (Modbus A + B + tierra + alimentación)</li>
+                    <li>Bajadas cortas por equipo (~1 m) en el mismo troncal</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2>Fórmulas de cálculo</h2>
+        <div class="formulas-grid">
+
+            <div class="formula-block central">
+                <div class="formula-head">PLC Central</div>
+                <div class="formula-body">
+                    <div class="formula-row">
+                        <div class="formula-label">Bandeja</div>
+                        <div class="formula-value">Recorrido perimetral desde tablero central</div>
+                    </div>
+                    <div class="formula-row">
+                        <div class="formula-label">Caño</div>
+                        <div class="formula-value">1 m × N equipos</div>
+                    </div>
+                    <div class="formula-row">
+                        <div class="formula-label">Marcha (hilo)</div>
+                        <div class="formula-value">Σ distancia por equipo × 5 conductores</div>
+                    </div>
+                    <div class="formula-row">
+                        <div class="formula-label">Sensores (hilo)</div>
+                        <div class="formula-value">Σ distancia por equipo × 8 conductores</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="formula-block ecomonitor">
+                <div class="formula-head">EcoMonitor</div>
+                <div class="formula-body">
+                    <div class="formula-row">
+                        <div class="formula-label">Bandeja</div>
+                        <div class="formula-value">No usa bandeja (0 m)</div>
+                    </div>
+                    <div class="formula-row">
+                        <div class="formula-label">Caño (canalización)</div>
+                        <div class="formula-value">Troncal perimetral + bajadas por equipo</div>
+                    </div>
+                    <div class="formula-row">
+                        <div class="formula-label">Bus de datos (hilo)</div>
+                        <div class="formula-value">Largo real del troncal con vueltas y curvas</div>
+                    </div>
+                    <div class="formula-row">
+                        <div class="formula-label">Cableado por equipo</div>
+                        <div class="formula-value">~1 m marcha + ~1,8 m sensores</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <h2>Ejemplo real — 8 HVAC + 1 Presurizador</h2>
+        <div class="example-context">
+            <strong>Escenario:</strong> Shelter 12 × 8 m. Tablero central en una punta. Presurizador siempre en la punta opuesta. HVAC 1–4 sobre un costado (distancias 8, 11, 14, 17 m). HVAC 5–8 en espejo sobre el costado opuesto. Pres 1 a 21 m. <strong>Suma total de distancias tablero→equipo = 121 m.</strong>
+        </div>
+        <table class="comparison">
+            <thead>
+                <tr>
+                    <th>Concepto</th>
+                    <th>PLC Central</th>
+                    <th>EcoMonitor</th>
+                    <th>Diferencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="metric">Bandeja</td>
+                    <td class="central-cell"><span class="value-strong">34 m</span></td>
+                    <td class="ecomonitor-cell"><span class="value-strong">0 m</span></td>
+                    <td class="diff-cell">–34 m</td>
+                </tr>
+                <tr>
+                    <td class="metric">Caño (canalización)</td>
+                    <td class="central-cell"><span class="value-strong">9 m</span> <span style="color:var(--ink-soft); font-size:7.5pt;">(1 × 9 equipos)</span></td>
+                    <td class="ecomonitor-cell"><span class="value-strong">43 m</span></td>
+                    <td class="diff-cell">+34 m</td>
+                </tr>
+                <tr class="subtotal-row">
+                    <td class="metric">Total canalización</td>
+                    <td class="central-cell"><span class="value-strong">43 m</span></td>
+                    <td class="ecomonitor-cell"><span class="value-strong">43 m</span></td>
+                    <td class="diff-cell" style="background: var(--ink-soft);">≈ 0 %</td>
+                </tr>
+                <tr>
+                    <td class="metric">Marcha (hilo)</td>
+                    <td class="central-cell"><span class="value-strong">605 m</span> <span style="color:var(--ink-soft); font-size:7.5pt;">(121 × 5)</span></td>
+                    <td class="ecomonitor-cell"><span class="value-strong">10 m</span></td>
+                    <td class="diff-cell">–98 %</td>
+                </tr>
+                <tr>
+                    <td class="metric">Sensores (hilo)</td>
+                    <td class="central-cell"><span class="value-strong">968 m</span> <span style="color:var(--ink-soft); font-size:7.5pt;">(121 × 8)</span></td>
+                    <td class="ecomonitor-cell"><span class="value-strong">16 m</span></td>
+                    <td class="diff-cell">–98 %</td>
+                </tr>
+                <tr>
+                    <td class="metric">Bus de datos (hilo)</td>
+                    <td class="central-cell"><span class="value-strong">0 m</span></td>
+                    <td class="ecomonitor-cell"><span class="value-strong">55 m</span></td>
+                    <td class="diff-cell" style="background: var(--ink-soft);">Solo EcoMon</td>
+                </tr>
+                <tr class="subtotal-row">
+                    <td class="metric">Total hilo</td>
+                    <td class="central-cell"><span class="value-strong">1.573 m</span></td>
+                    <td class="ecomonitor-cell"><span class="value-strong">81 m</span></td>
+                    <td class="diff-cell">–95 %</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Traducción comercial</h2>
+        <div class="commercial">
+            <div class="commercial-card">
+                <h4>Menor costo directo</h4>
+                <p>Menos metros de hilo (–95 %) reduce el costo de material en obra proporcionalmente.</p>
+            </div>
+            <div class="commercial-card">
+                <h4>Sin bandeja</h4>
+                <p>No hace falta bandeja portacables perimetral, ni sus soportes ni la mano de obra de montaje.</p>
+            </div>
+            <div class="commercial-card">
+                <h4>Más fácil de expandir</h4>
+                <p>Agregar un equipo nuevo en EcoMonitor es una bajada al troncal, no un cable nuevo desde el tablero.</p>
+            </div>
+        </div>
+
+        <footer>
+            <div>
+                <span class="brand-mark">EcoMonitor</span> · Ecocontrol · ecomonitor.com.ar
+            </div>
+            <div>Documento técnico interno · 2026</div>
+        </footer>
+
+    </div>
+</body>
+</html>
