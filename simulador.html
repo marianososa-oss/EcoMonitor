@@ -4045,11 +4045,17 @@
                 // Cada streamline lleva 2 "cometas" luminosos animados que viajan por la curva
                 // (estilo ParaView/OpenFOAM) mostrando la dirección y velocidad del flujo.
                 // Color cyan saturado para leerse claro en día y noche.
+                // Núcleo cyan brillante saturado
                 const _streamMat = new THREE.MeshBasicMaterial({
-                    color: '#00bfff', transparent: true, opacity: 0.75, depthWrite: false
+                    color: '#00e5ff', transparent: true, opacity: 0.95, depthWrite: false
+                });
+                // Halo exterior más grueso, difuso — le da presencia contra fondos claros y oscuros
+                const _streamHaloMat = new THREE.MeshBasicMaterial({
+                    color: '#4dd0ff', transparent: true, opacity: 0.35,
+                    blending: THREE.AdditiveBlending, depthWrite: false
                 });
                 const _cometMat = new THREE.MeshBasicMaterial({
-                    color: '#e0f7ff', transparent: true, opacity: 1.0,
+                    color: '#ffffff', transparent: true, opacity: 1.0,
                     blending: THREE.AdditiveBlending, depthWrite: false
                 });
                 hvacInfo.forEach(hp => {
@@ -4074,25 +4080,34 @@
                         const spread = (s / (N_STREAMS - 1) - 0.5) * grilleWidth;
                         let sx = injX, sz = injZ;
                         if (hp.wall === 'east') sz += spread; else sx += spread;
+                        // Waypoints: arco pronunciado desde INJ (en la pared, abajo) → centro sala
+                        // → sube al centro alto → arco de vuelta a la RET (en la pared, arriba)
                         const P0 = new THREE.Vector3(sx,                        yc - 0.95, sz);
-                        const P1 = new THREE.Vector3(sx + intDirX * 1.6,        yc - 0.85, sz + intDirZ * 1.6);
-                        const P2 = new THREE.Vector3(intDirX * 0.4,             yc - 0.35, intDirZ * 0.4);
-                        const P3 = new THREE.Vector3(intDirX * 0.4,             yc + 0.55, intDirZ * 0.4);
-                        const P4 = new THREE.Vector3(sx + intDirX * 1.6,        yc + 0.75, sz + intDirZ * 1.6);
+                        const P1 = new THREE.Vector3(sx + intDirX * 2.2,        yc - 0.80, sz + intDirZ * 2.2);
+                        const P2 = new THREE.Vector3(0,                         yc - 0.20, 0);
+                        const P3 = new THREE.Vector3(0,                         yc + 0.40, 0);
+                        const P4 = new THREE.Vector3(sx + intDirX * 2.2,        yc + 0.75, sz + intDirZ * 2.2);
                         const P5 = new THREE.Vector3(retX,                      yc + 0.95, retZ);
                         const curve = new THREE.CatmullRomCurve3([P0, P1, P2, P3, P4, P5], false, 'catmullrom', 0.5);
-                        const tubeGeo = new THREE.TubeGeometry(curve, 80, 0.028, 8, false);
-                        const streamMesh = new THREE.Mesh(tubeGeo, _streamMat);
-                        streamMesh.renderOrder = 3;
+                        // Núcleo brillante — bien visible, radio 5 cm
+                        const streamGeo = new THREE.TubeGeometry(curve, 96, 0.045, 10, false);
+                        const streamMesh = new THREE.Mesh(streamGeo, _streamMat);
+                        streamMesh.renderOrder = 4;
                         scene.add(streamMesh);
                         hvacColdStreamlines.push(streamMesh);
-                        // 2 cometas por streamline con phases desfasados
+                        // Halo exterior — el mismo curve pero radio 11 cm, difuso, para presencia
+                        const haloGeo = new THREE.TubeGeometry(curve, 96, 0.11, 10, false);
+                        const haloMesh = new THREE.Mesh(haloGeo, _streamHaloMat);
+                        haloMesh.renderOrder = 3;
+                        scene.add(haloMesh);
+                        hvacColdStreamlines.push(haloMesh);
+                        // 2 cometas por streamline con phases desfasados (más grandes y brillantes)
                         for (let c = 0; c < 2; c++) {
                             const comet = new THREE.Mesh(
-                                new THREE.SphereGeometry(0.075, 12, 8),
+                                new THREE.SphereGeometry(0.14, 14, 10),
                                 _cometMat
                             );
-                            comet.renderOrder = 5;
+                            comet.renderOrder = 6;
                             comet.userData = {
                                 curve, phase: ((s * 0.23) + (c * 0.5)) % 1, speed: 0.18
                             };
