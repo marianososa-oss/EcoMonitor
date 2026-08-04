@@ -1391,30 +1391,24 @@
         }
 
         function _initThermalDebugGUI() {
-            if (_thermalGUI) return;   // idempotente — solo se crea una vez
+            if (_thermalGUI) return;
             _loadDatGUI().then(dat => {
-                const gui = new dat.GUI({ width: 260, autoPlace: false });
-                // Contenedor propio: bottom-right, offset del borde, oculto del flujo normal.
+                const gui = new dat.GUI({ width: 280, autoPlace: false });
                 const wrapper = document.createElement('div');
                 wrapper.style.cssText = [
-                    'position:fixed',
-                    'right:14px',
-                    'bottom:14px',
-                    'z-index:10000',
-                    'font-family:system-ui, sans-serif',
+                    'position:fixed', 'right:14px', 'top:120px',
+                    'z-index:10000', 'font-family:system-ui, sans-serif',
                     'box-shadow:0 8px 24px rgba(0,0,0,0.45)',
-                    'border-radius:4px',
-                    'overflow:hidden'
+                    'border-radius:4px', 'overflow:hidden'
                 ].join(';');
                 wrapper.appendChild(gui.domElement);
                 document.body.appendChild(wrapper);
-                gui.close();   // Cerrado por default → solo se ve la barra "Open Controls"
                 _thermalGUI = gui;
-
-                // Fase 1 — panel mínimo. Se expande en fases siguientes.
-                gui.add(THERMAL_CONFIG, 'quality', ['low', 'medium', 'high']).name('Calidad');
-
-                // Preview visual del LUT termográfico como barra horizontal
+                // Sliders VISIBLES por default — controlan la simulación térmica
+                gui.add(THERMAL_CONFIG.heat, 'intensity', 0.0, 3.0, 0.1).name('Calor VFDs');
+                gui.add(THERMAL_CONFIG.cold, 'flowRate', 0.0, 3.0, 0.1).name('Aire frío HVAC');
+                gui.add(THERMAL_CONFIG.heat, 'riseSpeed', 0.05, 1.0, 0.01).name('Velocidad calor');
+                gui.add(THERMAL_CONFIG.cold, 'riseSpeed', 0.05, 1.0, 0.01).name('Velocidad frío');
                 const lutFolder = gui.addFolder('LUT termográfico');
                 const lutRow = document.createElement('div');
                 lutRow.style.cssText = 'height:18px; margin:6px 8px 8px 8px; border-radius:3px; overflow:hidden;';
@@ -1424,10 +1418,8 @@
                 lutFolder.domElement.appendChild(lutRow);
                 _updateLUTBar(lutBar);
                 _thermalLUTBar = lutBar;
-
-                console.log('[Thermal] Fase 1 GUI activa. THERMAL_CONFIG:', THERMAL_CONFIG);
-                console.log('[Thermal] Test sampleLUT(0.5) =', sampleLUT(0.5));
-            }).catch(err => console.warn('[Thermal] dat.GUI no pudo cargar:', err));
+                console.log('[Thermal] Panel activo. Ajustá los sliders para ver el efecto en vivo.');
+            }).catch(err => console.warn('[Thermal] dat.GUI no cargó:', err));
         }
 
         function _updateLUTBar(bar) {
@@ -3497,21 +3489,33 @@
                         const baseOp = isHeat ? 0.50 : 0.28;
                         h.material.opacity = baseOp + 0.12 * (0.5 + 0.5 * Math.sin(ph * 1.0));
                     });
-                    // Columnas verticales de calor — suben rectas SIN expandirse a los costados.
-                    // Solo cambia Y position + opacidad (sine curve para fade in/out).
+                    // Columnas verticales de calor — suben rectas, controladas por THERMAL_CONFIG.heat.
+                    // La intensidad y la velocidad se ajustan desde el panel dat.GUI en tiempo real.
+                    const heatCfg = (typeof THERMAL_CONFIG !== 'undefined') ? THERMAL_CONFIG.heat : { intensity: 1, riseSpeed: 0.30 };
                     sceneObj.current.heatWaves?.forEach(w => {
-                        const u = ((t * 0.30 * heatMul + w.userData.phase) % 1);
-                        // Sube desde el top del VFD hasta el techo del shelter (~2 m)
+                        const u = ((t * heatCfg.riseSpeed * heatMul + w.userData.phase) % 1);
                         w.position.set(
                             w.userData.baseX + w.userData.offsetX,
                             eqH + 2.21 + u * 2.0,
                             w.userData.baseZ + w.userData.offsetZ
                         );
-                        // Escala vertical constante (NO se expande a los costados)
                         w.scale.set(1, 3.2, 1);
-                        // Opacidad sinusoidal — fade in al nacer, fade out al llegar arriba
-                        const peakOp = isHeat ? 0.85 : 0.55;
+                        const peakOp = (isHeat ? 0.85 : 0.55) * heatCfg.intensity;
                         w.material.opacity = peakOp * Math.max(0, Math.sin(u * Math.PI));
+                    });
+                    // === AIRE FRÍO HVAC — partículas azules subiendo desde rejillas inferiores ===
+                    // Controladas por THERMAL_CONFIG.cold desde el slider "Aire frío HVAC" del panel.
+                    const coldCfg = (typeof THERMAL_CONFIG !== 'undefined') ? THERMAL_CONFIG.cold : { flowRate: 1, riseSpeed: 0.28 };
+                    sceneObj.current.hvacColdStreams?.forEach(s => {
+                        const u = ((t * coldCfg.riseSpeed + s.userData.phase) % 1);
+                        s.position.set(
+                            s.userData.baseX + s.userData.offsetX,
+                            s.userData.baseY + u * 2.0,
+                            s.userData.baseZ + s.userData.offsetZ
+                        );
+                        s.scale.set(1, 3.2, 1);
+                        const peakOp = 0.75 * coldCfg.flowRate;
+                        s.material.opacity = peakOp * Math.max(0, Math.sin(u * Math.PI));
                     });
                     // === AURORA AZUL HVAC — inyección de aire frío que sube y se oscurece ===
                     // Halos: pulse suave, muy visible
@@ -3892,10 +3896,11 @@
                 const presAssignments = presUnits.map((u, i) => ({ wall: 'east', along: presZs[i], idx: i }));
                 const n = hvacUnits.length;
                 const hvacInfo = []; // {wall, alongCoord, canon values..., idx}
-                const hvacAirPuffs = []; // (legacy, no usado ahora)
-                const hvacBgGlow   = []; // (legacy, no usado ahora)
-                const hvacInjMeshes = []; // Halo + núcleo azul de la INYECCIÓN de aire frío
-                const hvacInjWaves  = []; // Ondas expansivas azules que suben y oscurecen
+                const hvacAirPuffs = []; // (legacy)
+                const hvacBgGlow   = []; // (legacy)
+                const hvacInjMeshes = []; // (legacy)
+                const hvacInjWaves  = []; // (legacy)
+                const hvacColdStreams = []; // Partículas azules subiendo desde rejillas INJ inferiores
 
                 // === makeAlertSprite / getFaultTexture / makeIdLabel viven ahora en el INIT useEffect (ver arriba).
                 //     Se leen de sceneObj.current para evitar el ReferenceError silencioso.
@@ -4204,6 +4209,32 @@
                         airEsfumado.position.set(asX_esfumado, y, z);
                         airEsfumado.renderOrder = 5;
                         g.add(airEsfumado);
+                    }
+
+                    // === AIRE FRÍO INYECTADO — partículas azules subiendo desde rejilla INJ inferior ===
+                    // 12 columnas azules por HVAC, nacen en la rejilla inferior (y - 0.95) y suben.
+                    // Controladas por THERMAL_CONFIG.cold desde el slider "Aire frío HVAC" del panel.
+                    const asX_cold = interiorX + (-outSign) * 0.55;
+                    const yColdBase = y - 0.95;   // Nivel de la rejilla INJ
+                    for (let r = 0; r < 12; r++) {
+                        const stream = new THREE.Mesh(
+                            new THREE.SphereGeometry(0.10, 12, 10),
+                            new THREE.MeshBasicMaterial({
+                                color: 0x60a5fa, transparent: true, opacity: 0, depthWrite: false
+                            })
+                        );
+                        stream.scale.set(1, 3.2, 1);
+                        stream.position.set(asX_cold, yColdBase, z);
+                        const angleR = (r / 12) * Math.PI * 2;
+                        const radR = 0.12 + (r % 3) * 0.12;
+                        stream.userData = {
+                            phase: (idx * 0.28 + r * 0.083) % 1,
+                            baseX: asX_cold, baseZ: z, baseY: yColdBase,
+                            offsetX: Math.cos(angleR) * radR,
+                            offsetZ: Math.sin(angleR) * radR
+                        };
+                        g.add(stream);
+                        hvacColdStreams.push(stream);
                     }
 
                     g.userData = { fan, spinSpeed: spin, stateBand, unitId: u.id };
@@ -5452,6 +5483,7 @@
                 obj.hvacBgGlow   = hvacBgGlow;
                 obj.hvacInjMeshes = hvacInjMeshes;
                 obj.hvacInjWaves  = hvacInjWaves;
+                obj.hvacColdStreams = hvacColdStreams;
             }, [hvacUnits, presUnits]);
 
             // Toggle interior/exterior — actualiza opacidad de paredes
