@@ -2593,27 +2593,47 @@
                     label.position.set(x, y + eqH/2 - 0.3, z + facesOutward * (eqD/2 + 0.006));
                     if (facesOutward < 0) label.rotation.y = Math.PI;
                     scene.add(label);
-                    // === AURORA ROJA VFD — halo + núcleo (2 esferas concéntricas con pulso) ===
-                    // Halo rojo exterior — difuso, define la zona de emisión de calor
-                    const heat = new THREE.Mesh(
-                        new THREE.SphereGeometry(1.3, 20, 14),
-                        new THREE.MeshBasicMaterial({
-                            color: TH_COLOR.hvacHot, transparent: true, opacity: 0.32, depthWrite: false
-                        })
-                    );
-                    heat.position.set(x, eqH + 2.21, z);
-                    heat.userData.phase = i * 0.65;
-                    scene.add(heat); heatMeshes.push(heat);
-                    // Núcleo interno rojo brillante
-                    const heatCore = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.60, 16, 12),
-                        new THREE.MeshBasicMaterial({
-                            color: TH_COLOR.hvacHotBright, transparent: true, opacity: 0.62, depthWrite: false
-                        })
-                    );
-                    heatCore.position.set(x, eqH + 2.21, z);
-                    heatCore.userData.phase = i * 0.65;
-                    scene.add(heatCore); heatMeshes.push(heatCore);
+                    // === PARTÍCULAS ROJAS CHICAS — muchas, subiendo desde el VFD ===
+                    // 250 puntitos por VFD usando THREE.Points (eficiente). Cada uno tiene su phase
+                    // y velocidad. Suben desde el top del VFD con turbulencia sinusoidal.
+                    const N_PARTICLES = 250;
+                    const _positions = new Float32Array(N_PARTICLES * 3);
+                    const _initPos   = new Float32Array(N_PARTICLES * 3);
+                    const _phases    = new Float32Array(N_PARTICLES);
+                    const _speeds    = new Float32Array(N_PARTICLES);
+                    const _seeds     = new Float32Array(N_PARTICLES);
+                    for (let p = 0; p < N_PARTICLES; p++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const rad   = Math.sqrt(Math.random()) * 0.32;
+                        const ix = x + Math.cos(angle) * rad;
+                        const iy = eqH + 2.21 + Math.random() * 0.05;
+                        const iz = z + Math.sin(angle) * rad * 0.7;
+                        _positions[p * 3]     = _initPos[p * 3]     = ix;
+                        _positions[p * 3 + 1] = _initPos[p * 3 + 1] = iy;
+                        _positions[p * 3 + 2] = _initPos[p * 3 + 2] = iz;
+                        _phases[p] = Math.random();
+                        _speeds[p] = 0.20 + Math.random() * 0.20;
+                        _seeds[p]  = Math.random() * 100;
+                    }
+                    const _partGeo = new THREE.BufferGeometry();
+                    _partGeo.setAttribute('position', new THREE.BufferAttribute(_positions, 3));
+                    const _partMat = new THREE.PointsMaterial({
+                        color: TH_COLOR.hvacHot,
+                        size: 0.055,
+                        sizeAttenuation: true,
+                        transparent: true,
+                        opacity: 0.85,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    });
+                    const _points = new THREE.Points(_partGeo, _partMat);
+                    _points.frustumCulled = false;
+                    _points.userData = {
+                        initPos: _initPos, phases: _phases, speeds: _speeds, seeds: _seeds,
+                        N: N_PARTICLES
+                    };
+                    scene.add(_points);
+                    heatWaves.push(_points);   // Se usa heatWaves como array de partículas por VFD
                 });
 
                 // === Dynamic groups ===
@@ -3221,21 +3241,27 @@
                         const baseOp = isHeat ? 0.50 : 0.28;
                         h.material.opacity = baseOp + 0.12 * (0.5 + 0.5 * Math.sin(ph * 1.0));
                     });
-                    // Columnas verticales de calor — suben SIN expandirse a los costados.
-                    // Solo cambia Y position + opacidad (sine curve para fade in/out).
-                    sceneObj.current.heatWaves?.forEach(w => {
-                        const u = ((t * 0.30 * heatMul + w.userData.phase) % 1);
-                        // Sube desde el top del VFD hasta el techo del shelter (~2 m)
-                        w.position.set(
-                            w.userData.baseX + w.userData.offsetX,
-                            eqH + 2.21 + u * 2.0,
-                            w.userData.baseZ + w.userData.offsetZ
-                        );
-                        // Escala vertical constante (NO se expande a los costados)
-                        w.scale.set(1, 3.2, 1);
-                        // Opacidad sinusoidal — fade in al nacer, fade out al llegar arriba
-                        const peakOp = isHeat ? 0.85 : 0.55;
-                        w.material.opacity = peakOp * Math.max(0, Math.sin(u * Math.PI));
+                    // Partículas rojas chicas — actualizan sus posiciones cada frame.
+                    // Cada partícula sube ~1.8m desde su posición inicial con turbulencia sinusoidal.
+                    sceneObj.current.heatWaves?.forEach(pts => {
+                        if (!pts.geometry?.attributes?.position) return;
+                        const ud = pts.userData;
+                        const arr = pts.geometry.attributes.position.array;
+                        for (let p = 0; p < ud.N; p++) {
+                            const cycle = ((t * ud.speeds[p] * heatMul) + ud.phases[p]) % 1;
+                            const iX = ud.initPos[p * 3];
+                            const iY = ud.initPos[p * 3 + 1];
+                            const iZ = ud.initPos[p * 3 + 2];
+                            // Turbulencia crece con la edad (dispersan al subir)
+                            const wobble = cycle * 0.20;
+                            const seed = ud.seeds[p];
+                            arr[p * 3]     = iX + Math.sin(cycle * 4.0 + seed) * wobble;
+                            arr[p * 3 + 1] = iY + cycle * 1.9;
+                            arr[p * 3 + 2] = iZ + Math.cos(cycle * 4.0 + seed) * wobble;
+                        }
+                        pts.geometry.attributes.position.needsUpdate = true;
+                        // Opacidad global del sistema pulsa suavemente
+                        pts.material.opacity = (isHeat ? 0.95 : 0.65);
                     });
                     // === AURORA AZUL HVAC — inyección de aire frío que sube y se oscurece ===
                     // Halos: pulse suave, muy visible
