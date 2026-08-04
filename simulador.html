@@ -1218,6 +1218,18 @@
             hvacYellow:    '#fbbf24'    // amarillo — transición temprana
         };
 
+        // ═══ Colormap JET (CFD clásico: ParaView/OpenFOAM) ═══
+        // t ∈ [0,1] → azul (frío) → cyan → verde → amarillo → rojo (caliente).
+        // Se usa para colorear streamlines y partículas según temperatura del aire
+        // a lo largo del circuito: INJ (t=0, frío) → celdas VFD → RET (t=1, caliente).
+        const jetColor = (t) => {
+            t = Math.max(0, Math.min(1, t));
+            const r = Math.max(0, Math.min(1, 1.5 - Math.abs(4 * t - 3)));
+            const g = Math.max(0, Math.min(1, 1.5 - Math.abs(4 * t - 2)));
+            const b = Math.max(0, Math.min(1, 1.5 - Math.abs(4 * t - 1)));
+            return [r, g, b];
+        };
+
         // Icon: renderiza el SVG de lucide INLINE dentro del árbol de React.
         // Antes usábamos <i data-lucide> + lucide.createIcons() en un useEffect, pero eso
         // mutaba el DOM por fuera de React → cualquier re-render (ej. al inyectar una falla)
@@ -3436,30 +3448,39 @@
                     if (sceneObj.current.vfdHeatShaderMat) {
                         sceneObj.current.vfdHeatShaderMat.uniforms.uTime.value = t;
                     }
-                    // Cometas de streamlines — viajan a lo largo de las curvas simulando el flujo
+                    // Cometas de streamlines — pulsos viajando por la curva (samples precomputados)
                     sceneObj.current.hvacColdComets?.forEach(c => {
                         const ud = c.userData;
-                        if (!ud.curve) return;
+                        if (!ud.samples) return;
                         const u = ((t * ud.speed) + ud.phase) % 1;
-                        c.position.copy(ud.curve.getPointAt(u));
+                        const si = Math.min(ud.samples.length - 1, Math.floor(u * (ud.samples.length - 1)));
+                        c.position.copy(ud.samples[si]);
                         const fade = Math.max(0, Math.sin(u * Math.PI));
                         c.material.opacity = 0.95 * fade;
                     });
-                    // Partículas cyan (modo Partículas) — cada punto viaja por la curva de su streamline
+                    // Partículas (modo Partículas) — viajan por la misma curva, color JET según
+                    // su posición en el circuito (azul frío → verde/amarillo → rojo caliente)
                     sceneObj.current.hvacColdParticles?.forEach(pts => {
-                        if (!pts.userData.curve || !pts.geometry?.attributes?.position) return;
                         const ud = pts.userData;
-                        const arr = pts.geometry.attributes.position.array;
+                        if (!ud.samples || !pts.geometry?.attributes?.position) return;
+                        const arr  = pts.geometry.attributes.position.array;
+                        const cols = pts.geometry.attributes.color?.array;
+                        const maxI = ud.samples.length - 1;
                         for (let p = 0; p < ud.N; p++) {
-                            const u = ((t * 0.16 + ud.phases[p]) % 1);
-                            const pt = ud.curve.getPointAt(u);
-                            // Turbulencia perpendicular al flujo
+                            const u = ((t * 0.14 + ud.phases[p]) % 1);
+                            const si = Math.min(maxI, Math.floor(u * maxI));
+                            const pt = ud.samples[si];
                             const seed = ud.seeds[p];
-                            arr[p * 3]     = pt.x + Math.sin(t * 2.0 + seed) * 0.08;
+                            arr[p * 3]     = pt.x + Math.sin(t * 2.0 + seed) * 0.07;
                             arr[p * 3 + 1] = pt.y + Math.sin(t * 1.5 + seed * 1.3) * 0.05;
-                            arr[p * 3 + 2] = pt.z + Math.cos(t * 2.0 + seed) * 0.08;
+                            arr[p * 3 + 2] = pt.z + Math.cos(t * 2.0 + seed) * 0.07;
+                            if (cols) {
+                                const jc = jetColor(u);
+                                cols[p * 3] = jc[0]; cols[p * 3 + 1] = jc[1]; cols[p * 3 + 2] = jc[2];
+                            }
                         }
                         pts.geometry.attributes.position.needsUpdate = true;
+                        if (pts.geometry.attributes.color) pts.geometry.attributes.color.needsUpdate = true;
                     });
                     // Aire visible — perimeter wisps siempre + door streams solo con door_open
                     sceneObj.current.perimeterWisps?.forEach(w => {
@@ -4060,33 +4081,30 @@
                 hvacAssignments.forEach(a => buildHvac(a.idx, a.wall, a.along));
 
                 // ═══════════════════════════════════════════════════════════════════
-                // STREAMLINES DE AIRE FRÍO — modo Trayectorias (CFD-like)
+                // STREAMLINES CFD — circuito térmico completo con colormap JET
                 // ═══════════════════════════════════════════════════════════════════
-                // Por cada HVAC generamos 4 curvas de flujo que representan el mismo campo
-                // de velocidad que las partículas: nacen en la rejilla INJ, van al centro
-                // de la sala a baja altura, suben en el centro, y van a la rejilla RET.
-                // Cada streamline lleva 2 "cometas" luminosos animados que viajan por la curva
-                // (estilo ParaView/OpenFOAM) mostrando la dirección y velocidad del flujo.
-                // Color cyan saturado para leerse claro en día y noche.
-                // Núcleo cyan brillante — depthTest OFF para que siempre se vean, sin oclusion
-                const _streamMat = new THREE.MeshBasicMaterial({
-                    color: '#00ffff', transparent: false, opacity: 1.0,
-                    depthTest: false, depthWrite: false
-                });
-                const _streamHaloMat = new THREE.MeshBasicMaterial({
-                    color: '#4dd0ff', transparent: true, opacity: 0.55,
-                    blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
-                });
+                // Estética ParaView/OpenFOAM: MUCHAS líneas FINAS con gradiente de color
+                // mapeado a temperatura A LO LARGO de cada curva (vertex colors):
+                //   • t=0  → AZUL   — aire frío saliendo de la rejilla INJ (inferior)
+                //   • t≈0.5 → VERDE/AMARILLO — templándose al pasar por las celdas VFD
+                //   • t=1  → ROJO   — aire caliente entrando a la rejilla RET (superior)
+                // El recorrido físico: INJ (abajo) → bajo por la sala → cara de la celda
+                // VFD (intercambio de calor) → sube por encima de la celda → arco de
+                // regreso → RET (rejilla superior del mismo HVAC). depthTest normal para
+                // integrarse en la escena como en un post-proceso CFD real.
+                const _streamMat = new THREE.MeshBasicMaterial({ vertexColors: true });
                 const _cometMat = new THREE.MeshBasicMaterial({
                     color: '#ffffff', transparent: true, opacity: 1.0,
-                    blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
+                    blending: THREE.AdditiveBlending, depthWrite: false
                 });
-                // Material para partículas cyan del modo Partículas (fluyen por las mismas curvas)
+                // Partículas (modo Partículas): mismas curvas, color por temperatura via vertexColors
                 const _coldParticleMat = new THREE.PointsMaterial({
-                    color: '#00e5ff', size: 0.14, sizeAttenuation: true,
-                    transparent: true, opacity: 0.90, blending: THREE.AdditiveBlending,
-                    depthWrite: false
+                    vertexColors: true, size: 0.09, sizeAttenuation: true,
+                    transparent: true, opacity: 0.95, depthWrite: false
                 });
+                const _TUBE_SEGS = 120;      // segmentos tubulares (resolución del gradiente)
+                const _TUBE_RSEGS = 6;       // segmentos radiales (fino, CFD-like)
+                const _vfdTopY   = 2.21 + 2.0;   // techo de las celdas VFD (eqH=2.0 sobre piso 2.21)
                 hvacInfo.forEach(hp => {
                     let injX, injZ, retX, retZ, intDirX, intDirZ;
                     const yc = hp.y;
@@ -4103,64 +4121,85 @@
                         injZ = roomD/2 - 0.15;  retZ = injZ;
                         intDirX = 0; intDirZ = -1;
                     }
-                    const N_STREAMS = 4;
-                    const grilleWidth = 0.65;
+                    const N_STREAMS = 6;
+                    const grilleWidth = 0.72;
                     for (let s = 0; s < N_STREAMS; s++) {
                         const spread = (s / (N_STREAMS - 1) - 0.5) * grilleWidth;
+                        const jit = Math.sin(s * 12.9898) * 0.18;   // jitter determinista por línea
                         let sx = injX, sz = injZ;
                         if (hp.wall === 'east') sz += spread; else sx += spread;
-                        // Waypoints: arco pronunciado desde INJ (en la pared, abajo) → centro sala
-                        // → sube al centro alto → arco de vuelta a la RET (en la pared, arriba)
-                        const P0 = new THREE.Vector3(sx,                        yc - 0.95, sz);
-                        const P1 = new THREE.Vector3(sx + intDirX * 2.2,        yc - 0.80, sz + intDirZ * 2.2);
-                        const P2 = new THREE.Vector3(0,                         yc - 0.20, 0);
-                        const P3 = new THREE.Vector3(0,                         yc + 0.40, 0);
-                        const P4 = new THREE.Vector3(sx + intDirX * 2.2,        yc + 0.75, sz + intDirZ * 2.2);
-                        const P5 = new THREE.Vector3(retX,                      yc + 0.95, retZ);
-                        const curve = new THREE.CatmullRomCurve3([P0, P1, P2, P3, P4, P5], false, 'catmullrom', 0.5);
-                        // Núcleo brillante — bien visible, radio 5 cm
-                        const streamGeo = new THREE.TubeGeometry(curve, 96, 0.045, 10, false);
+                        // Punto de "intercambio de calor": la cara de la celda VFD más cercana.
+                        // Las celdas ocupan x ∈ [-3.25, 3.25] en dos filas z ≈ ±0.5.
+                        let tx, tzFace;
+                        if (hp.wall === 'east') {
+                            tx = 3.35; tzFace = Math.max(-1.5, Math.min(1.5, sz * 0.3));
+                        } else {
+                            tx = Math.max(-3.1, Math.min(3.1, sx + jit));
+                            tzFace = -intDirZ * 0.95;   // cara de la fila de celdas del lado del HVAC
+                        }
+                        // Waypoints del circuito térmico:
+                        const P0 = new THREE.Vector3(sx, yc - 0.95, sz);                                       // INJ (azul)
+                        const P1 = new THREE.Vector3(
+                            sx + intDirX * 1.1, yc - 1.05, sz + intDirZ * 1.1);                                // baja y entra a la sala
+                        const P2 = new THREE.Vector3(tx, yc - 0.90, tzFace + intDirZ * -0.15 + intDirX * -0.15); // llega a la cara de la celda (bajo)
+                        const P3 = new THREE.Vector3(tx, _vfdTopY + 0.18, tzFace * 0.55);                      // sube pegado a la celda (calienta)
+                        const P4 = new THREE.Vector3(
+                            (tx + retX) * 0.5, _vfdTopY + 0.62,
+                            (tzFace * 0.55 + retZ) * 0.5);                                                     // arco alto de regreso (mitad de camino a RET)
+                        const P5 = new THREE.Vector3(retX, yc + 0.95, retZ);                                   // RET (rojo)
+                        const curve = new THREE.CatmullRomCurve3([P0, P1, P2, P3, P4, P5], false, 'catmullrom', 0.35);
+                        // Precomputar samples para animación eficiente (comets + partículas)
+                        const curveSamples = curve.getSpacedPoints(200);
+                        // — Streamtube FINO con VERTEX COLORS (gradiente jet a lo largo) —
+                        const streamGeo = new THREE.TubeGeometry(curve, _TUBE_SEGS, 0.016, _TUBE_RSEGS, false);
+                        const vCount = streamGeo.attributes.position.count;
+                        const vCols = new Float32Array(vCount * 3);
+                        const perRing = _TUBE_RSEGS + 1;
+                        for (let v = 0; v < vCount; v++) {
+                            const ring = Math.floor(v / perRing);
+                            const tt = Math.min(1, ring / _TUBE_SEGS);
+                            const c = jetColor(tt);
+                            vCols[v * 3] = c[0]; vCols[v * 3 + 1] = c[1]; vCols[v * 3 + 2] = c[2];
+                        }
+                        streamGeo.setAttribute('color', new THREE.BufferAttribute(vCols, 3));
                         const streamMesh = new THREE.Mesh(streamGeo, _streamMat);
                         streamMesh.renderOrder = 4;
                         scene.add(streamMesh);
                         hvacColdStreamlines.push(streamMesh);
-                        // Halo exterior — el mismo curve pero radio 11 cm, difuso, para presencia
-                        const haloGeo = new THREE.TubeGeometry(curve, 96, 0.11, 10, false);
-                        const haloMesh = new THREE.Mesh(haloGeo, _streamHaloMat);
-                        haloMesh.renderOrder = 3;
-                        scene.add(haloMesh);
-                        hvacColdStreamlines.push(haloMesh);
-                        // 2 cometas por streamline con phases desfasados (más grandes y brillantes)
+                        // — Cometas chicos (pulsos de flujo, estilo flechas animadas ParaView) —
                         for (let c = 0; c < 2; c++) {
                             const comet = new THREE.Mesh(
-                                new THREE.SphereGeometry(0.14, 14, 10),
+                                new THREE.SphereGeometry(0.05, 10, 8),
                                 _cometMat
                             );
                             comet.renderOrder = 6;
                             comet.userData = {
-                                curve, phase: ((s * 0.23) + (c * 0.5)) % 1, speed: 0.18
+                                samples: curveSamples,
+                                phase: ((s * 0.23) + (c * 0.5)) % 1, speed: 0.16
                             };
                             scene.add(comet);
                             hvacColdComets.push(comet);
                         }
-                        // 40 partículas cyan que fluyen por ESTA MISMA curva (modo Partículas)
-                        const N_COLD = 40;
-                        const _colPos = new Float32Array(N_COLD * 3);
+                        // — Partículas (modo Partículas): fluyen por la MISMA curva, color jet por posición —
+                        const N_COLD = 30;
+                        const _colPos    = new Float32Array(N_COLD * 3);
+                        const _colColors = new Float32Array(N_COLD * 3);
                         const _colPhases = new Float32Array(N_COLD);
                         const _colSeeds  = new Float32Array(N_COLD);
                         for (let p = 0; p < N_COLD; p++) {
                             _colPhases[p] = Math.random();
                             _colSeeds[p]  = Math.random() * 100;
-                            // Posición inicial arbitraria — se actualiza cada frame
                             _colPos[p * 3]     = sx;
                             _colPos[p * 3 + 1] = yc - 0.95;
                             _colPos[p * 3 + 2] = sz;
+                            _colColors[p * 3 + 2] = 1.0;   // arranca azul
                         }
                         const _colGeo = new THREE.BufferGeometry();
                         _colGeo.setAttribute('position', new THREE.BufferAttribute(_colPos, 3));
+                        _colGeo.setAttribute('color',    new THREE.BufferAttribute(_colColors, 3));
                         const _colPoints = new THREE.Points(_colGeo, _coldParticleMat);
                         _colPoints.frustumCulled = false;
-                        _colPoints.userData = { curve, phases: _colPhases, seeds: _colSeeds, N: N_COLD };
+                        _colPoints.userData = { samples: curveSamples, phases: _colPhases, seeds: _colSeeds, N: N_COLD };
                         scene.add(_colPoints);
                         hvacColdParticles.push(_colPoints);
                     }
