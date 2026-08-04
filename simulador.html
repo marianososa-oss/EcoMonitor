@@ -3241,8 +3241,9 @@
                         const baseOp = isHeat ? 0.50 : 0.28;
                         h.material.opacity = baseOp + 0.12 * (0.5 + 0.5 * Math.sin(ph * 1.0));
                     });
-                    // Partículas rojas chicas — actualizan sus posiciones cada frame.
-                    // Cada partícula sube ~1.8m desde su posición inicial con turbulencia sinusoidal.
+                    // Partículas rojas — 2 tramos: SUBEN hasta el techo, DESPUÉS van a los costados
+                    // (como si fueran absorbidas por las rejillas RET superiores de los HVACs).
+                    const _ceilingY = 2.21 + 3.0 - 0.10;   // techo del shelter (roomH=3), 10cm de margen
                     sceneObj.current.heatWaves?.forEach(pts => {
                         if (!pts.geometry?.attributes?.position) return;
                         const ud = pts.userData;
@@ -3252,15 +3253,33 @@
                             const iX = ud.initPos[p * 3];
                             const iY = ud.initPos[p * 3 + 1];
                             const iZ = ud.initPos[p * 3 + 2];
-                            // Turbulencia crece con la edad (dispersan al subir)
-                            const wobble = cycle * 0.20;
                             const seed = ud.seeds[p];
-                            arr[p * 3]     = iX + Math.sin(cycle * 4.0 + seed) * wobble;
-                            arr[p * 3 + 1] = iY + cycle * 1.9;
-                            arr[p * 3 + 2] = iZ + Math.cos(cycle * 4.0 + seed) * wobble;
+                            let px, py, pz;
+                            // TRAMO 1 (0-0.55): sube derecho hasta el techo
+                            if (cycle < 0.55) {
+                                const tt = cycle / 0.55;
+                                const wobble = tt * 0.15;   // turbulencia crece al subir
+                                px = iX + Math.sin(cycle * 4.0 + seed) * wobble;
+                                py = iY + tt * (_ceilingY - iY);
+                                pz = iZ + Math.cos(cycle * 4.0 + seed) * wobble;
+                            }
+                            // TRAMO 2 (0.55-1.0): al techo, se despliega hacia los costados (rejillas RET)
+                            else {
+                                const tt = (cycle - 0.55) / 0.45;
+                                // Dirección radial desde el centro del shelter (0, ceilingY, 0)
+                                const dirLen = Math.max(0.001, Math.sqrt(iX * iX + iZ * iZ));
+                                const normX = iX / dirLen;
+                                const normZ = iZ / dirLen;
+                                const spreadDist = tt * 4.5;   // hasta 4.5m de spread horizontal
+                                px = iX + normX * spreadDist + Math.sin(cycle * 3.0 + seed) * 0.12;
+                                py = _ceilingY - tt * 0.15;   // baja levemente al acercarse a rejillas
+                                pz = iZ + normZ * spreadDist + Math.cos(cycle * 3.0 + seed) * 0.12;
+                            }
+                            arr[p * 3]     = px;
+                            arr[p * 3 + 1] = py;
+                            arr[p * 3 + 2] = pz;
                         }
                         pts.geometry.attributes.position.needsUpdate = true;
-                        // Opacidad global del sistema pulsa suavemente
                         pts.material.opacity = (isHeat ? 0.95 : 0.65);
                     });
                     // === AURORA AZUL HVAC — inyección de aire frío que sube y se oscurece ===
