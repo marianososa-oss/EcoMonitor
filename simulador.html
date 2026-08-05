@@ -3472,6 +3472,10 @@
                     if (sceneObj.current.vfdHeatShaderMat) {
                         sceneObj.current.vfdHeatShaderMat.uniforms.uTime.value = t;
                     }
+                    // Shader de flujo de los streamtubes — bandas de brillo viajando por el tubo
+                    if (sceneObj.current.streamFlowMat) {
+                        sceneObj.current.streamFlowMat.uniforms.uTime.value = t;
+                    }
                     // Cometas de streamlines — pulsos viajando por la curva (samples precomputados)
                     // Día: color oscuro + blending normal (el blanco additive desaparece contra cielo claro)
                     sceneObj.current.hvacColdComets?.forEach(c => {
@@ -4126,7 +4130,40 @@
                 // VFD (intercambio de calor) → sube por encima de la celda → arco de
                 // regreso → RET (rejilla superior del mismo HVAC). depthTest normal para
                 // integrarse en la escena como en un post-proceso CFD real.
-                const _streamMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+                // Material de tubo ANIMADO: bandas de brillo fluyendo a lo largo del tubo
+                // (uv.x = 0 en INJ → 1 en RET). Respeta el gradiente jet de vertex colors y
+                // le superpone pulsos asimétricos tipo cometa que viajan en la dirección del
+                // flujo — el look clásico de streamlines animadas de ParaView/CFD.
+                const _streamMat = new THREE.ShaderMaterial({
+                    uniforms: { uTime: { value: 0 } },
+                    vertexColors: true,
+                    vertexShader: `
+                        varying vec2 vUv;
+                        varying vec3 vCol;
+                        void main() {
+                            vUv = uv;
+                            #ifdef USE_COLOR
+                            vCol = color;
+                            #else
+                            vCol = vec3(1.0);
+                            #endif
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float uTime;
+                        varying vec2 vUv;
+                        varying vec3 vCol;
+                        void main() {
+                            // Bandas viajando hacia uv.x creciente (INJ → RET), 14 pulsos por tubo
+                            float band = fract(vUv.x * 14.0 - uTime * 0.9);
+                            // Pulso asimétrico: frente definido, cola que se desvanece
+                            float pulse = smoothstep(0.0, 0.22, band) * (1.0 - smoothstep(0.22, 1.0, band));
+                            float bright = 0.70 + 0.60 * pulse;
+                            gl_FragColor = vec4(vCol * bright, 1.0);
+                        }
+                    `
+                });
                 const _cometMat = new THREE.MeshBasicMaterial({
                     color: '#ffffff', transparent: true, opacity: 1.0,
                     blending: THREE.AdditiveBlending, depthWrite: false
@@ -5400,6 +5437,7 @@
                 obj.hvacColdStreamlines = hvacColdStreamlines;
                 obj.hvacColdComets      = hvacColdComets;
                 obj.hvacColdParticles   = hvacColdParticles;
+                obj.streamFlowMat       = _streamMat;   // shader animado de los tubos (uTime en animate)
 
                 // Reportar metros al padre (Simulador) para que actualice el HUD.
                 // CANALIZACION Central (modelo real Ecocontrol):
