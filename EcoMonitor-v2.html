@@ -2253,7 +2253,39 @@
             master: '#0033a0',   /* azul BRAND fuerte EcoMonitor — más saturado que blue-900 */
             masterAccent: '#0098c6',
             cable: '#0098c6',
-            cloudGreen: '#9ab63b'
+            cloudGreen: '#9ab63b',
+            // Airflow visualization: caliente (rojo dramático) para calor emitido y aire retornando,
+            // frío (azul saturado) para inyección de aire frío, y warm-intermedio para transición.
+            hvacHot:       '#8b0000',   // rojo sangre — calor emitido por VFDs
+            hvacHotBright: '#a00000',   // rojo sangre brillante
+            hvacCold:      '#2563eb',   // azul saturado — aire frío inyectado
+            hvacCoolWarm:  '#f59e0b',   // amarillo/naranja — transición cool→hot
+            hvacYellow:    '#fbbf24'    // amarillo — transición temprana
+        };
+
+        // ═══ Colormap JET (CFD clásico: ParaView/OpenFOAM) ═══
+        // t ∈ [0,1] → azul (frío) → cyan → verde → amarillo → rojo (caliente).
+        // Se usa para colorear streamlines y partículas según temperatura del aire
+        // a lo largo del circuito: INJ (t=0, frío) → celdas VFD → RET (t=1, caliente).
+        const jetColor = (t) => {
+            t = Math.max(0, Math.min(1, t));
+            const r = Math.max(0, Math.min(1, 1.5 - Math.abs(4 * t - 3)));
+            const g = Math.max(0, Math.min(1, 1.5 - Math.abs(4 * t - 2)));
+            const b = Math.max(0, Math.min(1, 1.5 - Math.abs(4 * t - 1)));
+            return [r, g, b];
+        };
+
+        // Perfil de TEMPERATURA a lo largo del circuito de aire (t = posición en la curva 0→1).
+        // El aire NO se calienta linealmente: el pico está EN la celda VFD y después se templa.
+        //   t 0.00–0.45 → azul→verde     (INJ fría, viaja bajo por la sala, se templa de a poco)
+        //   t 0.45–0.60 → verde→ROJO     (sube pegado a la celda: pico de calor en la fuente)
+        //   t 0.60–1.00 → ROJO→amarillo  (viaja por el aire, se templa, entra AMARILLA a la eyección)
+        // El valor devuelto se pasa a jetColor(): 0.88 = rojo brillante, 0.62 = amarillo.
+        const tempProfile = (t) => {
+            t = Math.max(0, Math.min(1, t));
+            if (t < 0.45) return (t / 0.45) * 0.40;
+            if (t < 0.60) return 0.40 + ((t - 0.45) / 0.15) * (0.88 - 0.40);
+            return 0.88 - ((t - 0.60) / 0.40) * (0.88 - 0.62);
         };
 
         // Icon: renderiza el SVG de lucide INLINE dentro del árbol de React.
@@ -2544,7 +2576,7 @@
         };
 
         // ===== Sala3D : Three.js shelter Neuquén con tableros Maestro+Esclavos =====
-        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible, sceneTheme, hmiValues, activeFaults, globalEvents, topologyMode, onCableMeters, cutDemoActive, cutTargetId }) => {
+        const Sala3D = ({ hvacUnits, presUnits, view, interiorVisible, sceneTheme, hmiValues, activeFaults, globalEvents, topologyMode, flowMode, onCableMeters, cutDemoActive, cutTargetId }) => {
             const containerRef = useRef(null);
             const canvasRef    = useRef(null);
             const sceneObj     = useRef(null);
@@ -3313,6 +3345,161 @@
                 _pctx.fillRect(0, 0, 128, 128);
                 const puffTex = new THREE.CanvasTexture(_puffCanvas);
                 if (THREE.SRGBColorSpace) puffTex.colorSpace = THREE.SRGBColorSpace;
+
+                // === Custom shader volumétrico para el aire HVAC (azul→amarillo→rojo con noise) ===
+                // Fragment shader: FBM noise animado scrolling hacia arriba, colorized por Y,
+                // density modulada por noise → look de vapor continuo, no partículas discretas.
+                // Un solo material compartido por todos los HVACs (uTime se anima globalmente).
+                const hvacAirShaderMat = new THREE.ShaderMaterial({
+                    uniforms: { uTime: { value: 0 } },
+                    vertexShader: `
+                        varying vec2 vUv;
+                        void main() {
+                            vUv = uv;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float uTime;
+                        varying vec2 vUv;
+                        float hash(vec2 p) {
+                            return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                        }
+                        float noise(vec2 p) {
+                            vec2 i = floor(p);
+                            vec2 f = fract(p);
+                            f = f * f * (3.0 - 2.0 * f);
+                            float a = hash(i);
+                            float b = hash(i + vec2(1.0, 0.0));
+                            float c = hash(i + vec2(0.0, 1.0));
+                            float d = hash(i + vec2(1.0, 1.0));
+                            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+                        }
+                        float fbm(vec2 p) {
+                            float total = 0.0;
+                            float amp = 0.5;
+                            for (int i = 0; i < 4; i++) {
+                                total += noise(p) * amp;
+                                p *= 2.0;
+                                amp *= 0.5;
+                            }
+                            return total;
+                        }
+                        void main() {
+                            // Animate noise scrolling upward (simula flujo ascendente)
+                            vec2 uv = vUv;
+                            uv.y -= uTime * 0.14;
+                            uv *= vec2(1.8, 3.4);
+                            // Domain warping DOBLE — mucho más orgánico, dispersión estilo humo real
+                            float warp1 = fbm(uv * 1.5) * 0.8;
+                            float warp2 = fbm(uv * 0.7 + vec2(uTime * 0.05, 0.0)) * 0.5;
+                            float n = fbm(uv + warp1 + warp2);
+                            // Gradiente vertical de color (basado en vUv.y, no en uv animada)
+                            vec3 blue   = vec3(0.15, 0.39, 0.92);
+                            vec3 yellow = vec3(0.98, 0.75, 0.15);
+                            vec3 orange = vec3(0.96, 0.53, 0.10);
+                            vec3 red    = vec3(0.86, 0.15, 0.15);
+                            vec3 color;
+                            float t = vUv.y;
+                            if (t < 0.32) {
+                                color = blue;
+                            } else if (t < 0.55) {
+                                color = mix(blue, yellow, (t - 0.32) / 0.23);
+                            } else if (t < 0.78) {
+                                color = mix(yellow, orange, (t - 0.55) / 0.23);
+                            } else {
+                                color = mix(orange, red, (t - 0.78) / 0.22);
+                            }
+                            // Densidad: rango amplio → área bien cubierta con vapor
+                            float density = smoothstep(0.10, 0.85, n);
+                            // Fade solo en Y (polos del elipsoide) — funciona en cualquier geometría 3D
+                            float edgeY = smoothstep(0.0, 0.05, vUv.y) * smoothstep(1.0, 0.95, vUv.y);
+                            // Boost cerca de las rejillas (extremos del elipsoide)
+                            float grilleBoost = smoothstep(0.22, 0.05, vUv.y) * 0.70 +
+                                                smoothstep(0.78, 0.95, vUv.y) * 0.70;
+                            float alpha = density * edgeY * (1.35 + grilleBoost);
+                            gl_FragColor = vec4(color, alpha);
+                        }
+                    `,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+
+                // === Shader volumétrico para CALOR VFD (todo warm: amarillo→naranja→rojo) ===
+                // Similar al de HVAC pero SIN azul: es solo aire caliente subiendo desde el equipo.
+                // Fuente del calor abajo (amarillo brillante en el equipo), dispersa hacia arriba (rojo oscuro).
+                const vfdHeatShaderMat = new THREE.ShaderMaterial({
+                    uniforms: { uTime: { value: 0 } },
+                    vertexShader: `
+                        varying vec2 vUv;
+                        void main() {
+                            vUv = uv;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float uTime;
+                        varying vec2 vUv;
+                        float hash(vec2 p) {
+                            return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                        }
+                        float noise(vec2 p) {
+                            vec2 i = floor(p);
+                            vec2 f = fract(p);
+                            f = f * f * (3.0 - 2.0 * f);
+                            float a = hash(i);
+                            float b = hash(i + vec2(1.0, 0.0));
+                            float c = hash(i + vec2(0.0, 1.0));
+                            float d = hash(i + vec2(1.0, 1.0));
+                            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+                        }
+                        float fbm(vec2 p) {
+                            float total = 0.0;
+                            float amp = 0.5;
+                            for (int i = 0; i < 4; i++) {
+                                total += noise(p) * amp;
+                                p *= 2.0;
+                                amp *= 0.5;
+                            }
+                            return total;
+                        }
+                        void main() {
+                            vec2 uv = vUv;
+                            uv.y -= uTime * 0.18;   // Sube un poco más rápido (calor asciende con fuerza)
+                            uv *= vec2(1.6, 3.2);
+                            float warp1 = fbm(uv * 1.5) * 0.85;
+                            float warp2 = fbm(uv * 0.7 + vec2(uTime * 0.06, 0.0)) * 0.55;
+                            float n = fbm(uv + warp1 + warp2);
+                            // Gradiente TODO CALIENTE: amarillo abajo (fuente), rojo profundo arriba
+                            vec3 yellow    = vec3(1.00, 0.85, 0.20);
+                            vec3 orange    = vec3(0.97, 0.55, 0.10);
+                            vec3 red       = vec3(0.86, 0.15, 0.15);
+                            vec3 darkRed   = vec3(0.55, 0.08, 0.08);
+                            vec3 color;
+                            float t = vUv.y;
+                            if (t < 0.30) {
+                                color = mix(yellow, orange, t / 0.30);
+                            } else if (t < 0.65) {
+                                color = mix(orange, red, (t - 0.30) / 0.35);
+                            } else {
+                                color = mix(red, darkRed, (t - 0.65) / 0.35);
+                            }
+                            float density = smoothstep(0.10, 0.85, n);
+                            // Fade Y — polos suaves, funciona en esferas 3D
+                            float edgeY = smoothstep(0.0, 0.05, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
+                            // Boost muy fuerte en la parte de abajo (fuente = el equipo emite calor)
+                            float sourceBoost = smoothstep(0.32, 0.03, vUv.y) * 0.90;
+                            float alpha = density * edgeY * (1.30 + sourceBoost);
+                            gl_FragColor = vec4(color, alpha);
+                        }
+                    `,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
                 const _makePuff = () => new THREE.Sprite(new THREE.SpriteMaterial({
                     map: puffTex, transparent: true, opacity: 0.35,
                     blending: THREE.AdditiveBlending, depthWrite: false
@@ -3476,25 +3663,47 @@
                     label.position.set(x, y + eqH/2 - 0.3, z + facesOutward * (eqD/2 + 0.006));
                     if (facesOutward < 0) label.rotation.y = Math.PI;
                     scene.add(label);
-                    // Halo muy sutil sobre el equipo (apenas un brillo cálido, NO una bola que pulsa)
-                    const heat = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.9, 16, 12),
-                        new THREE.MeshBasicMaterial({ color: TH_COLOR.heat, transparent: true, opacity: 0.08, depthWrite: false })
-                    );
-                    heat.position.set(x, eqH + 2.21, z);
-                    heat.userData.phase = i * 0.65;
-                    scene.add(heat); heatMeshes.push(heat);
-                    // Ondas de calor ascendiendo — sutiles, finas, ligeramente irregulares
-                    for (let r = 0; r < 4; r++) {
-                        const wave = new THREE.Mesh(
-                            new THREE.RingGeometry(0.25, 0.28, 24),
-                            new THREE.MeshBasicMaterial({ color: TH_COLOR.heat, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })
-                        );
-                        wave.rotation.x = -Math.PI / 2;
-                        wave.position.set(x, eqH + 2.21, z);
-                        wave.userData = { phase: (i * 0.35 + r * 0.25) % 1, baseX: x, baseZ: z };
-                        scene.add(wave); heatWaves.push(wave);
+                    // === PARTÍCULAS ROJAS CHICAS — muchas, subiendo desde el VFD ===
+                    // 250 puntitos por VFD usando THREE.Points (eficiente). Cada uno tiene su phase
+                    // y velocidad. Suben desde el top del VFD con turbulencia sinusoidal.
+                    const N_PARTICLES = 250;
+                    const _positions = new Float32Array(N_PARTICLES * 3);
+                    const _initPos   = new Float32Array(N_PARTICLES * 3);
+                    const _phases    = new Float32Array(N_PARTICLES);
+                    const _speeds    = new Float32Array(N_PARTICLES);
+                    const _seeds     = new Float32Array(N_PARTICLES);
+                    for (let p = 0; p < N_PARTICLES; p++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const rad   = Math.sqrt(Math.random()) * 0.32;
+                        const ix = x + Math.cos(angle) * rad;
+                        const iy = eqH + 2.21 + Math.random() * 0.05;
+                        const iz = z + Math.sin(angle) * rad * 0.7;
+                        _positions[p * 3]     = _initPos[p * 3]     = ix;
+                        _positions[p * 3 + 1] = _initPos[p * 3 + 1] = iy;
+                        _positions[p * 3 + 2] = _initPos[p * 3 + 2] = iz;
+                        _phases[p] = Math.random();
+                        _speeds[p] = 0.20 + Math.random() * 0.20;
+                        _seeds[p]  = Math.random() * 100;
                     }
+                    const _partGeo = new THREE.BufferGeometry();
+                    _partGeo.setAttribute('position', new THREE.BufferAttribute(_positions, 3));
+                    const _partMat = new THREE.PointsMaterial({
+                        color: TH_COLOR.hvacHot,
+                        size: 0.055,
+                        sizeAttenuation: true,
+                        transparent: true,
+                        opacity: 0.85,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    });
+                    const _points = new THREE.Points(_partGeo, _partMat);
+                    _points.frustumCulled = false;
+                    _points.userData = {
+                        initPos: _initPos, phases: _phases, speeds: _speeds, seeds: _seeds,
+                        N: N_PARTICLES
+                    };
+                    scene.add(_points);
+                    heatWaves.push(_points);   // Se usa heatWaves como array de partículas por VFD
                 });
 
                 // === Dynamic groups ===
@@ -3967,7 +4176,7 @@
                     THREE, scene, camera, renderer,
                     hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, secondaryMasterGroup, secondaryOutputPos, masterGroup,
                     heatMeshes, heatWaves, wifiRings, dataPackets, wallMeshes,
-                    perimeterWisps, doorStreams, puddleGroup,
+                    perimeterWisps, doorStreams, puddleGroup, puffTex, hvacAirShaderMat, vfdHeatShaderMat,
                     masterOutputPos, cloudPos,
                     roomW, roomD, roomH,
                     targetView: 'iso',
@@ -4094,22 +4303,89 @@
                     const isDoorOpen= !!events.door_open;
                     const heatMul   = isHeat ? 2.4 : 1;
 
-                    // Halo cálido sutil (más intenso durante heat_wave)
+                    // Halo ROJO dramático — pulsa fuerte, MUY visible (calor exagerado)
                     heatMeshes.forEach(h => {
                         const ph = t * heatMul + h.userData.phase;
-                        const s = 1 + 0.07 * Math.sin(ph * 1.0);
+                        const s = 1 + 0.10 * Math.sin(ph * 1.0);
                         h.scale.set(s, s, s);
-                        const baseOp = isHeat ? 0.18 : 0.06;
-                        h.material.opacity = baseOp + 0.05 * (0.5 + 0.5 * Math.sin(ph * 1.0));
+                        const baseOp = isHeat ? 0.50 : 0.28;
+                        h.material.opacity = baseOp + 0.12 * (0.5 + 0.5 * Math.sin(ph * 1.0));
                     });
-                    // Ondas de calor — más rápidas + más opacas durante heat_wave
-                    sceneObj.current.heatWaves?.forEach(w => {
-                        const u = ((t * 0.28 * heatMul + w.userData.phase) % 1);
-                        w.position.y = eqH + 2.21 + u * 2.0;
-                        const sc = 1 + u * 1.8;
+                    // Partículas rojas — 2 tramos: SUBEN hasta el techo, DESPUÉS van a los costados
+                    // (como si fueran absorbidas por las rejillas RET superiores de los HVACs).
+                    // Blending según tema: NOCHE = additive (glow) · DÍA = normal (color sólido,
+                    // porque additive contra el cielo claro desaparece).
+                    const _isDayNow = sceneObj.current.resolveTheme ? sceneObj.current.resolveTheme() : false;
+                    const _ceilingY = 2.21 + 3.0 - 0.10;   // techo del shelter (roomH=3), 10cm de margen
+                    sceneObj.current.heatWaves?.forEach(pts => {
+                        if (!pts.geometry?.attributes?.position) return;
+                        const ud = pts.userData;
+                        const arr = pts.geometry.attributes.position.array;
+                        for (let p = 0; p < ud.N; p++) {
+                            const cycle = ((t * ud.speeds[p] * heatMul) + ud.phases[p]) % 1;
+                            const iX = ud.initPos[p * 3];
+                            const iY = ud.initPos[p * 3 + 1];
+                            const iZ = ud.initPos[p * 3 + 2];
+                            const seed = ud.seeds[p];
+                            let px, py, pz;
+                            // TRAMO 1 (0-0.55): sube derecho hasta el techo
+                            if (cycle < 0.55) {
+                                const tt = cycle / 0.55;
+                                const wobble = tt * 0.15;   // turbulencia crece al subir
+                                px = iX + Math.sin(cycle * 4.0 + seed) * wobble;
+                                py = iY + tt * (_ceilingY - iY);
+                                pz = iZ + Math.cos(cycle * 4.0 + seed) * wobble;
+                            }
+                            // TRAMO 2 (0.55-1.0): al techo, se despliega hacia los costados (rejillas RET)
+                            else {
+                                const tt = (cycle - 0.55) / 0.45;
+                                // Dirección radial desde el centro del shelter (0, ceilingY, 0)
+                                const dirLen = Math.max(0.001, Math.sqrt(iX * iX + iZ * iZ));
+                                const normX = iX / dirLen;
+                                const normZ = iZ / dirLen;
+                                const spreadDist = tt * 4.5;   // hasta 4.5m de spread horizontal
+                                px = iX + normX * spreadDist + Math.sin(cycle * 3.0 + seed) * 0.12;
+                                py = _ceilingY - tt * 0.15;   // baja levemente al acercarse a rejillas
+                                pz = iZ + normZ * spreadDist + Math.cos(cycle * 3.0 + seed) * 0.12;
+                            }
+                            arr[p * 3]     = px;
+                            arr[p * 3 + 1] = py;
+                            arr[p * 3 + 2] = pz;
+                        }
+                        pts.geometry.attributes.position.needsUpdate = true;
+                        if (_isDayNow) {
+                            // Día: blending normal + opacidad plena — el rojo sangre se ve sólido contra el cielo claro
+                            pts.material.blending = THREE.NormalBlending;
+                            pts.material.opacity  = (isHeat ? 1.0 : 0.9);
+                        } else {
+                            // Noche: additive para el glow
+                            pts.material.blending = THREE.AdditiveBlending;
+                            pts.material.opacity  = (isHeat ? 0.95 : 0.65);
+                        }
+                    });
+                    // === AURORA AZUL HVAC — inyección de aire frío que sube y se oscurece ===
+                    // Halos: pulse suave, muy visible
+                    sceneObj.current.hvacInjMeshes?.forEach(h => {
+                        const ph = t + h.userData.phase;
+                        const s = 1 + 0.10 * Math.sin(ph * 0.9);
+                        h.scale.set(s, s, s);
+                    });
+                    // Ondas: suben del piso de la rejilla, se EXPANDEN mucho (cubren el shelter)
+                    // y cambian de color azul claro → azul oscuro simulando enfriamiento al ambiente
+                    const _hvacInjBright = new THREE.Color(0x60a5fa);   // Azul claro brillante (fresh cold)
+                    const _hvacInjDark   = new THREE.Color(0x1e3a8a);   // Azul oscuro (enfriando ambiente)
+                    sceneObj.current.hvacInjWaves?.forEach(w => {
+                        const u = ((t * 0.24 + w.userData.phase) % 1);
+                        // Rise up 2.2m desde inyección → llega cerca del techo
+                        w.position.y = w.userData.baseY + u * 2.2;
+                        // Escala CRECE MUCHO — la onda cubre gran parte del shelter al llegar arriba
+                        const sc = 1 + u * 4.5;
                         w.scale.set(sc, sc, sc);
-                        const peakOp = isHeat ? 0.55 : 0.22;
-                        w.material.opacity = (1 - u) * peakOp * Math.max(0, Math.sin(u * Math.PI));
+                        // Opacity: sine curve, peak en el medio
+                        const peakOp = 0.55;
+                        w.material.opacity = peakOp * Math.max(0, Math.sin(u * Math.PI));
+                        // Color: bright blue → dark blue lerp según altura
+                        w.material.color.copy(_hvacInjBright).lerp(_hvacInjDark, u);
                     });
 
                     // === PUERTAS abriéndose (door_open) — interpolación suave ===
@@ -4233,6 +4509,62 @@
                             puddle.scale.set(ripple, 1, ripple);
                         }
                     }
+                    // Shader volumétrico HVAC — actualizar tiempo para animar el noise
+                    if (sceneObj.current.hvacAirShaderMat) {
+                        sceneObj.current.hvacAirShaderMat.uniforms.uTime.value = t;
+                    }
+                    // Shader volumétrico VFD (calor emitido) — mismo pattern
+                    if (sceneObj.current.vfdHeatShaderMat) {
+                        sceneObj.current.vfdHeatShaderMat.uniforms.uTime.value = t;
+                    }
+                    // Shader de flujo de los streamtubes — bandas de brillo viajando por el tubo
+                    if (sceneObj.current.streamFlowMat) {
+                        sceneObj.current.streamFlowMat.uniforms.uTime.value = t;
+                    }
+                    // Cometas de streamlines — pulsos viajando por la curva (samples precomputados)
+                    // Día: color oscuro + blending normal (el blanco additive desaparece contra cielo claro)
+                    sceneObj.current.hvacColdComets?.forEach(c => {
+                        const ud = c.userData;
+                        if (!ud.samples) return;
+                        const u = ((t * ud.speed) + ud.phase) % 1;
+                        const si = Math.min(ud.samples.length - 1, Math.floor(u * (ud.samples.length - 1)));
+                        c.position.copy(ud.samples[si]);
+                        const fade = Math.max(0, Math.sin(u * Math.PI));
+                        if (_isDayNow) {
+                            c.material.blending = THREE.NormalBlending;
+                            c.material.color.setHex(0x0f172a);   // pip oscuro — contrasta contra el fondo claro
+                            c.material.opacity = 0.9 * fade;
+                        } else {
+                            c.material.blending = THREE.AdditiveBlending;
+                            c.material.color.setHex(0xffffff);
+                            c.material.opacity = 0.95 * fade;
+                        }
+                    });
+                    // Partículas (modo Partículas) — viajan por la misma curva, color JET según
+                    // su posición en el circuito (azul frío → verde/amarillo → rojo caliente)
+                    sceneObj.current.hvacColdParticles?.forEach(pts => {
+                        const ud = pts.userData;
+                        if (!ud.samples || !pts.geometry?.attributes?.position) return;
+                        const arr  = pts.geometry.attributes.position.array;
+                        const cols = pts.geometry.attributes.color?.array;
+                        const maxI = ud.samples.length - 1;
+                        for (let p = 0; p < ud.N; p++) {
+                            const u = ((t * 0.14 + ud.phases[p]) % 1);
+                            const si = Math.min(maxI, Math.floor(u * maxI));
+                            const pt = ud.samples[si];
+                            const seed = ud.seeds[p];
+                            arr[p * 3]     = pt.x + Math.sin(t * 2.0 + seed) * 0.13;
+                            arr[p * 3 + 1] = pt.y + Math.sin(t * 1.5 + seed * 1.3) * 0.09;
+                            arr[p * 3 + 2] = pt.z + Math.cos(t * 2.0 + seed) * 0.13;
+                            if (cols) {
+                                // Mismo perfil de temperatura que las streamlines (rojo en celda, amarillo en eyección)
+                                const jc = jetColor(tempProfile(u));
+                                cols[p * 3] = jc[0]; cols[p * 3 + 1] = jc[1]; cols[p * 3 + 2] = jc[2];
+                            }
+                        }
+                        pts.geometry.attributes.position.needsUpdate = true;
+                        if (pts.geometry.attributes.color) pts.geometry.attributes.color.needsUpdate = true;
+                    });
                     // Aire visible — perimeter wisps siempre + door streams solo con door_open
                     sceneObj.current.perimeterWisps?.forEach(w => {
                         const cycle = (t * w.userData.speed + w.userData.phase) % 1;
@@ -4242,6 +4574,77 @@
                         w.material.opacity = 0.32 * Math.min(fadeIn, fadeOut);
                         const sc = 0.35 + cycle * 0.9;
                         w.scale.set(sc, sc, 1);
+                    });
+                    // === Glow de fondo HVAC — capas estáticas con pulse muy sutil ===
+                    // Da el "campo de temperatura" ambiente: azul cerca de inyección, rojo cerca de retorno.
+                    sceneObj.current.hvacBgGlow?.forEach(g => {
+                        const u = g.userData;
+                        const pulse = 1 + 0.08 * Math.sin(t * 0.6 + u.phase);
+                        g.material.opacity = u.baseOp * pulse;
+                        g.scale.set(u.baseScale * (0.98 + 0.04 * pulse), u.baseScale * (0.98 + 0.04 * pulse), 1);
+                    });
+                    // === Polvo fino HVAC — 2 tipos de partículas: rising (inyección) + absorbed (retorno) ===
+                    sceneObj.current.hvacAirPuffs?.forEach(p => {
+                        const u = p.userData;
+                        const cycle = (t * u.speed + u.phase) % 1;
+                        // ------- Partícula que sube con impulso desde INYECCIÓN -------
+                        if (u.kind === 'hvac-dust-up') {
+                            // Impulso: ease-out cuadrático → rápido al principio (sale con fuerza),
+                            // luego se calma (movimiento sereno). Simula el impulso real de la rejilla.
+                            const eased = 1 - Math.pow(1 - cycle, 1.7);
+                            const localY = u.yStart + eased * u.yRange;
+                            // Wobble sereno — pequeño y suave, mayor amplitud a mitad del recorrido
+                            const wf = Math.sin(cycle * Math.PI);
+                            const wX = Math.sin(cycle * u.wobbleFreq * 6.28 + t * 0.9 + u.wobblePhase) * u.wobbleAmp * wf;
+                            const wZ = Math.cos(cycle * u.wobbleFreq * 6.28 + t * 0.7 + u.wobblePhase * 0.7) * u.wobbleAmp * 1.4 * wf;
+                            p.position.set(u.baseX + u.jitterX + wX, localY, u.baseZ + u.jitterZ + wZ);
+                            // Color en gradiente por Y (basado en 'eased', no cycle → más natural)
+                            const c = p.material.color;
+                            const t2 = eased;
+                            if (t2 < 0.30) {
+                                c.setRGB(0.15, 0.39, 0.92);
+                            } else if (t2 < 0.55) {
+                                const k = (t2 - 0.30) / 0.25;
+                                c.setRGB(0.15 + k * 0.83, 0.39 + k * 0.36, 0.92 - k * 0.77);
+                            } else if (t2 < 0.80) {
+                                const k = (t2 - 0.55) / 0.25;
+                                c.setRGB(0.98, 0.75 - k * 0.16, 0.15 + k * 0.02);
+                            } else {
+                                const k = (t2 - 0.80) / 0.20;
+                                c.setRGB(0.98 - k * 0.12, 0.59 - k * 0.43, 0.17 - k * 0.02);
+                            }
+                            // Escala apenas crece — que se noten CHICAS
+                            const sc = u.scale * (0.90 + eased * 0.35);
+                            p.scale.set(sc, sc, 1);
+                            // Opacidad: nace fuerte por el impulso, decae gradualmente al ser absorbida
+                            const fadeIn  = Math.min(1, cycle * 8);
+                            const fadeOut = Math.min(1, (1 - cycle) * 3);
+                            p.material.opacity = 0.70 * Math.min(fadeIn, fadeOut);
+                        }
+                        // ------- Partícula roja que es ABSORBIDA por el RETORNO -------
+                        else if (u.kind === 'hvac-dust-absorb') {
+                            // Nace lejos del retorno y converge hacia él (efecto succión).
+                            // Ease-in: parte lenta, acelera al final (el retorno "la traga").
+                            const eased = Math.pow(cycle, 1.8);
+                            const startX = u.baseX + u.originX;
+                            const startZ = u.baseZ + u.originZ;
+                            const startY = u.targetY + u.originYOff;
+                            const localX = startX + (u.targetX - startX) * eased;
+                            const localY = startY + (u.targetY - startY) * eased;
+                            const localZ = startZ + (u.targetZ - startZ) * eased;
+                            p.position.set(localX, localY, localZ);
+                            // Color: siempre rojo/naranja intenso (es aire caliente siendo succionado)
+                            const c = p.material.color;
+                            const t2 = 1 - cycle;   // Al inicio más naranja, al final más rojo profundo
+                            c.setRGB(0.86 + t2 * 0.10, 0.15 + t2 * 0.20, 0.15);
+                            // Escala se achica al acercarse al retorno (comprimida al ser succionada)
+                            const sc = u.scale * (1.2 - cycle * 0.5);
+                            p.scale.set(sc, sc, 1);
+                            // Opacidad: fade in rápido, se apaga al ser absorbida (fade out fuerte al final)
+                            const fadeIn  = Math.min(1, cycle * 5);
+                            const fadeOut = Math.min(1, (1 - cycle) * 2.5);
+                            p.material.opacity = 0.55 * Math.min(fadeIn, fadeOut);
+                        }
                     });
                     // Door streams: turbulencia perpendicular + elongación en dir del flujo → look de chorro real
                     sceneObj.current.doorStreams?.forEach(s => {
@@ -4331,7 +4734,7 @@
             useEffect(() => {
                 const obj = sceneObj.current;
                 if (!obj) return;
-                const { THREE, hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, roomW, roomD, roomH, masterOutputPos } = obj;
+                const { THREE, scene, hvacGroup, presGroup, esclavoGroup, cableGroup, centralizedGroup, roomW, roomD, roomH, masterOutputPos } = obj;
                 const lineMat = new THREE.LineBasicMaterial({ color: TH_COLOR.line });
 
                 const clearGroup = (g) => {
@@ -4344,6 +4747,28 @@
                         g.remove(c);
                     }
                 };
+                // Cleanup streamlines y cometas de la iteración anterior (viven en scene, no en un group)
+                if (sceneObj.current?.hvacColdStreamlines?.length) {
+                    sceneObj.current.hvacColdStreamlines.forEach(m => {
+                        m.geometry?.dispose();
+                        scene.remove(m);
+                    });
+                    sceneObj.current.hvacColdStreamlines.length = 0;
+                }
+                if (sceneObj.current?.hvacColdComets?.length) {
+                    sceneObj.current.hvacColdComets.forEach(c => {
+                        c.geometry?.dispose();
+                        scene.remove(c);
+                    });
+                    sceneObj.current.hvacColdComets.length = 0;
+                }
+                if (sceneObj.current?.hvacColdParticles?.length) {
+                    sceneObj.current.hvacColdParticles.forEach(p => {
+                        p.geometry?.dispose();
+                        scene.remove(p);
+                    });
+                    sceneObj.current.hvacColdParticles.length = 0;
+                }
                 clearGroup(hvacGroup);
                 clearGroup(presGroup);
                 clearGroup(esclavoGroup);
@@ -4387,6 +4812,13 @@
                 const presAssignments = presUnits.map((u, i) => ({ wall: 'east', along: presZs[i], idx: i }));
                 const n = hvacUnits.length;
                 const hvacInfo = []; // {wall, alongCoord, canon values..., idx}
+                const hvacColdStreamlines = [];   // Streamtubes (TubeGeometry) por HVAC — modo Trayectorias
+                const hvacColdComets      = [];   // Esferas animadas que viajan a lo largo de las streamlines
+                const hvacColdParticles   = [];   // THREE.Points por HVAC — modo Partículas (usan MISMAS curvas)
+                const hvacAirPuffs = []; // (legacy, no usado ahora)
+                const hvacBgGlow   = []; // (legacy, no usado ahora)
+                const hvacInjMeshes = []; // Halo + núcleo azul de la INYECCIÓN de aire frío
+                const hvacInjWaves  = []; // Ondas expansivas azules que suben y oscurecen
 
                 // === makeAlertSprite / getFaultTexture / makeIdLabel viven ahora en el INIT useEffect (ver arriba).
                 //     Se leen de sceneObj.current para evitar el ReferenceError silencioso.
@@ -4670,8 +5102,32 @@
                         if (arrowDown) arrow.rotation.x = Math.PI;
                         g.add(arrow);
                     };
-                    buildInteriorGrille(y + 0.95, 0.45, 0.85, TH_COLOR.cable, true);   // INYECCIÓN (arriba, flecha ↓)
-                    buildInteriorGrille(y - 0.95, 0.45, 0.85, TH_COLOR.heat,  false);  // RETORNO   (abajo, flecha ↑)
+                    // SETUP FÍSICO REAL: aire frío inyectado desde ABAJO (rejilla azul), aire caliente
+                    // absorbido por ARRIBA (rejilla roja). El aire sube naturalmente al calentarse.
+                    buildInteriorGrille(y + 0.95, 0.45, 0.85, TH_COLOR.hvacHot,  false);  // RETORNO (arriba, absorbe calor, flecha ↑)
+                    buildInteriorGrille(y - 0.95, 0.45, 0.85, TH_COLOR.hvacCold, false);  // INYECCIÓN (abajo, aire frío sale, flecha ↑ por arriba de la rejilla)
+
+                    // === AIRE VISIBLE HVAC — SHADER VOLUMÉTRICO ===
+                    // Plano vertical entre las 2 rejillas con material shader custom.
+                    // El shader renderiza noise fbm animado hacia arriba con gradiente vertical
+                    // de color (azul abajo → amarillo/naranja → rojo arriba). Look de vapor continuo,
+                    // no de partículas discretas. DoubleSide = visible desde ambos lados.
+                    // Se usan 2 planos CRUZADOS en 90° para que el efecto se vea desde cualquier ángulo.
+                    // === HVAC AIRE — ESFUMADO SHADER VOLUMÉTRICO ===
+                    // Elipsoide 3D con shader que va de azul (INJ abajo) a rojo (RET arriba).
+                    // Mismo estilo "esfumado" que los VFDs pero con gradiente frío→caliente.
+                    const _airShaderMat = sceneObj.current?.hvacAirShaderMat;
+                    if (_airShaderMat) {
+                        const asX_esfumado = interiorX + (-outSign) * 0.55;
+                        const airEsfumado = new THREE.Mesh(
+                            new THREE.SphereGeometry(1, 28, 20),
+                            _airShaderMat
+                        );
+                        airEsfumado.scale.set(0.55, 1.05, 0.55);
+                        airEsfumado.position.set(asX_esfumado, y, z);
+                        airEsfumado.renderOrder = 5;
+                        g.add(airEsfumado);
+                    }
 
                     g.userData = { fan, spinSpeed: spin, stateBand, unitId: u.id };
                     // === Ícono de ALERTA flotando (visible solo con activeFaults[u.id]) ===
@@ -4706,6 +5162,165 @@
 
                 // Construir HVACs en paredes largas (norte/sur) según asignación
                 hvacAssignments.forEach(a => buildHvac(a.idx, a.wall, a.along));
+
+                // ═══════════════════════════════════════════════════════════════════
+                // STREAMLINES CFD — circuito térmico completo con colormap JET
+                // ═══════════════════════════════════════════════════════════════════
+                // Estética ParaView/OpenFOAM: MUCHAS líneas FINAS con gradiente de color
+                // mapeado a temperatura A LO LARGO de cada curva (vertex colors):
+                //   • t=0  → AZUL   — aire frío saliendo de la rejilla INJ (inferior)
+                //   • t≈0.5 → VERDE/AMARILLO — templándose al pasar por las celdas VFD
+                //   • t=1  → ROJO   — aire caliente entrando a la rejilla RET (superior)
+                // El recorrido físico: INJ (abajo) → bajo por la sala → cara de la celda
+                // VFD (intercambio de calor) → sube por encima de la celda → arco de
+                // regreso → RET (rejilla superior del mismo HVAC). depthTest normal para
+                // integrarse en la escena como en un post-proceso CFD real.
+                // Material de tubo ANIMADO: bandas de brillo fluyendo a lo largo del tubo
+                // (uv.x = 0 en INJ → 1 en RET). Respeta el gradiente jet de vertex colors y
+                // le superpone pulsos asimétricos tipo cometa que viajan en la dirección del
+                // flujo — el look clásico de streamlines animadas de ParaView/CFD.
+                const _streamMat = new THREE.ShaderMaterial({
+                    uniforms: { uTime: { value: 0 } },
+                    vertexColors: true,
+                    vertexShader: `
+                        varying vec2 vUv;
+                        varying vec3 vCol;
+                        void main() {
+                            vUv = uv;
+                            #ifdef USE_COLOR
+                            vCol = color;
+                            #else
+                            vCol = vec3(1.0);
+                            #endif
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float uTime;
+                        varying vec2 vUv;
+                        varying vec3 vCol;
+                        void main() {
+                            // Bandas viajando hacia uv.x creciente (INJ → RET), 14 pulsos por tubo
+                            float band = fract(vUv.x * 14.0 - uTime * 0.9);
+                            // Pulso asimétrico: frente definido, cola que se desvanece
+                            float pulse = smoothstep(0.0, 0.22, band) * (1.0 - smoothstep(0.22, 1.0, band));
+                            float bright = 0.70 + 0.60 * pulse;
+                            gl_FragColor = vec4(vCol * bright, 1.0);
+                        }
+                    `
+                });
+                const _cometMat = new THREE.MeshBasicMaterial({
+                    color: '#ffffff', transparent: true, opacity: 1.0,
+                    blending: THREE.AdditiveBlending, depthWrite: false
+                });
+                // Partículas (modo Partículas): mismas curvas, color por temperatura via vertexColors
+                const _coldParticleMat = new THREE.PointsMaterial({
+                    vertexColors: true, size: 0.09, sizeAttenuation: true,
+                    transparent: true, opacity: 0.95, depthWrite: false
+                });
+                const _TUBE_SEGS = 120;      // segmentos tubulares (resolución del gradiente)
+                const _TUBE_RSEGS = 6;       // segmentos radiales (fino, CFD-like)
+                const _vfdTopY   = 2.21 + 2.0;   // techo de las celdas VFD (eqH=2.0 sobre piso 2.21)
+                hvacInfo.forEach(hp => {
+                    let injX, injZ, retX, retZ, intDirX, intDirZ;
+                    const yc = hp.y;
+                    if (hp.wall === 'east') {
+                        injX = roomW/2 - 0.15; retX = injX;
+                        injZ = hp.alongCoord;  retZ = injZ;
+                        intDirX = -1; intDirZ = 0;
+                    } else if (hp.wall === 'north') {
+                        injX = hp.alongCoord;  retX = injX;
+                        injZ = -roomD/2 + 0.15; retZ = injZ;
+                        intDirX = 0; intDirZ = 1;
+                    } else {
+                        injX = hp.alongCoord;  retX = injX;
+                        injZ = roomD/2 - 0.15;  retZ = injZ;
+                        intDirX = 0; intDirZ = -1;
+                    }
+                    const N_STREAMS = 6;
+                    const grilleWidth = 0.72;
+                    for (let s = 0; s < N_STREAMS; s++) {
+                        const spread = (s / (N_STREAMS - 1) - 0.5) * grilleWidth;
+                        const jit = Math.sin(s * 12.9898) * 0.18;   // jitter determinista por línea
+                        let sx = injX, sz = injZ;
+                        if (hp.wall === 'east') sz += spread; else sx += spread;
+                        // Punto de "intercambio de calor": la cara de la celda VFD más cercana.
+                        // Las celdas ocupan x ∈ [-3.25, 3.25] en dos filas z ≈ ±0.5.
+                        let tx, tzFace;
+                        if (hp.wall === 'east') {
+                            tx = 3.35; tzFace = Math.max(-1.5, Math.min(1.5, sz * 0.3));
+                        } else {
+                            tx = Math.max(-3.1, Math.min(3.1, sx + jit));
+                            tzFace = -intDirZ * 0.95;   // cara de la fila de celdas del lado del HVAC
+                        }
+                        // Waypoints del circuito térmico:
+                        const P0 = new THREE.Vector3(sx, yc - 0.95, sz);                                       // INJ (azul)
+                        const P1 = new THREE.Vector3(
+                            sx + intDirX * 1.1, yc - 1.05, sz + intDirZ * 1.1);                                // baja y entra a la sala
+                        const P2 = new THREE.Vector3(tx, yc - 0.90, tzFace + intDirZ * -0.15 + intDirX * -0.15); // llega a la cara de la celda (bajo)
+                        const P3 = new THREE.Vector3(tx, _vfdTopY + 0.14 + s * 0.05, tzFace * 0.55);           // sube pegado a la celda (calienta) — altura variada por línea
+                        const P4 = new THREE.Vector3(
+                            (tx + retX) * 0.5, _vfdTopY + 0.52 + s * 0.05,
+                            (tzFace * 0.55 + retZ) * 0.5);                                                     // arco alto de regreso — abanico vertical para lectura desde arriba
+                        const P5 = new THREE.Vector3(retX, yc + 0.95, retZ);                                   // RET (rojo)
+                        const curve = new THREE.CatmullRomCurve3([P0, P1, P2, P3, P4, P5], false, 'catmullrom', 0.35);
+                        // Precomputar samples para animación eficiente (comets + partículas)
+                        const curveSamples = curve.getSpacedPoints(200);
+                        // — Streamtube FINO con VERTEX COLORS (gradiente jet a lo largo) —
+                        const streamGeo = new THREE.TubeGeometry(curve, _TUBE_SEGS, 0.016, _TUBE_RSEGS, false);
+                        const vCount = streamGeo.attributes.position.count;
+                        const vCols = new Float32Array(vCount * 3);
+                        const perRing = _TUBE_RSEGS + 1;
+                        for (let v = 0; v < vCount; v++) {
+                            const ring = Math.floor(v / perRing);
+                            const tt = Math.min(1, ring / _TUBE_SEGS);
+                            // Perfil de temperatura: pico ROJO en la celda VFD, AMARILLO al entrar a la eyección
+                            const c = jetColor(tempProfile(tt));
+                            vCols[v * 3] = c[0]; vCols[v * 3 + 1] = c[1]; vCols[v * 3 + 2] = c[2];
+                        }
+                        streamGeo.setAttribute('color', new THREE.BufferAttribute(vCols, 3));
+                        const streamMesh = new THREE.Mesh(streamGeo, _streamMat);
+                        streamMesh.renderOrder = 4;
+                        scene.add(streamMesh);
+                        hvacColdStreamlines.push(streamMesh);
+                        // — Cometas chicos (pulsos de flujo, estilo flechas animadas ParaView) —
+                        for (let c = 0; c < 2; c++) {
+                            const comet = new THREE.Mesh(
+                                new THREE.SphereGeometry(0.05, 10, 8),
+                                _cometMat
+                            );
+                            comet.renderOrder = 6;
+                            comet.userData = {
+                                samples: curveSamples,
+                                phase: ((s * 0.23) + (c * 0.5)) % 1, speed: 0.16
+                            };
+                            scene.add(comet);
+                            hvacColdComets.push(comet);
+                        }
+                        // — Partículas (modo Partículas): fluyen por la MISMA curva, color jet por posición —
+                        const N_COLD = 80;
+                        const _colPos    = new Float32Array(N_COLD * 3);
+                        const _colColors = new Float32Array(N_COLD * 3);
+                        const _colPhases = new Float32Array(N_COLD);
+                        const _colSeeds  = new Float32Array(N_COLD);
+                        for (let p = 0; p < N_COLD; p++) {
+                            _colPhases[p] = Math.random();
+                            _colSeeds[p]  = Math.random() * 100;
+                            _colPos[p * 3]     = sx;
+                            _colPos[p * 3 + 1] = yc - 0.95;
+                            _colPos[p * 3 + 2] = sz;
+                            _colColors[p * 3 + 2] = 1.0;   // arranca azul
+                        }
+                        const _colGeo = new THREE.BufferGeometry();
+                        _colGeo.setAttribute('position', new THREE.BufferAttribute(_colPos, 3));
+                        _colGeo.setAttribute('color',    new THREE.BufferAttribute(_colColors, 3));
+                        const _colPoints = new THREE.Points(_colGeo, _coldParticleMat);
+                        _colPoints.frustumCulled = false;
+                        _colPoints.userData = { samples: curveSamples, phases: _colPhases, seeds: _colSeeds, N: N_COLD };
+                        scene.add(_colPoints);
+                        hvacColdParticles.push(_colPoints);
+                    }
+                });
 
                 // === PRESURIZADOR CASIBA 2002-EQM (gabinete alto y angosto, ventilador CENTRÍFUGO interno) ===
                 // Diferente al HVAC: NO tiene aspa axial visible en la cara.
@@ -5374,19 +5989,28 @@
                 const _c_wallZ_south =  roomD/2 - 0.08;
                 const _c_wallX_east  =  roomW/2 - 0.08;
                 const _c_wallX_west  = -roomW/2 + 0.08;
-                const _c_cableRadius = 0.055;   // MUCHO más grueso — cada caño carga 30 hilos (sensores + control)
-                const _c_bundleGap   = 0.08;    // separación vertical entre puntos de salida en el costado del tablero
-                // Cada cable sale a SU PROPIA altura en el costado del tablero (como puertos apilados)
+                const _c_cableRadius = 0.007;   // Cable real 5-8 hilos: ~1,4 cm de diámetro. Fino para que entren side-by-side en la bandeja
+                const _c_bundleGap   = 0.015;   // Separación LATERAL entre cables side-by-side dentro de la bandeja
+                // Cada cable va side-by-side (perpendicular a la pared) DENTRO de la bandeja, no apilados verticalmente
                 const _computeYOff = (idx, groupSize) => {
                     const raw = (idx - (groupSize - 1) / 2) * _c_bundleGap;
-                    return Math.max(-0.22, Math.min(0.22, raw));   // cap para que no supere el techo ni el piso del tablero
+                    return Math.max(-0.09, Math.min(0.09, raw));   // spread lateral: hasta 18 cm total dentro de bandeja ancha
                 };
                 // Hilos por equipo en el cálculo de metros lineales de HILO
-                const _WIRES_PER_EQUIP   = 30;   // 30 hilos por equipo — Central (15 hilos rojo control + 15 hilos verde sensores)
+                // Fórmulas reales de producción (fuente: libreta Ingeniería Ecocontrol 2026):
+                //   Central por equipo = 2 cables → Marcha (5 conductores) + Sensores (8 conductores) = 13 conductores totales
+                //   EcoMonitor         = 1 cable troncal Modbus con 4 conductores (A + B + GND + V)
+                const _WIRES_MARCHA_CENTRAL   = 5;    // Cable Marcha (rojo) — 5 conductores
+                const _WIRES_SENSORES_CENTRAL = 8;    // Cable Sensores (verde) — 8 conductores
+                const _WIRES_PER_EQUIP   = _WIRES_MARCHA_CENTRAL + _WIRES_SENSORES_CENTRAL;   // 13 conductores por equipo
                 const _WIRES_MODBUS_BUS  = 4;    // Modbus + alim = 4 hilos (A + B + GND + V) en un solo cable troncal
                 const _ECOMON_LOCAL_M    = 0;    // EcoMonitor NO cuenta el cableado local del esclavo al equipo (según cliente)
+                // Bandeja portacables Central: altura 2,70 m desde piso de shelter (fuente: instalación real Ecocontrol)
+                // Caño vertical Central: 1 m fijo desde bandeja al tablero de cada equipo
+                const _CANIO_PER_EQUIP_M = 1.0;  // Metros de caño vertical por equipo (bajada bandeja → tablero)
                 let   centralizadoTotalMeters = 0;
                 let   centralizadoCanalizMeters = 0;   // suma de largos individuales de los caños transparentes por equipo
+                let   _bandejaLargoTotal = 0;         // Largo total de bandeja (perimetral compartida, para reporter)
 
                 // Anchor points en los COSTADOS del master (master está en pared oeste, Z=0, mD=0.9)
                 // Salen POR LA CARA LATERAL a MEDIA ALTURA — se ve claramente que emerge por el costado
@@ -5552,34 +6176,44 @@
                     const _opp_offset = 0.50;   // mismo sideOffset del azul, aplicado al lado opuesto
                     const _caj2_offset = 0;   // cajita centrada en el equipo (ya no hay caj1 del bundle azul)
 
-                    // Helper: computa los waypoints del ruteo (compartido entre cables rojo/verde y el caño transparente)
-                    const _computeSecPts = (eq, yOff, sideKey) => {
-                        const bundleY = cableYCornisa + yOff;
-                        const startY  = _sec_faceY + yOff;
+                    // Helper: computa los waypoints del ruteo. Cables SIDE-BY-SIDE dentro de la bandeja
+                    // (offset LATERAL perpendicular a la pared, no vertical). Todos comparten el mismo Y.
+                    const _computeSecPts = (eq, lateralOff, sideKey) => {
+                        const bundleY = cableYCornisa;   // Todos los cables al mismo nivel (piso de bandeja)
+                        const startY  = _sec_faceY;
                         const startZ = (sideKey === 'north') ? _sec_facePosZ_north : _sec_facePosZ_south;
                         const startPt = new THREE.Vector3(_sec_X, startY, startZ);
+                        // Coord perpendicular a la pared: cables side-by-side dentro de la bandeja.
+                        // La bandeja tiene un inset de 3 cm respecto a la pared del cable (debe coincidir
+                        // con _bandejaInsetShift más adelante). Cables spread ±lateralOff alrededor del centro de la bandeja.
+                        const _bandejaInset = 0.03;
+                        const westX  = _c_wallX_west  + _bandejaInset + lateralOff;
+                        const northZ = _c_wallZ_north + _bandejaInset + lateralOff;
+                        const southZ = _c_wallZ_south - _bandejaInset - lateralOff;
+                        const eastX  = _c_wallX_east  - _bandejaInset - lateralOff;
                         let bypassBundlePt, bypassMidPt, caj2Pt;
                         if (eq.wall === 'north') {
-                            bypassBundlePt = new THREE.Vector3(eq.wpX + _opp_offset, bundleY, _c_wallZ_north);
+                            bypassBundlePt = new THREE.Vector3(eq.wpX + _opp_offset, bundleY, northZ);
                             bypassMidPt    = new THREE.Vector3(eq.wpX + _opp_offset, eq.y,   _c_wallZ_north);
                             caj2Pt         = new THREE.Vector3(eq.wpX + _caj2_offset, eq.y,  _c_wallZ_north);
                         } else if (eq.wall === 'south') {
-                            bypassBundlePt = new THREE.Vector3(eq.wpX - _opp_offset, bundleY, _c_wallZ_south);
+                            bypassBundlePt = new THREE.Vector3(eq.wpX - _opp_offset, bundleY, southZ);
                             bypassMidPt    = new THREE.Vector3(eq.wpX - _opp_offset, eq.y,   _c_wallZ_south);
                             caj2Pt         = new THREE.Vector3(eq.wpX - _caj2_offset, eq.y,  _c_wallZ_south);
                         } else {
-                            bypassBundlePt = new THREE.Vector3(_c_wallX_east, bundleY, eq.wpZ - _opp_offset);
+                            bypassBundlePt = new THREE.Vector3(eastX, bundleY, eq.wpZ - _opp_offset);
                             bypassMidPt    = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ - _opp_offset);
                             caj2Pt         = new THREE.Vector3(_c_wallX_east, eq.y,   eq.wpZ - _caj2_offset);
                         }
-                        const cornerZ = (sideKey === 'north') ? _c_wallZ_north : _c_wallZ_south;
+                        // Esquinas con offset lateral en la coordenada perpendicular a la pared destino
+                        const cornerZ = (sideKey === 'north') ? northZ : southZ;
                         const pts = [];
                         pts.push(startPt);
-                        pts.push(new THREE.Vector3(_c_wallX_west, startY, startZ));
-                        pts.push(new THREE.Vector3(_c_wallX_west, bundleY, startZ));
-                        pts.push(new THREE.Vector3(_c_wallX_west, bundleY, cornerZ));
+                        pts.push(new THREE.Vector3(westX, startY, startZ));           // Entra en la bandeja del oeste
+                        pts.push(new THREE.Vector3(westX, bundleY, startZ));          // Sube dentro de la bandeja
+                        pts.push(new THREE.Vector3(westX, bundleY, cornerZ));         // Va hacia la esquina
                         if (eq.wall === 'east') {
-                            pts.push(new THREE.Vector3(_c_wallX_east, bundleY, cornerZ));
+                            pts.push(new THREE.Vector3(eastX, bundleY, cornerZ));
                             pts.push(bypassBundlePt);
                         } else {
                             pts.push(bypassBundlePt);
@@ -5595,12 +6229,14 @@
                         const pts = _computeSecPts(eq, yOff, sideKey);
                         const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
                         const tube = new THREE.Mesh(
-                            new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.020, 8, false),
+                            new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.006, 8, false),
                             colorMat
                         );
                         tube.castShadow = true;
                         centralizedGroup.add(tube);
-                        // Metros lineales: cada caño rojo/verde carga _WIRES_PER_EQUIP/2 hilos
+                        // Metros de HILO (conductor) — Central usa cables gruesos (5+8=13 conductores/equipo).
+                        // Cada llamada corresponde a 1 cable (Marcha o Sensores). Como se llama 2 veces
+                        // por equipo, cada llamada aporta la MITAD de los conductores (13/2 = 6.5 promedio).
                         centralizadoTotalMeters += curve.getLength() * (_WIRES_PER_EQUIP / 2);
                     };
 
@@ -5620,13 +6256,16 @@
                         const yOffCenter = _computeYOff(pairIdxCenter, groupSize);
                         const pts = _computeSecPts(eq, yOffCenter, sideKey);
                         const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.0);
-                        // Radio 6.5 cm — envuelve red+green (bundleGap 8 cm + radios propios)
+                        // Conduit transparente per-equipo del modelo viejo — oculto ahora que la bandeja
+                        // portacables es el elemento visual principal. La curva sigue sirviendo para
+                        // el cálculo de metros de canalización perimetral.
                         const conduit = new THREE.Mesh(
-                            new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.065, 12, false),
+                            new THREE.TubeGeometry(curve, Math.max(64, pts.length * 12), 0.004, 8, false),
                             _c_conduitMat
                         );
+                        conduit.visible = false;
                         centralizedGroup.add(conduit);
-                        // Cada caño transparente CUENTA para canalización de Central (individual por equipo)
+                        // La curva se sigue midiendo para el cálculo de canalización perimetral
                         centralizadoCanalizMeters += curve.getLength();
                     };
 
@@ -5655,32 +6294,227 @@
                         caj2.position.set(cajX, eq.y, cajZ);
                         centralizedGroup.add(caj2);
                     });
+
+                    // === BANDEJA PORTACABLES + CAÑOS VERTICALES (solo modo Central) ===
+                    // Fuente: libreta Ecocontrol. Bandeja galvanizada perforada a ~2,70 m del piso
+                    // recorre las paredes perimetralmente. Se modela como canal abierto en U
+                    // (piso + 2 paredes laterales) para que los cables se vean adentro desde arriba.
+                    // Cables entran al canal por la abertura superior. Caños verticales de 1 m bajan al equipo.
+                    // NOTA: `_bandejaLargoTotal` está hoisted arriba (fuera del if) para que
+                    // el reporter pueda leerlo. Acá se resetea a 0 y se acumula segmento a segmento.
+                    _bandejaLargoTotal = 0;
+                    const _bandejaFloorY = cableYCornisa - 0.008;   // Piso de la bandeja apenas debajo de los cables
+                    const _bandejaMat = new THREE.MeshStandardMaterial({
+                        color: '#b8b8b8', metalness: 0.7, roughness: 0.55,
+                        transparent: true, opacity: 0.55, side: THREE.DoubleSide
+                    });
+                    const _canioMat = new THREE.MeshStandardMaterial({
+                        color: '#a8a8a8', metalness: 0.75, roughness: 0.5
+                    });
+                    const _bandejaCajitaMat = new THREE.MeshStandardMaterial({
+                        color: '#3a4658', metalness: 0.55, roughness: 0.45
+                    });
+                    const _bandejaWidth     = 0.22;   // Ancho interior del canal (22 cm — permite 18 cables side-by-side)
+                    const _bandejaFloorThk  = 0.008;  // Espesor plancha inferior
+                    const _bandejaWallThk   = 0.008;  // Espesor paredes laterales
+                    const _bandejaWallH     = 0.06;   // Alto de las paredes laterales (6 cm)
+                    // Shift interior: bandeja se corre hacia adentro del shelter para no atravesar la pared
+                    // (la pared del cable está a 8 cm de la pared real; bandeja de 22 cm ancho necesita 3 cm más)
+                    const _bandejaInsetShift = 0.03;
+
+                    // Paredes que efectivamente tienen equipos
+                    const _wallsUsed = new Set();
+                    allEquip.forEach(e => _wallsUsed.add(e.wall));
+
+                    // Helper: agrega un segmento de bandeja en U (piso + 2 paredes) entre 2 puntos
+                    // orientation: 'x' = tramo a lo largo de X, 'z' = tramo a lo largo de Z
+                    const _addBandejaSeg = (x1, z1, x2, z2, orientation) => {
+                        const centerX = (x1 + x2) / 2;
+                        const centerZ = (z1 + z2) / 2;
+                        // Acumular el largo REAL de este segmento (sin el +0.02 de solape en esquinas)
+                        _bandejaLargoTotal += (orientation === 'x')
+                            ? Math.abs(x2 - x1)
+                            : Math.abs(z2 - z1);
+                        const _addMesh = (geom, x, y, z) => {
+                            const m = new THREE.Mesh(geom, _bandejaMat);
+                            m.position.set(x, y, z);
+                            m.castShadow = m.receiveShadow = true;
+                            centralizedGroup.add(m);
+                        };
+                        if (orientation === 'x') {
+                            const lenX = Math.abs(x2 - x1) + 0.02;
+                            // Piso del canal
+                            _addMesh(new THREE.BoxGeometry(lenX, _bandejaFloorThk, _bandejaWidth),
+                                     centerX, _bandejaFloorY, centerZ);
+                            // Pared lateral hacia Z-
+                            _addMesh(new THREE.BoxGeometry(lenX, _bandejaWallH, _bandejaWallThk),
+                                     centerX, _bandejaFloorY + _bandejaWallH/2, centerZ - _bandejaWidth/2);
+                            // Pared lateral hacia Z+
+                            _addMesh(new THREE.BoxGeometry(lenX, _bandejaWallH, _bandejaWallThk),
+                                     centerX, _bandejaFloorY + _bandejaWallH/2, centerZ + _bandejaWidth/2);
+                        } else {
+                            const lenZ = Math.abs(z2 - z1) + 0.02;
+                            // Piso del canal
+                            _addMesh(new THREE.BoxGeometry(_bandejaWidth, _bandejaFloorThk, lenZ),
+                                     centerX, _bandejaFloorY, centerZ);
+                            // Pared lateral hacia X-
+                            _addMesh(new THREE.BoxGeometry(_bandejaWallThk, _bandejaWallH, lenZ),
+                                     centerX - _bandejaWidth/2, _bandejaFloorY + _bandejaWallH/2, centerZ);
+                            // Pared lateral hacia X+
+                            _addMesh(new THREE.BoxGeometry(_bandejaWallThk, _bandejaWallH, lenZ),
+                                     centerX + _bandejaWidth/2, _bandejaFloorY + _bandejaWallH/2, centerZ);
+                        }
+                    };
+
+                    // Posición inset ajustada para que la bandeja quede totalmente adentro del shelter
+                    const _bWestX  = _c_wallX_west  + _bandejaInsetShift;
+                    const _bEastX  = _c_wallX_east  - _bandejaInsetShift;
+                    const _bNorthZ = _c_wallZ_north + _bandejaInsetShift;
+                    const _bSouthZ = _c_wallZ_south - _bandejaInsetShift;
+
+                    // Segmentos oeste (desde master hasta las esquinas donde arrancan las otras paredes)
+                    if (_wallsUsed.has('north')) {
+                        _addBandejaSeg(_bWestX, 0, _bWestX, _bNorthZ, 'z');
+                    }
+                    if (_wallsUsed.has('south')) {
+                        _addBandejaSeg(_bWestX, 0, _bWestX, _bSouthZ, 'z');
+                    }
+                    // Pared norte (paralela al costado largo)
+                    if (_wallsUsed.has('north')) {
+                        _addBandejaSeg(_bWestX, _bNorthZ, _bEastX, _bNorthZ, 'x');
+                    }
+                    // Pared sur
+                    if (_wallsUsed.has('south')) {
+                        _addBandejaSeg(_bWestX, _bSouthZ, _bEastX, _bSouthZ, 'x');
+                    }
+                    // Pared este (si hay equipos ahí, aunque en el escenario típico están en costados)
+                    if (_wallsUsed.has('east')) {
+                        _addBandejaSeg(_bEastX, _bNorthZ, _bEastX, _bSouthZ, 'z');
+                    }
+
+                    // Soportes de la bandeja (angulitos que la sostienen contra el techo cada ~2m)
+                    const _soporteMat = new THREE.MeshStandardMaterial({
+                        color: '#888', metalness: 0.7, roughness: 0.5
+                    });
+                    const _addSoporte = (x, z) => {
+                        const soporte = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.03, 0.20, 0.03),
+                            _soporteMat
+                        );
+                        soporte.position.set(x, _bandejaFloorY + _bandejaWallH + 0.10, z);
+                        centralizedGroup.add(soporte);
+                    };
+                    // Un soporte cada ~2 m a lo largo de paredes norte/sur
+                    if (_wallsUsed.has('north')) {
+                        for (let x = _c_wallX_east - roomW + 0.5; x <= _c_wallX_east - 0.5; x += 2) {
+                            _addSoporte(x, _bNorthZ);
+                        }
+                    }
+                    if (_wallsUsed.has('south')) {
+                        for (let x = _c_wallX_east - roomW + 0.5; x <= _c_wallX_east - 0.5; x += 2) {
+                            _addSoporte(x, _bSouthZ);
+                        }
+                    }
+
+                    // === CAÑOS EN L: BAJAN AL COSTADO DE LA REJILLA Y DOBLAN A LA CAJA DE PASO ===
+                    // Recorrido de cada caño:
+                    //   1) Vertical DESDE la bandeja hacia abajo, al COSTADO de la rejilla (sideOffset 0.48 m)
+                    //   2) Codo 90° a la altura de la caja de paso (aproximadamente eq.y)
+                    //   3) Horizontal hacia la caja de paso que está EN EL MEDIO entre las 2 rejillas
+                    // La caja de paso ya existe como `caj2` (definida más arriba en el bloque de cables rojo/verde).
+                    const _canioRadius = 0.020;
+                    const _canioSideOffset = 0.48;   // Corrimiento lateral para esquivar la rejilla
+                    allEquip.forEach(eq => {
+                        // Segmento vertical al costado del equipo — MISMO LADO que los cables rojo/verde
+                        // (convención `_opp_offset` del ruteo secundario) para evitar mostrar 2 canalizaciones
+                        //   norte → +X (mismo lado que cables), sur → -X, este → -Z
+                        let sideX, sideZ, cajaX, cajaZ;
+                        if (eq.wall === 'north') {
+                            sideX = eq.wpX + _canioSideOffset; sideZ = _bNorthZ;
+                            cajaX = eq.wpX;                    cajaZ = _c_wallZ_north;
+                        } else if (eq.wall === 'south') {
+                            sideX = eq.wpX - _canioSideOffset; sideZ = _bSouthZ;
+                            cajaX = eq.wpX;                    cajaZ = _c_wallZ_south;
+                        } else {
+                            sideX = _bEastX;                   sideZ = eq.wpZ - _canioSideOffset;
+                            cajaX = _c_wallX_east;             cajaZ = eq.wpZ;
+                        }
+
+                        // Waypoints de la L: attach (bandeja) → knee (codo al costado) → caja de paso
+                        const attach = new THREE.Vector3(sideX, _bandejaFloorY - 0.005, sideZ);
+                        const knee   = new THREE.Vector3(sideX, eq.y + 0.06,             sideZ);
+                        const intoC  = new THREE.Vector3(cajaX, eq.y,                    cajaZ);
+                        const curve  = new THREE.CatmullRomCurve3([attach, knee, intoC], false, 'catmullrom', 0.5);
+                        const canio  = new THREE.Mesh(
+                            new THREE.TubeGeometry(curve, 48, _canioRadius, 10, false),
+                            _canioMat
+                        );
+                        canio.castShadow = true;
+                        centralizedGroup.add(canio);
+                    });
+
+                    // === CANALIZACIÓN CENTRAL SEGÚN LIBRETA ECOCONTROL ===
+                    // Central Canalización = Bandeja (compartida) + Caño (1 m × N equipos)
+                    // Reemplaza el viejo `centralizadoCanalizMeters` que double-counteaba el perímetro
+                    // sumando los recorridos individuales de cada equipo. La bandeja se recorre 1 vez,
+                    // no N veces.
+                    centralizadoCanalizMeters = _bandejaLargoTotal + allEquip.length * _CANIO_PER_EQUIP_M;
                 }
 
-                // === MEDIR METROS DE HILO ECOMONITOR ===
-                // Troncal Modbus: solo 2 hilos (A/B) recorren TODO el troncal.
-                // Cada equipo tiene ~3 m de cableado LOCAL con 30 hilos (sensores + control).
-                // EcoMonitor: TRONCAL Modbus + BAJADAS T-tap por cada esclavo (todo con 4 hilos Modbus).
-                // Con más equipos → más bajadas → más metros de cable.
-                let ecomonitorTotalMeters = (ecomonitorTrunkMeters + ecomonitorStubsMetersOuter) * _WIRES_MODBUS_BUS;
+                // === MEDIR METROS DE CABLE ECOMONITOR ===
+                // Fuente: libreta Ecocontrol. EcoMonitor usa 3 tipos de cable:
+                //   • Bus dato (Modbus, 4 conductores) — 1 cable troncal que recorre TODO el shelter
+                //     con bends internos ≈ canalización × 1.28 (aprox 28% más largo por curvas)
+                //   • Marcha (5 conductores) — cable local corto a cada equipo, ~1.1 m × N
+                //   • Sensores (8 conductores) — cable local a cada equipo, ~1.8 m × N
+                // Total cable EcoMonitor = bus dato + marcha + sensores
+                const _ECO_BUS_BEND_FACTOR   = 1.28;   // Bends internos del cable troncal
+                const _ECO_MARCHA_M_PER_EQ   = 1.1;    // Metros de cable Marcha local por equipo
+                const _ECO_SENSORES_M_PER_EQ = 1.8;    // Metros de cable Sensores local por equipo
+                const _ecoCanalizPrelim   = ecomonitorTrunkMeters + esclavoData.length * 1.0;
+                const _ecoBusDatoCable    = _ecoCanalizPrelim * _ECO_BUS_BEND_FACTOR;
+                const _ecoMarchaCable     = esclavoData.length * _ECO_MARCHA_M_PER_EQ;
+                const _ecoSensoresCable   = esclavoData.length * _ECO_SENSORES_M_PER_EQ;
+                let ecomonitorTotalMeters = _ecoBusDatoCable + _ecoMarchaCable + _ecoSensoresCable;
 
                 // Guardar refs para el toggle useEffect
                 obj.esclavoAssemblies = esclavoData.map(e => e.assembly);
+                obj.hvacColdStreamlines = hvacColdStreamlines;
+                obj.hvacColdComets      = hvacColdComets;
+                obj.hvacColdParticles   = hvacColdParticles;
+                obj.streamFlowMat       = _streamMat;   // shader animado de los tubos (uTime en animate)
 
                 // Reportar metros al padre (Simulador) para que actualice el HUD.
-                // CANALIZACION:
-                //   - EcoMonitor: 1 caño Modbus troncal perimetral + 1 m de bajada por equipo
-                //       ecoCanaliz = trunk + N × 1 m
-                //   - Central: cada equipo lleva SU PROPIO caño individual (topología estrella).
-                //     La suma de todos los caños transparentes por equipo → mucho más que EcoMonitor.
-                //       centralCanaliz = Σ largo_del_caño_i por cada equipo
+                // CANALIZACION Central (modelo real Ecocontrol):
+                //   - Bandeja portacables perimetral a 2,70 m del piso, recorre paredes desde tablero central
+                //   - Caño vertical de 1 m fijo, baja desde bandeja al tablero de cada equipo
+                //   - Total canalización Central = bandeja + (N × 1 m)
+                //   - centralizadoCanalizMeters actual = suma de recorridos individuales de cables ≈ bandeja perimetral
+                //     (buena aproximación mientras no rehacemos la geometría 3D)
+                // CANALIZACION EcoMonitor:
+                //   - 1 caño Modbus troncal perimetral + 1 m de bajada por equipo
+                //     ecoCanaliz = trunk + N × 1 m
                 const _perDropMeters = 1.0;
                 const _ecoCanalizTotal = ecomonitorTrunkMeters + esclavoData.length * _perDropMeters;
+                // Estimación granular Central para reporte comercial (fórmulas reales)
+                const _centralCanioTotal = esclavoData.length * _CANIO_PER_EQUIP_M;
+                const _centralBandejaTotal = Math.max(0, centralizadoCanalizMeters - _centralCanioTotal);
                 const _meters = {
                     ecomonitor:              Math.round(ecomonitorTotalMeters       * 10) / 10,
                     centralizado:            Math.round(centralizadoTotalMeters     * 10) / 10,
                     ecomonitor_canaliz:      Math.round(_ecoCanalizTotal            * 10) / 10,
-                    centralizado_canaliz:    Math.round(centralizadoCanalizMeters   * 10) / 10
+                    centralizado_canaliz:    Math.round(centralizadoCanalizMeters   * 10) / 10,
+                    // Granulares Central (según libreta): bandeja + caño + marcha_hilo + sensores_hilo
+                    central_bandeja:         Math.round(_bandejaLargoTotal                                                                      * 10) / 10,
+                    central_canio:           Math.round(_centralCanioTotal                                                                      * 10) / 10,
+                    central_marcha_hilo:     Math.round((centralizadoTotalMeters / _WIRES_PER_EQUIP) * _WIRES_MARCHA_CENTRAL   * 10) / 10,
+                    central_sensores_hilo:   Math.round((centralizadoTotalMeters / _WIRES_PER_EQUIP) * _WIRES_SENSORES_CENTRAL * 10) / 10,
+                    // Granulares EcoMonitor (según libreta): bandeja=0, caño (canalización), bus_dato, marcha, sensores
+                    eco_bandeja:             0,
+                    eco_canio:               Math.round(_ecoCanalizPrelim                                                     * 10) / 10,
+                    eco_bus_dato_cable:      Math.round(_ecoBusDatoCable                                                      * 10) / 10,
+                    eco_marcha_cable:        Math.round(_ecoMarchaCable                                                       * 10) / 10,
+                    eco_sensores_cable:      Math.round(_ecoSensoresCable                                                     * 10) / 10
                 };
                 if (typeof onCableMeters === 'function') {
                     try { onCableMeters(_meters); } catch (err) { console.warn('onCableMeters failed', err); }
@@ -5699,6 +6533,11 @@
                 // Exponer hvacInfo/presInfo al animate loop para fault icons
                 obj.hvacInfo = hvacInfo;
                 obj.presInfo = presInfo;
+                // Exponer las partículas de aire para el animate loop (flujo cold→hot entre rejillas)
+                obj.hvacAirPuffs = hvacAirPuffs;
+                obj.hvacBgGlow   = hvacBgGlow;
+                obj.hvacInjMeshes = hvacInjMeshes;
+                obj.hvacInjWaves  = hvacInjWaves;
             }, [hvacUnits, presUnits]);
 
             // Toggle interior/exterior — actualiza opacidad de paredes
@@ -5745,6 +6584,21 @@
                 if (obj.secondaryMasterGroup) obj.secondaryMasterGroup.visible = !isEco;   // tablero secundario en Central
                 if (obj.esclavoAssemblies)    obj.esclavoAssemblies.forEach(a => { if (a) a.visible = isEco; });
             }, [topologyMode, hvacUnits, presUnits]);
+
+            // Toggle Partículas / Trayectorias — muestra u oculta cada modo
+            useEffect(() => {
+                const obj = sceneObj.current;
+                if (!obj) return;
+                const showStreams   = (flowMode === 'streamlines');
+                const showParticles = !showStreams;
+                // Modo Trayectorias: streamtubes cyan + cometas visibles
+                obj.hvacColdStreamlines?.forEach(m => { m.visible = showStreams; });
+                obj.hvacColdComets?.forEach(m      => { m.visible = showStreams; });
+                // Modo Partículas: partículas cyan (aire frío) + VFDs rojas
+                obj.hvacColdParticles?.forEach(pts => { pts.visible = showParticles; });
+                obj.heatWaves?.forEach(pts        => { pts.visible = showParticles; });
+                obj.heatMeshes?.forEach(h         => { h.visible  = showParticles; });
+            }, [flowMode, hvacUnits, presUnits]);
 
             // Demo de FALLA: pinta el equipo target de rojo cuando el corte está activo (solo Central)
             useEffect(() => {
@@ -5840,11 +6694,12 @@
             const [interiorVisible, setInteriorVisible] = useState(true); // ver interior vs exterior cerrado
             const [sceneTheme, setSceneTheme]     = useState('auto'); // 'auto' | 'day' | 'night' — tema de la escena 3D
             const [topologyMode, setTopologyMode] = useState('ecomonitor');
+            const [flowMode, setFlowMode]         = useState('particles'); // 'particles' | 'streamlines' — modo visual del flujo de aire y calor
             // Detecta si estamos en el simulador standalone (/simulador.html). Solo ahí mostramos
             // el toggle de topología Central/EcoMonitor. En la landing (EcoMonitor.html) se fuerza
             // EcoMonitor únicamente.
             const isStandaloneSim = useMemo(() => (
-                typeof window !== 'undefined' && /simulador/i.test(window.location.pathname)
+                typeof window !== 'undefined' && /simulador|ecomonitor-v2/i.test(window.location.pathname)
             ), []);
             const [cableMeters, setCableMeters]   = useState(null);   // { ecomonitor, centralizado } — se llena via callback desde Sala3D
             // Layout — priorizar sala 3D:
@@ -6354,6 +7209,10 @@
                             <button onClick={() => setInteriorVisible(true)}  className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Int</button>
                             <button onClick={() => setInteriorVisible(false)} className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${!interiorVisible ? 'bg-eco-lightgreen text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Ext</button>
                         </div>
+                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex" title="Modo de visualización del flujo de aire y calor">
+                            <button onClick={() => setFlowMode('particles')}   className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${flowMode === 'particles'   ? 'bg-eco-lightblue text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Partículas</button>
+                            <button onClick={() => setFlowMode('streamlines')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${flowMode === 'streamlines' ? 'bg-eco-lightblue text-eco-dark' : 'text-slate-400 hover:text-white'}`}>Trayectorias</button>
+                        </div>
                         <div className="bg-slate-950 border border-slate-800 rounded-lg p-0.5 flex" title="Tema escena">
                             <button onClick={() => setSceneTheme('auto')}  className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'auto'  ? 'bg-eco-blue text-white'      : 'text-slate-400 hover:text-white'}`}>Auto</button>
                             <button onClick={() => setSceneTheme('day')}   className={`px-1.5 py-1 rounded text-[10px] font-bold uppercase ${sceneTheme === 'day'   ? 'bg-amber-400 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Día</button>
@@ -6401,7 +7260,7 @@
                             const borderCol = topologyMode === 'ecomonitor' ? 'border-eco-lightgreen' : 'border-amber-400';
                             return (
                                 <>
-                                    <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${borderCol}`} title="Metros lineales de HILO (largo del caño × cantidad de hilos que lleva adentro — 15 hilos por caño rojo/verde, 2 hilos Modbus)">
+                                    <div className={`bg-slate-950 border rounded-lg px-2 py-1 flex items-center gap-1 ${borderCol}`} title="Central: metros de HILO (largo de cable × conductores adentro, 5 Marcha + 8 Sensores = 13 por equipo). EcoMonitor: metros de CABLE físico (canalización + 1 m de bajada por equipo, un solo cable Modbus con 4 conductores).">
                                         <span className="text-[9px] font-bold text-slate-500 uppercase">Cable</span>
                                         <span className="text-sm font-mono font-bold text-white">{cur.toFixed(0)}<span className="text-[9px] text-slate-400 ml-0.5">m</span></span>
                                         {topologyMode === 'ecomonitor' && other > 0 && (
@@ -6532,6 +7391,7 @@
                                 activeFaults={activeFaults}
                                 globalEvents={globalEvents}
                                 topologyMode={topologyMode}
+                                flowMode={flowMode}
                                 onCableMeters={setCableMeters}
                                 cutDemoActive={cutDemoActive}
                                 cutTargetId={cutTargetId}
